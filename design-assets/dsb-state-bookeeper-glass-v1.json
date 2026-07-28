@@ -1,0 +1,30 @@
+{
+  "runId": "bookeeper-glass-v1",
+  "fileKey": "QBgOyvkkkvVSAHaUrwwyCt",
+  "phase": "phase2",
+  "step": "blocked-by-figma-mcp-starter-call-limit",
+  "entities": {
+    "collections": {
+      "primitives": "VariableCollectionId:4:2",
+      "color": "VariableCollectionId:4:3",
+      "spacing": "VariableCollectionId:4:4"
+    },
+    "variables": {},
+    "pages": {},
+    "styles": {
+      "textCount": 7,
+      "effectCount": 3
+    },
+    "components": {},
+    "prototypeFrames": {}
+  },
+  "pendingValidations": [
+    "blocker:figma-mcp-starter-call-limit",
+    "phase2:pages",
+    "phase2:foundations-screenshot"
+  ],
+  "completedSteps": [
+    "phase0",
+    "phase1"
+  ]
+}
