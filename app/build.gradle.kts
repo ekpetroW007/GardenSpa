@@ -5,16 +5,20 @@ plugins {
     alias(libs.plugins.devtoolsKsp)
 }
 
+System.getenv("BOOKEEPER_BUILD_DIR")
+    ?.takeIf { it.isNotBlank() }
+    ?.let { layout.buildDirectory.set(file(it)) }
+
 android {
-    namespace = "com.example.myapplication"
+    namespace = "ru.samates.gardenspa"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.myapplication"
+        applicationId = "ru.samates.gardenspa"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 5
+        versionName = "1.0.4"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
     }
