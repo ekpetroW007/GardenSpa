@@ -32,6 +32,8 @@ import androidx.navigation.NavController
 import ru.samates.gardenspa.BookeeperApp
 import ru.samates.gardenspa.data.database.entity.GardenEntity
 import ru.samates.gardenspa.data.database.entity.PlantEntity
+import ru.samates.gardenspa.domain.PlantCard
+import ru.samates.gardenspa.domain.toPlantCards
 import ru.samates.gardenspa.presentation.navigation.AppDestinations
 import ru.samates.gardenspa.ui.theme.Cream
 import ru.samates.gardenspa.ui.theme.Danger
@@ -74,12 +76,13 @@ fun MyGardens(navController: NavController, innerPadding: PaddingValues) {
             item { EmptyGlassState("Создайте первый сад", "Объединяйте растения, процедуры и историю ухода") }
         }
         items(gardens, key = { it.id }) { garden ->
-            val gardenPlants = plants.filter { it.gardenId == garden.id }
+            val gardenPlantRows = plants.filter { it.gardenId == garden.id }
+            val gardenPlants = gardenPlantRows.toPlantCards()
             GardenGlassCard(
                 name = garden.name,
-                plants = gardenPlants,
+                plantCards = gardenPlants,
                 onDelete = { gardenPendingDelete = garden },
-                onExport = { exportGardenToFile(context, garden.name, gardenPlants) },
+                onExport = { exportGardenToFile(context, garden.name, gardenPlantRows) },
                 onPlantOpen = { navController.navigate(AppDestinations.plantDetails(it)) },
                 onAddPlant = { navController.navigate(AppDestinations.plantAdd(java.time.LocalDate.now().toString())) }
             )
@@ -101,7 +104,7 @@ fun MyGardens(navController: NavController, innerPadding: PaddingValues) {
 @Composable
 private fun GardenGlassCard(
     name: String,
-    plants: List<PlantEntity>,
+    plantCards: List<PlantCard>,
     onDelete: () -> Unit,
     onExport: () -> Unit,
     onPlantOpen: (Int) -> Unit,
@@ -120,14 +123,18 @@ private fun GardenGlassCard(
                 }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
-                Metric(plants.size.toString(), "растений")
-                Metric(plants.count { it.taskName.isNotBlank() }.toString(), "процедур")
-                Metric(plants.map { it.drugId }.filterNotNull().distinct().size.toString(), "препаратов")
+                Metric(plantCards.size.toString(), "растений")
+                Metric(plantCards.sumOf { it.procedures.size }.toString(), "процедур")
+                Metric(
+                    plantCards.flatMap { it.procedures }.map { it.drugId }.filterNotNull().distinct().size.toString(),
+                    "препаратов"
+                )
             }
-            if (plants.isEmpty()) {
+            if (plantCards.isEmpty()) {
                 Text("В этом саду пока нет растений", color = Mist)
             } else {
-                plants.take(4).forEach { plant ->
+                plantCards.take(4).forEach { card ->
+                    val plant = card.primary
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -137,13 +144,18 @@ private fun GardenGlassCard(
                     ) {
                         Column {
                             Text(plant.plantName, color = Cream, style = MaterialTheme.typography.titleMedium)
-                            Text(plant.taskName, color = Mist, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                card.procedures.joinToString(" · ") { it.taskName },
+                                color = Mist,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 2
+                            )
                         }
                         Text("›", color = Leaf300, style = MaterialTheme.typography.titleLarge)
                     }
                 }
             }
-            PrimaryAction("Добавить процедуру", onAddPlant, Modifier.fillMaxWidth())
+            PrimaryAction("Добавить растение", onAddPlant, Modifier.fillMaxWidth())
         }
     }
 }
@@ -156,7 +168,7 @@ private fun exportGardenToFile(context: Context, gardenName: String, plants: Lis
             appendLine("Дата экспорта: ${formatter.format(Date())}")
             appendLine("=".repeat(40))
             plants.forEach { appendLine("${it.plantName} — ${it.taskName} — ${it.drugName}") }
-            appendLine("Всего растений: ${plants.size}")
+            appendLine("Всего растений: ${plants.toPlantCards().size}")
         }
         val fileStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
         val file = File(context.getExternalFilesDir(null), "сад_${gardenName}_$fileStamp.txt")

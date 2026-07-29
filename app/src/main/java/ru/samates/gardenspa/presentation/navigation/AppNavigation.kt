@@ -63,6 +63,14 @@ fun AppNavigation(userViewModel: UserViewModel) {
                 selectedDate = backStackEntry.arguments?.getString("selectedDate").orEmpty()
             )
         }
+        composable(route = AppDestinations.PLANT_EDIT) { backStackEntry ->
+            val plantId = backStackEntry.arguments?.getString("plantId")?.toIntOrNull() ?: return@composable
+            PlantAdd(
+                navController = navController,
+                selectedDate = "",
+                plantId = plantId
+            )
+        }
         composable(route = AppDestinations.PLANT_DETAILS) { backStackEntry ->
             val plantId = backStackEntry.arguments?.getString("plantId")?.toIntOrNull() ?: return@composable
             PlantDetails(navController = navController, plantId = plantId)

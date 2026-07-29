@@ -42,6 +42,10 @@ class BookeeperRepository(
         plantDAO.deletePlant(id)
     }
 
+    suspend fun deletePlantCard(cardId: String) {
+        plantDAO.deletePlantCard(cardId)
+    }
+
     suspend fun insertTask(task: TaskEntity) {
         taskDAO.insertTask(task)
     }
@@ -60,6 +64,14 @@ class BookeeperRepository(
 
     suspend fun insertPlant(plant: PlantEntity) {
         plantDAO.insertPlant(plant)
+    }
+
+    suspend fun updatePlant(plant: PlantEntity) {
+        plantDAO.updatePlant(plant)
+    }
+
+    suspend fun replacePlantCard(cardId: String, plants: List<PlantEntity>) {
+        plantDAO.replacePlantCard(cardId, plants)
     }
 
     suspend fun insertProcedure(procedure: ProcedureEntity) {

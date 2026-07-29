@@ -47,6 +47,7 @@ fun GardenAdd(navController: NavController) {
                             value = name,
                             onValueChange = { name = it },
                             label = { Text("Название сада") },
+                            keyboardOptions = SentenceKeyboardOptions,
                             singleLine = true,
                             colors = glassTextFieldColors(),
                             shape = CompactGlassShape,

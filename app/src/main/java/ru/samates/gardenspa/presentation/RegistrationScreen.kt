@@ -43,6 +43,7 @@ fun Registration(navController: NavController, userViewModel: UserViewModel) {
                         value = login,
                         onValueChange = { login = it },
                         label = { Text("Имя") },
+                        keyboardOptions = SentenceKeyboardOptions,
                         singleLine = true,
                         colors = glassTextFieldColors(),
                         shape = CompactGlassShape,
