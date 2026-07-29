@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import ru.samates.gardenspa.BookeeperApp
+import ru.samates.gardenspa.data.database.entity.PlantEntity
 import ru.samates.gardenspa.domain.ScheduledTreatment
 import ru.samates.gardenspa.domain.recurrenceDescription
 import ru.samates.gardenspa.domain.scheduledTreatmentsOn
@@ -63,6 +64,7 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController) {
     val procedures by proceduresVm.procedures.collectAsState()
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var visibleMonth by remember { mutableStateOf(YearMonth.from(selectedDate)) }
+    var plantPendingDelete by remember { mutableStateOf<PlantEntity?>(null) }
     val treatments = scheduledTreatmentsOn(plants, procedures, selectedDate)
     val markedDates = (1..visibleMonth.lengthOfMonth()).mapNotNull { day ->
         visibleMonth.atDay(day).takeIf { scheduledTreatmentsOn(plants, procedures, it).isNotEmpty() }
@@ -102,7 +104,7 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController) {
             TreatmentCard(
                 treatment = treatment,
                 onOpen = { navController.navigate(AppDestinations.plantDetails(treatment.plant.id)) },
-                onDelete = { plantsVm.deletePlant(treatment.plant.id) },
+                onDelete = { plantPendingDelete = treatment.plant },
                 onComplete = {
                     proceduresVm.markCompleted(
                         treatment.plant.id,
@@ -123,6 +125,17 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController) {
                 }
             )
         }
+    }
+
+    plantPendingDelete?.let { plant ->
+        DeleteConfirmationDialog(
+            itemName = plant.plantName,
+            onConfirm = {
+                plantsVm.deletePlant(plant.id)
+                plantPendingDelete = null
+            },
+            onDismiss = { plantPendingDelete = null }
+        )
     }
 }
 

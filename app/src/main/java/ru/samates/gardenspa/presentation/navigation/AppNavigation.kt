@@ -44,6 +44,10 @@ fun AppNavigation(userViewModel: UserViewModel) {
         composable(route = AppDestinations.DRUG_ADD_ROUTE) {
             DrugAdd(navController = navController)
         }
+        composable(route = AppDestinations.DRUG_EDIT_ROUTE) { backStackEntry ->
+            val drugId = backStackEntry.arguments?.getString("drugId")?.toIntOrNull() ?: return@composable
+            DrugAdd(navController = navController, drugId = drugId)
+        }
         composable(route = AppDestinations.GARDEN_ADD) {
             GardenAdd(navController = navController)
         }

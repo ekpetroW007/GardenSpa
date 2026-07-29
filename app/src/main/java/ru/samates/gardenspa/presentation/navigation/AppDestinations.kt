@@ -5,6 +5,7 @@ object AppDestinations {
     const val MAINSCREEN_ROUTE = "mainScreen"
 
     const val DRUG_ADD_ROUTE = "drugsAddScreen"
+    const val DRUG_EDIT_ROUTE = "drugEditScreen/{drugId}"
 
     const val GARDEN_ADD = "gardenAddScreen"
 
@@ -16,4 +17,5 @@ object AppDestinations {
 
     fun plantAdd(selectedDate: String) = "plantAddScreen/$selectedDate"
     fun plantDetails(plantId: Int) = "plantDetails/$plantId"
+    fun drugEdit(drugId: Int) = "drugEditScreen/$drugId"
 }

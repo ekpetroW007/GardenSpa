@@ -19,9 +19,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -221,6 +223,39 @@ fun EmptyGlassState(title: String, description: String) {
             Text(description, color = Mist, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
         }
     }
+}
+
+@Composable
+fun DeleteConfirmationDialog(
+    itemName: String? = null,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Forest900,
+        titleContentColor = Cream,
+        textContentColor = Cream,
+        title = { Text("Подтверждение удаления") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Точно ли вы хотите это удалить?")
+                if (!itemName.isNullOrBlank()) {
+                    Text(itemName, color = Mist)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Да", color = ru.samates.gardenspa.ui.theme.Danger)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Нет", color = Leaf300)
+            }
+        }
+    )
 }
 
 @Composable

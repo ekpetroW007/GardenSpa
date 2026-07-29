@@ -13,7 +13,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -41,6 +43,8 @@ fun Drugs(navController: NavController, innerPadding: PaddingValues) {
     val drugsVm: DrugsViewmodel = viewModel(factory = DrugsViewmodelFactory(application.repository))
     val drugs by drugsVm.drugs.collectAsState()
     var query by remember { mutableStateOf("") }
+    var drugForActions by remember { mutableStateOf<DrugEntity?>(null) }
+    var drugPendingDelete by remember { mutableStateOf<DrugEntity?>(null) }
     val filtered = drugs.filter {
         query.isBlank() || it.name.contains(query, true) || it.purpose.contains(query, true)
     }
@@ -82,14 +86,40 @@ fun Drugs(navController: NavController, innerPadding: PaddingValues) {
                         "drugInfoScreen/${Uri.encode(drug.name)}/${Uri.encode(drug.purpose)}/${Uri.encode(drug.consumptionRate)}"
                     )
                 },
-                onDelete = { drugsVm.deleteDrug(drug.id) }
+                onManage = { drugForActions = drug }
             )
         }
+    }
+
+    drugForActions?.let { drug ->
+        DrugActionsDialog(
+            drug = drug,
+            onDismiss = { drugForActions = null },
+            onEdit = {
+                drugForActions = null
+                navController.navigate(AppDestinations.drugEdit(drug.id))
+            },
+            onDelete = {
+                drugForActions = null
+                drugPendingDelete = drug
+            }
+        )
+    }
+
+    drugPendingDelete?.let { drug ->
+        DeleteConfirmationDialog(
+            itemName = drug.name,
+            onConfirm = {
+                drugsVm.deleteDrug(drug.id)
+                drugPendingDelete = null
+            },
+            onDismiss = { drugPendingDelete = null }
+        )
     }
 }
 
 @Composable
-fun DrugCard(drug: DrugEntity, onOpen: () -> Unit, onDelete: () -> Unit) {
+fun DrugCard(drug: DrugEntity, onOpen: () -> Unit, onManage: () -> Unit) {
     GlassCard(Modifier.fillMaxWidth(), onClick = onOpen) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("◇", color = Leaf300, style = MaterialTheme.typography.headlineLarge)
@@ -98,7 +128,39 @@ fun DrugCard(drug: DrugEntity, onOpen: () -> Unit, onDelete: () -> Unit) {
                 Text(drug.purpose, color = Mist, maxLines = 2)
                 Text("Норма: ${drug.consumptionRate}", color = Leaf300, modifier = Modifier.padding(top = 6.dp))
             }
-            Text("×", color = Danger, modifier = Modifier.clickable(onClick = onDelete))
+            Text(
+                "✎",
+                color = Leaf300,
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.clickable(onClick = onManage)
+            )
         }
     }
+}
+
+@Composable
+private fun DrugActionsDialog(
+    drug: DrugEntity,
+    onDismiss: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = ru.samates.gardenspa.ui.theme.Forest900,
+        titleContentColor = Cream,
+        textContentColor = Cream,
+        title = { Text(drug.name) },
+        text = { Text("Что вы хотите сделать с препаратом?") },
+        confirmButton = {
+            TextButton(onClick = onEdit) {
+                Text("Редактировать", color = Leaf300)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDelete) {
+                Text("Удалить", color = Danger)
+            }
+        }
+    )
 }

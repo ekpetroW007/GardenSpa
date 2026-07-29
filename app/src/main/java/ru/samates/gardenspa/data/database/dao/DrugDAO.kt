@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import ru.samates.gardenspa.data.database.entity.DrugEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -11,6 +12,9 @@ import kotlinx.coroutines.flow.Flow
 interface DrugDAO {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDrug(drug: DrugEntity)
+
+    @Update
+    suspend fun updateDrug(drug: DrugEntity)
 
     @Query("SELECT * FROM drug")
     fun getAllDrugs(): Flow<List<DrugEntity>>

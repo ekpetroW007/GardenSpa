@@ -34,6 +34,30 @@ class DrugsViewmodel(
         }
     }
 
+    fun updateDrug(
+        id: Int,
+        name: String,
+        purpose: String,
+        consumptionRate: String,
+        onUpdated: () -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                repository.updateDrug(
+                    DrugEntity(
+                        id = id,
+                        name = name,
+                        purpose = purpose,
+                        consumptionRate = consumptionRate
+                    )
+                )
+                onUpdated()
+            } catch (e: Exception) {
+                Log.d("updateDrug", e.toString())
+            }
+        }
+    }
+
     fun deleteDrug(id: Int) {
         viewModelScope.launch {
             try {
