@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="432" height="432" viewBox="0 0 432 432">
+  <defs>
+    <linearGradient id="leafForeground" x1="236" y1="105" x2="302" y2="164" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E2F3BF"/>
+      <stop offset="1" stop-color="#A9CB7D"/>
+    </linearGradient>
+  </defs>
+
+  <path
+      d="M216 92C184 142 140 194 140 246C140 294 174 328 216 328C258 328 292 294 292 246C292 194 248 142 216 92Z"
+      fill="none"
+      stroke="#F4F3E8"
+      stroke-width="10"
+      stroke-linecap="round"
+      stroke-linejoin="round"/>
+  <ellipse cx="216" cy="245" rx="61" ry="49" fill="#071D17" opacity=".92"/>
+  <text
+      x="216"
+      y="272"
+      text-anchor="middle"
+      fill="#CDE8A7"
+      font-family="Georgia, 'Times New Roman', serif"
+      font-size="76"
+      font-weight="600"
+      letter-spacing="-3">GS</text>
+  <path
+      d="M242 153C251 119 274 105 304 110C298 139 279 156 242 162Z"
+      fill="url(#leafForeground)"/>
+  <path
+      d="M177 299C203 307 229 307 255 299"
+      fill="none"
+      stroke="#C7A865"
+      stroke-width="7"
+      stroke-linecap="round"/>
+</svg>

@@ -68,4 +68,10 @@ data class PlantEntity(
 
     @ColumnInfo(name = "repeat_count")
     val repeatCount: Int? = null,
+
+    @ColumnInfo(name = "plant_card_id", defaultValue = "''")
+    val plantCardId: String = "",
 )
+
+val PlantEntity.resolvedCardId: String
+    get() = plantCardId.ifBlank { "legacy-$id" }

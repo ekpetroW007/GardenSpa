@@ -81,7 +81,7 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController) {
                     Text("План ухода", color = Mist)
                     Text("Календарь", style = MaterialTheme.typography.headlineLarge, color = Cream)
                 }
-                PrimaryAction("+ Процедура", { navController.navigate(AppDestinations.plantAdd(selectedDate.toString())) })
+                PrimaryAction("+ Растение", { navController.navigate(AppDestinations.plantAdd(selectedDate.toString())) })
             }
         }
         item {
@@ -131,7 +131,7 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController) {
         DeleteConfirmationDialog(
             itemName = plant.plantName,
             onConfirm = {
-                plantsVm.deletePlant(plant.id)
+                plantsVm.deletePlantCard(plant)
                 plantPendingDelete = null
             },
             onDismiss = { plantPendingDelete = null }
@@ -227,11 +227,10 @@ private fun TreatmentCard(
                             datePicker.minDate = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
                         }.show()
                     },
-                    enabled = !treatment.completed,
                     modifier = Modifier.weight(1f)
                 )
                 PrimaryAction(
-                    if (treatment.completed) "Выполнено" else "Выполнить",
+                    "Выполнено",
                     onComplete,
                     Modifier.weight(1f),
                     enabled = !treatment.completed

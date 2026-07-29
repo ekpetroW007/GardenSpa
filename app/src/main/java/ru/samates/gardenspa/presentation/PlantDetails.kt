@@ -29,8 +29,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import ru.samates.gardenspa.BookeeperApp
+import ru.samates.gardenspa.data.database.entity.resolvedCardId
 import ru.samates.gardenspa.domain.RepeatType
 import ru.samates.gardenspa.domain.recurrenceDescription
+import ru.samates.gardenspa.domain.toPlantCards
 import ru.samates.gardenspa.notifications.TreatmentReminderScheduler
 import ru.samates.gardenspa.presentation.navigation.AppDestinations
 import ru.samates.gardenspa.ui.theme.Cream
@@ -49,8 +51,13 @@ fun PlantDetails(navController: NavController, plantId: Int) {
     val proceduresVm: ProceduresViewmodel = viewModel(factory = ProceduresViewmodelFactory(app.repository))
     val plants by plantsVm.plants.collectAsState()
     val procedures by proceduresVm.procedures.collectAsState()
-    val plant = plants.firstOrNull { it.id == plantId }
-    val history = procedures.filter { it.plantId == plantId && it.status == "COMPLETED" }
+    val selectedPlant = plants.firstOrNull { it.id == plantId }
+    val cardRows = selectedPlant?.let { selected ->
+        plants.filter { it.resolvedCardId == selected.resolvedCardId }.sortedBy { it.id }
+    }.orEmpty()
+    val plant = cardRows.firstOrNull()
+    val cardPlantIds = cardRows.map { it.id }.toSet()
+    val history = procedures.filter { it.plantId in cardPlantIds && it.status == "COMPLETED" }
     var editorOpen by remember { mutableStateOf(false) }
     var scheduleType by remember { mutableStateOf(RepeatType.MONTHLY) }
     var intervalText by remember { mutableStateOf("1") }
@@ -79,13 +86,20 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                         GlassCard(Modifier.fillMaxWidth()) {
                             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Text(plant.plantName, style = MaterialTheme.typography.headlineLarge, color = Cream)
-                                Text(plant.taskName, color = Leaf300, style = MaterialTheme.typography.titleMedium)
                                 Text("Уход начат ${plant.creationDate}", color = Mist)
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                     Metric(plant.gardenName, "сад", Modifier.weight(1f))
                                     Metric(plant.drugName, "препарат", Modifier.weight(1f))
                                 }
-                                Text("Периодичность: ${plant.recurrenceDescription()}", color = Cream)
+                                Text(
+                                    "Процедур: ${cardRows.size} · ${plant.recurrenceDescription()}",
+                                    color = Cream
+                                )
+                                SecondaryAction(
+                                    text = "Редактировать карточку",
+                                    onClick = { navController.navigate(AppDestinations.plantEdit(plant.id)) },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
                                 SecondaryAction(
                                     text = if (editorOpen) "Закрыть настройку" else "Настроить удобрение",
                                     onClick = {
@@ -114,13 +128,23 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                                 onCancel = { editorOpen = false },
                                 onSave = {
                                     val interval = intervalText.toIntOrNull()?.coerceIn(1, 365) ?: 1
-                                    plantsVm.updateFertilizingPeriod(plant, scheduleType, interval) {
+                                    plantsVm.updateFertilizingPeriod(cardRows, scheduleType, interval) {
                                         TreatmentReminderScheduler.refreshNow(app)
                                         savedMessage = true
                                     }
                                     editorOpen = false
                                 }
                             )
+                        }
+                    }
+                    item { SectionTitle("Процедуры") }
+                    items(cardRows, key = { "card-procedure:${it.id}" }) { procedure ->
+                        GlassCard(Modifier.fillMaxWidth()) {
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(procedure.taskName, color = Cream, style = MaterialTheme.typography.titleMedium)
+                                Text(procedure.drugName, color = Leaf300)
+                                Text(procedure.recurrenceDescription(), color = Mist)
+                            }
                         }
                     }
                     item { SectionTitle("История ухода") }
@@ -241,21 +265,23 @@ fun AllPlants(navController: NavController) {
     val app = LocalContext.current.applicationContext as BookeeperApp
     val plantsVm: PlantsViewmodel = viewModel(factory = PlantsViewmodelFactory(app.repository))
     val plants by plantsVm.plants.collectAsState()
+    val plantCards = plants.toPlantCards()
     BotanicalBackground {
         Column(Modifier.fillMaxSize()) {
-            ScreenHeader("Все растения", "${plants.size} в вашей коллекции", onBack = { navController.popBackStack() })
+            ScreenHeader("Все растения", "${plantCards.size} в вашей коллекции", onBack = { navController.popBackStack() })
             LazyColumn(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(18.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                if (plants.isEmpty()) item { EmptyGlassState("Растений пока нет", "Добавьте первую процедуру из календаря") }
-                items(plants, key = { it.id }) { plant ->
+                if (plantCards.isEmpty()) item { EmptyGlassState("Растений пока нет", "Добавьте первое растение из календаря") }
+                items(plantCards, key = { it.cardId }) { card ->
+                    val plant = card.primary
                     GlassCard(Modifier.fillMaxWidth(), onClick = { navController.navigate(AppDestinations.plantDetails(plant.id)) }) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Column {
+                            Column(Modifier.weight(1f)) {
                                 Text(plant.plantName, style = MaterialTheme.typography.titleLarge, color = Cream)
                                 Text(plant.gardenName, color = Leaf300)
-                                Text(plant.taskName, color = Mist)
+                                Text(card.procedures.joinToString(" · ") { it.taskName }, color = Mist, maxLines = 2)
                             }
                             Text("›", color = Leaf300, style = MaterialTheme.typography.headlineMedium)
                         }

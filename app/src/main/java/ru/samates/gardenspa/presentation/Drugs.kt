@@ -69,6 +69,7 @@ fun Drugs(navController: NavController, innerPadding: PaddingValues) {
                 onValueChange = { query = it },
                 placeholder = { Text("Поиск по названию или назначению") },
                 leadingIcon = { Text("⌕", color = Leaf300) },
+                keyboardOptions = SentenceKeyboardOptions,
                 singleLine = true,
                 colors = glassTextFieldColors(),
                 shape = CompactGlassShape,

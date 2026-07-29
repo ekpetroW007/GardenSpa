@@ -62,4 +62,25 @@ class TreatmentScheduleTest {
         assertTrue(treatment.completed)
         assertFalse(treatment.scheduledDate == treatment.originalDate)
     }
+
+    @Test
+    fun plannedRecordOnTodayRestoresACompletedOccurrence() {
+        val restored = ProcedureEntity(
+            plantId = plant.id,
+            procedureName = plant.taskName,
+            scheduledDate = "2026-07-30",
+            rescheduledDate = null,
+            completedDate = null,
+            status = "PLANNED"
+        )
+
+        val treatment = scheduledTreatmentsOn(
+            listOf(plant),
+            listOf(restored),
+            LocalDate.parse("2026-07-30")
+        ).single()
+
+        assertFalse(treatment.completed)
+        assertEquals(LocalDate.parse("2026-07-30"), treatment.scheduledDate)
+    }
 }

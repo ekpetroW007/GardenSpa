@@ -3,10 +3,8 @@ package ru.samates.gardenspa.presentation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
@@ -21,6 +19,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import ru.samates.gardenspa.BookeeperApp
 import ru.samates.gardenspa.domain.scheduledTreatmentsOn
+import ru.samates.gardenspa.domain.toPlantCards
 import ru.samates.gardenspa.presentation.navigation.AppDestinations
 import ru.samates.gardenspa.ui.theme.Cream
 import ru.samates.gardenspa.ui.theme.Leaf300
@@ -65,7 +64,7 @@ fun Profile(
                     Text("Добро пожаловать,", color = Mist)
                     Text(userLogin, style = MaterialTheme.typography.headlineLarge, color = Cream)
                     Text(
-                        "Ваш сад сегодня выглядит спокойно. Проверьте ближайшие процедуры и продолжайте в своём ритме.",
+                        "Сегодня в саду всё идёт по плану. Проверьте ближайшие процедуры и продолжайте в своём ритме.",
                         color = Mist,
                         modifier = Modifier.padding(top = 10.dp)
                     )
@@ -91,7 +90,7 @@ fun Profile(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(14.dp),
                     onClick = { navController.navigate(AppDestinations.ALL_PLANTS) }
                 ) {
-                    Metric(plants.size.toString(), "растений", Modifier.fillMaxWidth())
+                    Metric(plants.toPlantCards().size.toString(), "растений", Modifier.fillMaxWidth())
                 }
                 GlassCard(
                     Modifier.weight(1f),
@@ -102,7 +101,21 @@ fun Profile(
                 }
             }
         }
-        item { SectionTitle("Сегодня", "В календарь", { onScreenSelected("Календарь") }) }
+        item { SectionTitle("Быстрые действия") }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SecondaryAction("+ Сад", { navController.navigate(AppDestinations.GARDEN_ADD) }, Modifier.weight(1f))
+                    SecondaryAction("+ Растение", { navController.navigate(AppDestinations.plantAdd(today.toString())) }, Modifier.weight(1f))
+                }
+                SecondaryAction(
+                    "В календарь",
+                    { onScreenSelected("Календарь") },
+                    Modifier.fillMaxWidth()
+                )
+            }
+        }
+        item { SectionTitle("Сегодня") }
         if (todayTreatments.isEmpty()) {
             item { EmptyGlassState("На сегодня всё", "Новых процедур не запланировано") }
         } else {
@@ -119,14 +132,6 @@ fun Profile(
                     }
                 }
             }
-        }
-        item { SectionTitle("Быстрые действия") }
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                SecondaryAction("+ Сад", { navController.navigate(AppDestinations.GARDEN_ADD) }, Modifier.weight(1f))
-                SecondaryAction("+ Процедура", { navController.navigate(AppDestinations.plantAdd(today.toString())) }, Modifier.weight(1f))
-            }
-            Spacer(Modifier.height(6.dp))
         }
     }
 }

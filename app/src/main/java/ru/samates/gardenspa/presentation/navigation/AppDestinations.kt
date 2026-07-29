@@ -12,10 +12,12 @@ object AppDestinations {
     const val DRUG_INFO = "drugInfoScreen"
 
     const val PLANT_ADD = "plantAddScreen/{selectedDate}"
+    const val PLANT_EDIT = "plantEditScreen/{plantId}"
     const val PLANT_DETAILS = "plantDetails/{plantId}"
     const val ALL_PLANTS = "allPlants"
 
     fun plantAdd(selectedDate: String) = "plantAddScreen/$selectedDate"
+    fun plantEdit(plantId: Int) = "plantEditScreen/$plantId"
     fun plantDetails(plantId: Int) = "plantDetails/$plantId"
     fun drugEdit(drugId: Int) = "drugEditScreen/$drugId"
 }
