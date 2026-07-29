@@ -19,6 +19,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -27,6 +30,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import ru.samates.gardenspa.BookeeperApp
+import ru.samates.gardenspa.data.database.entity.GardenEntity
 import ru.samates.gardenspa.data.database.entity.PlantEntity
 import ru.samates.gardenspa.presentation.navigation.AppDestinations
 import ru.samates.gardenspa.ui.theme.Cream
@@ -50,6 +54,7 @@ fun MyGardens(navController: NavController, innerPadding: PaddingValues) {
     val plantsVm: PlantsViewmodel = viewModel(factory = PlantsViewmodelFactory(application.repository))
     val gardens by gardensVm.gardens.collectAsState()
     val plants by plantsVm.plants.collectAsState()
+    var gardenPendingDelete by remember { mutableStateOf<GardenEntity?>(null) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(innerPadding),
@@ -73,12 +78,23 @@ fun MyGardens(navController: NavController, innerPadding: PaddingValues) {
             GardenGlassCard(
                 name = garden.name,
                 plants = gardenPlants,
-                onDelete = { gardensVm.deleteGarden(garden.id) },
+                onDelete = { gardenPendingDelete = garden },
                 onExport = { exportGardenToFile(context, garden.name, gardenPlants) },
                 onPlantOpen = { navController.navigate(AppDestinations.plantDetails(it)) },
                 onAddPlant = { navController.navigate(AppDestinations.plantAdd(java.time.LocalDate.now().toString())) }
             )
         }
+    }
+
+    gardenPendingDelete?.let { garden ->
+        DeleteConfirmationDialog(
+            itemName = garden.name,
+            onConfirm = {
+                gardensVm.deleteGarden(garden.id)
+                gardenPendingDelete = null
+            },
+            onDismiss = { gardenPendingDelete = null }
+        )
     }
 }
 

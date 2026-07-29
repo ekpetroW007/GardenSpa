@@ -29,6 +29,11 @@ class BookeeperRepository(
         drugDao.insertDrug(drug)
     }
 
+    suspend fun updateDrug(drug: DrugEntity) {
+        drugDao.updateDrug(drug)
+        plantDAO.updateDrugName(drug.id, drug.name)
+    }
+
     suspend fun deleteDrug(id: Int) {
         drugDao.deleteDrug(id)
     }

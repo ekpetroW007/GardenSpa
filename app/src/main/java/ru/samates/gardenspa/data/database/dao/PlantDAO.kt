@@ -24,5 +24,7 @@ interface PlantDAO {
     @Query("DELETE FROM plants WHERE id = :id ")
     suspend fun deletePlant(id: Int)
 
+    @Query("UPDATE plants SET drugNameInPlant = :name WHERE drug_id = :drugId")
+    suspend fun updateDrugName(drugId: Int, name: String)
 
 }
