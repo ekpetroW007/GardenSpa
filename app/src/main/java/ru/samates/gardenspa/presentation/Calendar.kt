@@ -34,14 +34,12 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import ru.samates.gardenspa.BookeeperApp
-import ru.samates.gardenspa.data.database.entity.PlantEntity
 import ru.samates.gardenspa.domain.ScheduledTreatment
 import ru.samates.gardenspa.domain.recurrenceDescription
 import ru.samates.gardenspa.domain.scheduledTreatmentsOn
 import ru.samates.gardenspa.notifications.TreatmentReminderScheduler
 import ru.samates.gardenspa.presentation.navigation.AppDestinations
 import ru.samates.gardenspa.ui.theme.Cream
-import ru.samates.gardenspa.ui.theme.Danger
 import ru.samates.gardenspa.ui.theme.Leaf300
 import ru.samates.gardenspa.ui.theme.Mist
 import ru.samates.gardenspa.ui.theme.Warning
@@ -64,7 +62,6 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController) {
     val procedures by proceduresVm.procedures.collectAsState()
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var visibleMonth by remember { mutableStateOf(YearMonth.from(selectedDate)) }
-    var plantPendingDelete by remember { mutableStateOf<PlantEntity?>(null) }
     val treatments = scheduledTreatmentsOn(plants, procedures, selectedDate)
     val markedDates = (1..visibleMonth.lengthOfMonth()).mapNotNull { day ->
         visibleMonth.atDay(day).takeIf { scheduledTreatmentsOn(plants, procedures, it).isNotEmpty() }
@@ -104,7 +101,6 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController) {
             TreatmentCard(
                 treatment = treatment,
                 onOpen = { navController.navigate(AppDestinations.plantDetails(treatment.plant.id)) },
-                onDelete = { plantPendingDelete = treatment.plant },
                 onComplete = {
                     proceduresVm.markCompleted(
                         treatment.plant.id,
@@ -127,16 +123,6 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController) {
         }
     }
 
-    plantPendingDelete?.let { plant ->
-        DeleteConfirmationDialog(
-            itemName = plant.plantName,
-            onConfirm = {
-                plantsVm.deletePlantCard(plant)
-                plantPendingDelete = null
-            },
-            onDismiss = { plantPendingDelete = null }
-        )
-    }
 }
 
 @Composable
@@ -202,8 +188,7 @@ private fun TreatmentCard(
     treatment: ScheduledTreatment,
     onComplete: () -> Unit,
     onReschedule: (LocalDate) -> Unit,
-    onOpen: () -> Unit,
-    onDelete: () -> Unit
+    onOpen: () -> Unit
 ) {
     val context = LocalContext.current
     GlassCard(Modifier.fillMaxWidth(), onClick = onOpen) {
@@ -214,7 +199,6 @@ private fun TreatmentCard(
                     Text(treatment.plant.plantName, style = MaterialTheme.typography.titleLarge, color = Cream)
                     Text(treatment.plant.gardenName, color = Leaf300)
                 }
-                Text("×", color = Danger, modifier = Modifier.clickable(onClick = onDelete))
             }
             Text(treatment.plant.taskName, color = Cream)
             Text("${treatment.plant.drugName} · ${treatment.plant.recurrenceDescription()}", color = Mist, fontSize = 13.sp)

@@ -16,9 +16,11 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -44,6 +46,7 @@ import ru.samates.gardenspa.notifications.TreatmentReminderScheduler
 import ru.samates.gardenspa.ui.theme.Cream
 import ru.samates.gardenspa.ui.theme.Danger
 import ru.samates.gardenspa.ui.theme.Forest700
+import ru.samates.gardenspa.ui.theme.Forest900
 import ru.samates.gardenspa.ui.theme.Leaf300
 import ru.samates.gardenspa.ui.theme.Mist
 import ru.samates.gardenspa.viewmodel.DrugsViewmodel
@@ -107,6 +110,8 @@ fun PlantAdd(navController: NavController, selectedDate: String, plantId: Int? =
     var endDate by remember { mutableStateOf(startDate.plusMonths(1)) }
     var countText by remember { mutableStateOf("10") }
     var fieldsInitialized by remember(plantId) { mutableStateOf(false) }
+    var addDrugDialogOpen by remember { mutableStateOf(false) }
+    var pendingNewDrugName by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(editingPlant, editingRows, drugs, gardens, fieldsInitialized) {
         if (editingPlant != null && !fieldsInitialized) {
@@ -130,6 +135,17 @@ fun PlantAdd(navController: NavController, selectedDate: String, plantId: Int? =
             countText = editingPlant.repeatCount?.toString() ?: "10"
             fieldsInitialized = true
         }
+    }
+
+    LaunchedEffect(drugs, pendingNewDrugName) {
+        val newDrugName = pendingNewDrugName ?: return@LaunchedEffect
+        drugs
+            .filter { it.name.equals(newDrugName, ignoreCase = true) }
+            .maxByOrNull { it.id }
+            ?.let { newDrug ->
+                selectedDrug = newDrug
+                pendingNewDrugName = null
+            }
     }
 
     BotanicalBackground {
@@ -159,9 +175,13 @@ fun PlantAdd(navController: NavController, selectedDate: String, plantId: Int? =
                                 shape = CompactGlassShape,
                                 modifier = Modifier.fillMaxWidth()
                             )
-                            SelectionMenu("Сад", selectedGarden?.name ?: "Не выбран", gardens, { it.name }) {
-                                selectedGarden = it
-                            }
+                            SelectionMenu(
+                                label = "Сад",
+                                value = selectedGarden?.name ?: "Не выбран",
+                                options = gardens,
+                                optionLabel = { it.name },
+                                onSelected = { selectedGarden = it }
+                            )
                         }
                     }
                     GlassCard(Modifier.fillMaxWidth()) {
@@ -202,15 +222,27 @@ fun PlantAdd(navController: NavController, selectedDate: String, plantId: Int? =
                                 onClick = { taskNames = taskNames + "" },
                                 modifier = Modifier.fillMaxWidth()
                             )
-                            SelectionMenu("Препарат", selectedDrug?.name ?: "Не выбран", drugs, { it.name }) {
-                                selectedDrug = it
-                            }
+                            SelectionMenu(
+                                label = "Препарат",
+                                value = selectedDrug?.name ?: "Не выбран",
+                                options = drugs,
+                                optionLabel = { it.name },
+                                onSelected = { selectedDrug = it },
+                                addActionLabel = "+ Добавить новый препарат",
+                                onAddAction = { addDrugDialogOpen = true }
+                            )
                         }
                     }
                     GlassCard(Modifier.fillMaxWidth()) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text("Общее расписание", color = Cream, style = MaterialTheme.typography.titleLarge)
-                            SelectionMenu("Повтор", repeatLabels.getValue(repeatType), repeatLabels.keys.toList(), { repeatLabels.getValue(it) }) { repeatType = it }
+                            SelectionMenu(
+                                label = "Повтор",
+                                value = repeatLabels.getValue(repeatType),
+                                options = repeatLabels.keys.toList(),
+                                optionLabel = { repeatLabels.getValue(it) },
+                                onSelected = { repeatType = it }
+                            )
                             if (repeatType == RepeatType.CUSTOM) {
                                 OutlinedTextField(
                                     intervalText,
@@ -245,7 +277,13 @@ fun PlantAdd(navController: NavController, selectedDate: String, plantId: Int? =
                                 }
                             }
                             if (repeatType != RepeatType.NONE) {
-                                SelectionMenu("Окончание", endLabels.getValue(endType), endLabels.keys.toList(), { endLabels.getValue(it) }) { endType = it }
+                                SelectionMenu(
+                                    label = "Окончание",
+                                    value = endLabels.getValue(endType),
+                                    options = endLabels.keys.toList(),
+                                    optionLabel = { endLabels.getValue(it) },
+                                    onSelected = { endType = it }
+                                )
                                 when (endType) {
                                     RepeatEndType.UNTIL_DATE -> SecondaryAction("До $endDate", {
                                         DatePickerDialog(context, { _, y, m, d -> endDate = LocalDate.of(y, m + 1, d) }, endDate.year, endDate.monthValue - 1, endDate.dayOfMonth).apply {
@@ -294,6 +332,17 @@ fun PlantAdd(navController: NavController, selectedDate: String, plantId: Int? =
             }
         }
     }
+
+    if (addDrugDialogOpen) {
+        AddDrugDialog(
+            onDismiss = { addDrugDialogOpen = false },
+            onSave = { name, purpose, rate ->
+                pendingNewDrugName = name.trim()
+                drugsVm.addDrug(name.trim(), purpose.trim(), rate.trim())
+                addDrugDialogOpen = false
+            }
+        )
+    }
 }
 
 @Composable
@@ -302,7 +351,9 @@ private fun <T> SelectionMenu(
     value: String,
     options: List<T>,
     optionLabel: (T) -> String,
-    onSelected: (T) -> Unit
+    onSelected: (T) -> Unit,
+    addActionLabel: String? = null,
+    onAddAction: (() -> Unit)? = null
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
@@ -324,6 +375,81 @@ private fun <T> SelectionMenu(
             options.forEach { option ->
                 DropdownMenuItem(text = { Text(optionLabel(option)) }, onClick = { onSelected(option); expanded = false })
             }
+            if (addActionLabel != null && onAddAction != null) {
+                DropdownMenuItem(
+                    text = { Text(addActionLabel, color = Leaf300) },
+                    onClick = {
+                        expanded = false
+                        onAddAction()
+                    }
+                )
+            }
         }
     }
+}
+
+@Composable
+private fun AddDrugDialog(
+    onDismiss: () -> Unit,
+    onSave: (name: String, purpose: String, rate: String) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var purpose by remember { mutableStateOf("") }
+    var rate by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Forest900,
+        titleContentColor = Cream,
+        textContentColor = Cream,
+        title = { Text("Новый препарат") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("После сохранения препарат появится здесь и на вкладке «Препараты».", color = Mist)
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Название") },
+                    keyboardOptions = SentenceKeyboardOptions,
+                    singleLine = true,
+                    colors = glassTextFieldColors(),
+                    shape = CompactGlassShape,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = purpose,
+                    onValueChange = { purpose = it },
+                    label = { Text("Назначение") },
+                    keyboardOptions = SentenceKeyboardOptions,
+                    minLines = 2,
+                    colors = glassTextFieldColors(),
+                    shape = CompactGlassShape,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = rate,
+                    onValueChange = { rate = it },
+                    label = { Text("Норма расхода") },
+                    keyboardOptions = SentenceKeyboardOptions,
+                    singleLine = true,
+                    colors = glassTextFieldColors(),
+                    shape = CompactGlassShape,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onSave(name, purpose, rate) },
+                enabled = name.isNotBlank() && purpose.isNotBlank() && rate.isNotBlank()
+            ) {
+                Text("Добавить", color = Leaf300)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Отмена", color = Mist)
+            }
+        }
+    )
 }
