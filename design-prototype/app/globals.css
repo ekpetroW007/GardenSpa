@@ -323,8 +323,8 @@ h2 em {
 }
 
 .phone {
-  width: 330px;
-  height: 670px;
+  width: 318px;
+  height: 707px;
   position: relative;
   transform: rotate(1.3deg);
   filter: drop-shadow(0 32px 48px rgba(0, 0, 0, .44));
@@ -339,6 +339,21 @@ h2 em {
   background: linear-gradient(145deg, #31433c 0%, #09100e 35%, #263a31 100%);
   border: 1px solid rgba(255, 255, 255, .32);
   box-shadow: inset 0 0 0 1px #020706, inset -3px 0 5px rgba(255, 255, 255, .1);
+}
+
+.phone-frame-real {
+  padding: 7px;
+  overflow: hidden;
+}
+
+.phone-screenshot {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 41px;
+  background: var(--forest-950);
 }
 
 .phone-screen {

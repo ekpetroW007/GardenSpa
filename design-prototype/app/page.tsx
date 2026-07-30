@@ -50,62 +50,34 @@ function ArrowIcon() {
   return <span className="arrow" aria-hidden="true">↗</span>;
 }
 
-function PhonePreview({ compact = false }: { compact?: boolean }) {
+function PhonePreview({
+  compact = false,
+  screen = "home",
+}: {
+  compact?: boolean;
+  screen?: "home" | "calendar";
+}) {
+  const isCalendar = screen === "calendar";
+
   return (
     <div className={compact ? "phone phone-compact" : "phone"}>
-      <div className="phone-frame">
-        <div className="phone-island" />
-        <div className="phone-screen">
-          <div className="phone-glow" />
-          <div className="phone-status">
-            <span>9:41</span>
-            <span className="status-icons" aria-hidden="true">● ◒</span>
-          </div>
-          <div className="phone-brand">
-            <BrandMark />
-            <span>GardenSpa</span>
-          </div>
-          <div className="phone-greeting">
-            <span className="eyebrow">Доброе утро</span>
-            <strong>Марина</strong>
-            <p>Ваш сад чувствует себя хорошо.</p>
-          </div>
-          <div className="phone-metrics">
-            <div><strong>3</strong><span>сада</span></div>
-            <div><strong>14</strong><span>растений</span></div>
-            <div><strong>2</strong><span>сегодня</span></div>
-          </div>
-          <div className="phone-card">
-            <div className="phone-card-head">
-              <span>Сегодня</span>
-              <small>30 июля</small>
-            </div>
-            <div className="task-row">
-              <span className="task-dot task-dot-water" />
-              <span><strong>Полить гортензию</strong><small>Сад у дома</small></span>
-              <b>08:00</b>
-            </div>
-            <div className="task-row">
-              <span className="task-dot task-dot-leaf" />
-              <span><strong>Подкормить монстеру</strong><small>Домашние растения</small></span>
-              <b>18:30</b>
-            </div>
-          </div>
-          <div className="phone-next">
-            <span>Ближайшие дни</span>
-            <div className="mini-week">
-              {["Пн", "Вт", "Ср", "Чт", "Пт"].map((day, index) => (
-                <span className={index === 2 ? "active-day" : ""} key={day}>
-                  <small>{day}</small>
-                  <b>{28 + index}</b>
-                </span>
-              ))}
-            </div>
-          </div>
-          <div className="phone-nav" aria-hidden="true">
-            <span className="nav-active">⌂</span><span>⌁</span><span>＋</span><span>◫</span>
-          </div>
-        </div>
+      <div className="phone-frame phone-frame-real">
+        <img
+          className="phone-screenshot"
+          src={
+            isCalendar
+              ? "/screenshots/app-calendar.png"
+              : "/screenshots/app-home.png"
+          }
+          alt={
+            isCalendar
+              ? "Реальный экран календаря приложения GardenSpa"
+              : "Реальный главный экран приложения GardenSpa"
+          }
+          width={1080}
+          height={2400}
+          loading={compact ? "lazy" : "eager"}
+        />
       </div>
     </div>
   );
@@ -152,10 +124,10 @@ export default function Home() {
           </div>
           <div className="hero-phone">
             <div className="phone-aura" />
-            <PhonePreview />
+            <PhonePreview screen="home" />
             <div className="floating-note floating-note-top">
               <span className="note-icon note-icon-leaf" />
-              <span><small>Следующая забота</small><strong>Полив через 2 дня</strong></span>
+              <span><small>Сегодня в календаре</small><strong>Первая подкормка</strong></span>
             </div>
             <div className="floating-note floating-note-bottom">
               <span className="pulse-dot" />
@@ -221,7 +193,7 @@ export default function Home() {
           <div className="how-phone-wrap">
             <div className="how-orbit orbit-one" />
             <div className="how-orbit orbit-two" />
-            <PhonePreview compact />
+            <PhonePreview compact screen="calendar" />
           </div>
           <div className="how-copy">
             <span className="section-label section-label-dark">Просто начать</span>

@@ -36,6 +36,8 @@ test("server-renders the GardenSpa landing page", async () => {
   assert.match(html, /Календарь заботы/);
   assert.match(html, /Только на вашем телефоне/);
   assert.match(html, /Персональный помощник садовода/);
+  assert.match(html, /\/screenshots\/app-home\.png/);
+  assert.match(html, /\/screenshots\/app-calendar\.png/);
   assert.match(html, /\/og\.png/);
   assert.doesNotMatch(html, /codex-preview|SkeletonPreview|Starter Project/);
 });
