@@ -1,42 +1,36 @@
 package ru.samates.gardenspa.presentation
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import ru.samates.gardenspa.BookeeperApp
 import ru.samates.gardenspa.data.database.entity.resolvedCardId
-import ru.samates.gardenspa.domain.RepeatType
 import ru.samates.gardenspa.domain.recurrenceDescription
 import ru.samates.gardenspa.domain.toPlantCards
 import ru.samates.gardenspa.notifications.TreatmentReminderScheduler
 import ru.samates.gardenspa.presentation.navigation.AppDestinations
 import ru.samates.gardenspa.ui.theme.Cream
-import ru.samates.gardenspa.ui.theme.Forest700
 import ru.samates.gardenspa.ui.theme.Leaf300
 import ru.samates.gardenspa.ui.theme.Mist
 import ru.samates.gardenspa.viewmodel.PlantsViewmodel
@@ -44,6 +38,7 @@ import ru.samates.gardenspa.viewmodel.PlantsViewmodelFactory
 import ru.samates.gardenspa.viewmodel.ProceduresViewmodel
 import ru.samates.gardenspa.viewmodel.ProceduresViewmodelFactory
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PlantDetails(navController: NavController, plantId: Int) {
     val app = LocalContext.current.applicationContext as BookeeperApp
@@ -58,19 +53,7 @@ fun PlantDetails(navController: NavController, plantId: Int) {
     val plant = cardRows.firstOrNull()
     val cardPlantIds = cardRows.map { it.id }.toSet()
     val history = procedures.filter { it.plantId in cardPlantIds && it.status == "COMPLETED" }
-    var editorOpen by remember { mutableStateOf(false) }
-    var scheduleType by remember { mutableStateOf(RepeatType.MONTHLY) }
-    var intervalText by remember { mutableStateOf("1") }
-    var savedMessage by remember { mutableStateOf(false) }
-
-    LaunchedEffect(plant?.repeatType, plant?.repeatInterval, editorOpen) {
-        if (!editorOpen && plant != null) {
-            scheduleType = runCatching { RepeatType.valueOf(plant.repeatType) }
-                .getOrDefault(RepeatType.MONTHLY)
-                .takeUnless { it == RepeatType.NONE } ?: RepeatType.MONTHLY
-            intervalText = plant.repeatInterval.coerceAtLeast(1).toString()
-        }
-    }
+    var deleteConfirmationOpen by remember { mutableStateOf(false) }
 
     BotanicalBackground {
         Column(Modifier.fillMaxSize()) {
@@ -87,54 +70,44 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Text(plant.plantName, style = MaterialTheme.typography.headlineLarge, color = Cream)
                                 Text("Уход начат ${plant.creationDate}", color = Mist)
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Metric(plant.gardenName, "сад", Modifier.weight(1f))
-                                    Metric(plant.drugName, "препарат", Modifier.weight(1f))
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Text(
+                                        text = "Сад: ${plant.gardenName}",
+                                        color = Leaf300,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        modifier = Modifier.weight(1f).basicMarquee()
+                                    )
+                                    Text(
+                                        text = "Препарат: ${plant.drugName}",
+                                        color = Leaf300,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        textAlign = TextAlign.End,
+                                        modifier = Modifier.weight(1f).basicMarquee()
+                                    )
                                 }
                                 Text(
-                                    "Процедур: ${cardRows.size} · ${plant.recurrenceDescription()}",
-                                    color = Cream
+                                    text = "Процедур: ${cardRows.size}   Частота обработки: ${plant.recurrenceDescription()}",
+                                    color = Cream,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    modifier = Modifier.fillMaxWidth().basicMarquee()
                                 )
                                 SecondaryAction(
                                     text = "Редактировать карточку",
                                     onClick = { navController.navigate(AppDestinations.plantEdit(plant.id)) },
                                     modifier = Modifier.fillMaxWidth()
                                 )
-                                SecondaryAction(
-                                    text = if (editorOpen) "Закрыть настройку" else "Настроить удобрение",
-                                    onClick = {
-                                        editorOpen = !editorOpen
-                                        savedMessage = false
-                                    },
+                                DangerAction(
+                                    text = "Удалить растение",
+                                    onClick = { deleteConfirmationOpen = true },
                                     modifier = Modifier.fillMaxWidth()
                                 )
-                                if (savedMessage) {
-                                    Text("График обновлён", color = Leaf300)
-                                }
                             }
-                        }
-                    }
-                    if (editorOpen) {
-                        item {
-                            FertilizingPeriodEditor(
-                                selectedType = scheduleType,
-                                intervalText = intervalText,
-                                onTypeSelected = { scheduleType = it },
-                                onIntervalChanged = { intervalText = it.filter(Char::isDigit).take(3) },
-                                onPreset = { type, interval ->
-                                    scheduleType = type
-                                    intervalText = interval.toString()
-                                },
-                                onCancel = { editorOpen = false },
-                                onSave = {
-                                    val interval = intervalText.toIntOrNull()?.coerceIn(1, 365) ?: 1
-                                    plantsVm.updateFertilizingPeriod(cardRows, scheduleType, interval) {
-                                        TreatmentReminderScheduler.refreshNow(app)
-                                        savedMessage = true
-                                    }
-                                    editorOpen = false
-                                }
-                            )
                         }
                     }
                     item { SectionTitle("Процедуры") }
@@ -168,97 +141,21 @@ fun PlantDetails(navController: NavController, plantId: Int) {
             }
         }
     }
-}
 
-@Composable
-private fun FertilizingPeriodEditor(
-    selectedType: RepeatType,
-    intervalText: String,
-    onTypeSelected: (RepeatType) -> Unit,
-    onIntervalChanged: (String) -> Unit,
-    onPreset: (RepeatType, Int) -> Unit,
-    onCancel: () -> Unit,
-    onSave: () -> Unit
-) {
-    val interval = intervalText.toIntOrNull()
-    val unit = when (selectedType) {
-        RepeatType.DAILY -> "дн."
-        RepeatType.WEEKLY -> "нед."
-        RepeatType.MONTHLY -> "мес."
-        RepeatType.YEARLY -> "г."
-        RepeatType.CUSTOM -> "дн."
-        RepeatType.NONE -> ""
-    }
-    GlassCard(Modifier.fillMaxWidth()) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Периодичность удобрения", color = Cream, style = MaterialTheme.typography.titleLarge)
-            Text("Выберите готовый вариант или задайте свой интервал", color = Mist)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(
-                    Triple("7 дней", RepeatType.DAILY, 7),
-                    Triple("14 дней", RepeatType.DAILY, 14),
-                    Triple("30 дней", RepeatType.DAILY, 30)
-                ).forEach { preset ->
-                    FilterChip(
-                        selected = selectedType == preset.second && interval == preset.third,
-                        onClick = { onPreset(preset.second, preset.third) },
-                        label = { Text(preset.first) },
-                        modifier = Modifier.weight(1f),
-                        colors = fertilizingChipColors()
-                    )
+    if (deleteConfirmationOpen && plant != null) {
+        DeleteConfirmationDialog(
+            itemName = plant.plantName,
+            onConfirm = {
+                deleteConfirmationOpen = false
+                plantsVm.deletePlantCard(plant) {
+                    TreatmentReminderScheduler.refreshNow(app)
+                    navController.popBackStack()
                 }
-            }
-            Text("Единица периода", color = Mist, style = MaterialTheme.typography.labelLarge)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(
-                    RepeatType.DAILY to "Дни",
-                    RepeatType.WEEKLY to "Недели",
-                    RepeatType.MONTHLY to "Месяцы",
-                    RepeatType.YEARLY to "Годы"
-                ).forEach { option ->
-                    FilterChip(
-                        selected = selectedType == option.first,
-                        onClick = { onTypeSelected(option.first) },
-                        label = { Text(option.second) },
-                        modifier = Modifier.weight(1f),
-                        colors = fertilizingChipColors()
-                    )
-                }
-            }
-            OutlinedTextField(
-                value = intervalText,
-                onValueChange = onIntervalChanged,
-                label = { Text("Каждые ($unit)") },
-                supportingText = { Text("От 1 до 365", color = Mist) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                singleLine = true,
-                colors = glassTextFieldColors(),
-                shape = CompactGlassShape,
-                modifier = Modifier.fillMaxWidth()
-            )
-            if (interval != null && interval > 0) {
-                Text("Удобрять каждые $interval $unit · без даты окончания", color = Leaf300)
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SecondaryAction("Отмена", onCancel, Modifier.weight(1f))
-                PrimaryAction(
-                    "Сохранить",
-                    onSave,
-                    Modifier.weight(1f),
-                    enabled = interval != null && interval in 1..365
-                )
-            }
-        }
+            },
+            onDismiss = { deleteConfirmationOpen = false }
+        )
     }
 }
-
-@Composable
-private fun fertilizingChipColors() = FilterChipDefaults.filterChipColors(
-    selectedContainerColor = Leaf300,
-    selectedLabelColor = Color(0xFF071D17),
-    containerColor = Forest700,
-    labelColor = Cream
-)
 
 @Composable
 fun AllPlants(navController: NavController) {

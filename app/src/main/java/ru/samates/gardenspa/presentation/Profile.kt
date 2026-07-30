@@ -103,16 +103,9 @@ fun Profile(
         }
         item { SectionTitle("Быстрые действия") }
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SecondaryAction("+ Сад", { navController.navigate(AppDestinations.GARDEN_ADD) }, Modifier.weight(1f))
-                    SecondaryAction("+ Растение", { navController.navigate(AppDestinations.plantAdd(today.toString())) }, Modifier.weight(1f))
-                }
-                SecondaryAction(
-                    "В календарь",
-                    { onScreenSelected("Календарь") },
-                    Modifier.fillMaxWidth()
-                )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SecondaryAction("+ Сад", { navController.navigate(AppDestinations.GARDEN_ADD) }, Modifier.weight(1f))
+                SecondaryAction("+ Растение", { navController.navigate(AppDestinations.plantAdd(today.toString())) }, Modifier.weight(1f))
             }
         }
         item { SectionTitle("Сегодня") }

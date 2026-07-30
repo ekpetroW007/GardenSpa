@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.samates.gardenspa.ui.theme.Cream
+import ru.samates.gardenspa.ui.theme.Danger
 import ru.samates.gardenspa.ui.theme.Forest700
 import ru.samates.gardenspa.ui.theme.Forest800
 import ru.samates.gardenspa.ui.theme.Forest900
@@ -188,6 +189,27 @@ fun SecondaryAction(
         colors = ButtonDefaults.buttonColors(
             containerColor = Forest700,
             contentColor = Cream,
+            disabledContainerColor = Forest800,
+            disabledContentColor = Mist
+        )
+    ) { Text(text) }
+}
+
+@Composable
+fun DangerAction(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Danger.copy(alpha = 0.18f),
+            contentColor = Danger,
             disabledContainerColor = Forest800,
             disabledContentColor = Mist
         )

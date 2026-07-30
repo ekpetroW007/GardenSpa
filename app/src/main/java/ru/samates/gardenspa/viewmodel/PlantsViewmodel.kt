@@ -31,10 +31,11 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
         }
     }
 
-    fun deletePlantCard(plant: PlantEntity) {
+    fun deletePlantCard(plant: PlantEntity, onDeleted: () -> Unit = {}) {
         viewModelScope.launch {
             try {
                 repository.deletePlantCard(plant.resolvedCardId)
+                onDeleted()
             } catch (e: Exception) {
                 Log.d("deletePlantCard", e.toString())
             }
