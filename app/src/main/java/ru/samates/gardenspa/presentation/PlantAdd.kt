@@ -76,6 +76,12 @@ private val endLabels = linkedMapOf(
     RepeatEndType.COUNT to "После количества повторов"
 )
 
+private val reminderLabels = linkedMapOf(
+    0 to "В день процедуры",
+    1 to "За 1 день",
+    5 to "За 5 дней"
+)
+
 @Composable
 fun PlantAdd(navController: NavController, selectedDate: String, plantId: Int? = null) {
     val context = LocalContext.current
@@ -109,6 +115,7 @@ fun PlantAdd(navController: NavController, selectedDate: String, plantId: Int? =
     var endType by remember { mutableStateOf(RepeatEndType.NEVER) }
     var endDate by remember { mutableStateOf(startDate.plusMonths(1)) }
     var countText by remember { mutableStateOf("10") }
+    var reminderDaysBefore by remember { mutableStateOf(1) }
     var fieldsInitialized by remember(plantId) { mutableStateOf(false) }
     var addDrugDialogOpen by remember { mutableStateOf(false) }
     var pendingNewDrugName by remember { mutableStateOf<String?>(null) }
@@ -133,6 +140,9 @@ fun PlantAdd(navController: NavController, selectedDate: String, plantId: Int? =
                 ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
                 ?: startDate.plusMonths(1)
             countText = editingPlant.repeatCount?.toString() ?: "10"
+            reminderDaysBefore = editingPlant.reminderDaysBefore
+                .takeIf(reminderLabels::containsKey)
+                ?: 1
             fieldsInitialized = true
         }
     }
@@ -151,7 +161,7 @@ fun PlantAdd(navController: NavController, selectedDate: String, plantId: Int? =
     BotanicalBackground {
         Column(Modifier.fillMaxSize()) {
             ScreenHeader(
-                if (editing) "Редактирование растения" else "Новое растение",
+                if (editing) "Редактирование процедуры" else "Новая процедура",
                 startDate.toString(),
                 onBack = { navController.popBackStack() }
             )
@@ -243,6 +253,13 @@ fun PlantAdd(navController: NavController, selectedDate: String, plantId: Int? =
                                 optionLabel = { repeatLabels.getValue(it) },
                                 onSelected = { repeatType = it }
                             )
+                            SelectionMenu(
+                                label = "Напоминание",
+                                value = reminderLabels.getValue(reminderDaysBefore),
+                                options = reminderLabels.keys.toList(),
+                                optionLabel = { reminderLabels.getValue(it) },
+                                onSelected = { reminderDaysBefore = it }
+                            )
                             if (repeatType == RepeatType.CUSTOM) {
                                 OutlinedTextField(
                                     intervalText,
@@ -297,7 +314,7 @@ fun PlantAdd(navController: NavController, selectedDate: String, plantId: Int? =
                         }
                     }
                     PrimaryAction(
-                        if (editing) "Сохранить изменения" else "Сохранить растение",
+                        if (editing) "Сохранить изменения" else "Сохранить процедуру",
                         onClick = {
                             val interval = intervalText.toIntOrNull()?.coerceAtLeast(1) ?: 1
                             val normalizedTaskNames = taskNames.map { it.trim() }
@@ -318,6 +335,7 @@ fun PlantAdd(navController: NavController, selectedDate: String, plantId: Int? =
                                 repeatEndDate = endDate.toString().takeIf { repeatType != RepeatType.NONE && endType == RepeatEndType.UNTIL_DATE },
                                 repeatCount = countText.toIntOrNull()?.coerceAtLeast(1)
                                     .takeIf { repeatType != RepeatType.NONE && endType == RepeatEndType.COUNT },
+                                reminderDaysBefore = reminderDaysBefore,
                                 onSaved = {
                                     normalizedTaskNames.forEach(tasksVm::addTask)
                                     TreatmentReminderScheduler.refreshNow(app)

@@ -79,10 +79,10 @@ object TreatmentReminderScheduler {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Запланированные обработки",
+            "Запланированные процедуры",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
-            description = "Напоминания об обработках за один день"
+            description = "Напоминания о процедурах в выбранный пользователем срок"
         }
         context.getSystemService(NotificationManager::class.java)
             .createNotificationChannel(channel)

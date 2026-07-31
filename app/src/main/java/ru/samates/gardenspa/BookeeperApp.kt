@@ -5,6 +5,7 @@ import kotlin.getValue
 import ru.samates.gardenspa.data.database.AppDatabase
 import ru.samates.gardenspa.data.repository.BookeeperRepository
 import ru.samates.gardenspa.notifications.TreatmentReminderScheduler
+import ru.samates.gardenspa.notifications.GardenWorkReminderScheduler
 
 class BookeeperApp : Application() {
     private val database by lazy { AppDatabase.getInstance(this) }
@@ -15,7 +16,8 @@ class BookeeperApp : Application() {
             plantDAO = database.plantDao(),
             gardenDAO = database.gardenDao(),
             taskDAO = database.taskDao(),
-            procedureDAO = database.procedureDao()
+            procedureDAO = database.procedureDao(),
+            gardenWorkDAO = database.gardenWorkDao()
         )
     }
 
@@ -23,5 +25,6 @@ class BookeeperApp : Application() {
         super.onCreate()
         TreatmentReminderScheduler.schedule(this)
         TreatmentReminderScheduler.refreshOnceToday(this)
+        GardenWorkReminderScheduler.schedule(this)
     }
 }

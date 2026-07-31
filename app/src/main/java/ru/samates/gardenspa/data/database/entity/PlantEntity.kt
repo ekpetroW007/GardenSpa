@@ -69,6 +69,9 @@ data class PlantEntity(
     @ColumnInfo(name = "repeat_count")
     val repeatCount: Int? = null,
 
+    @ColumnInfo(name = "reminder_days_before", defaultValue = "1")
+    val reminderDaysBefore: Int = 1,
+
     @ColumnInfo(name = "plant_card_id", defaultValue = "''")
     val plantCardId: String = "",
 )

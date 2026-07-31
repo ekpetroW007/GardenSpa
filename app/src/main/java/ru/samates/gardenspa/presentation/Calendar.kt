@@ -1,6 +1,12 @@
 package ru.samates.gardenspa.presentation
 
 import android.app.DatePickerDialog
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -10,11 +16,15 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,6 +50,7 @@ import ru.samates.gardenspa.domain.scheduledTreatmentsOn
 import ru.samates.gardenspa.notifications.TreatmentReminderScheduler
 import ru.samates.gardenspa.presentation.navigation.AppDestinations
 import ru.samates.gardenspa.ui.theme.Cream
+import ru.samates.gardenspa.ui.theme.Forest950
 import ru.samates.gardenspa.ui.theme.Leaf300
 import ru.samates.gardenspa.ui.theme.Mist
 import ru.samates.gardenspa.ui.theme.Warning
@@ -47,25 +58,34 @@ import ru.samates.gardenspa.viewmodel.PlantsViewmodel
 import ru.samates.gardenspa.viewmodel.PlantsViewmodelFactory
 import ru.samates.gardenspa.viewmodel.ProceduresViewmodel
 import ru.samates.gardenspa.viewmodel.ProceduresViewmodelFactory
+import ru.samates.gardenspa.viewmodel.GardenWorkViewModel
+import ru.samates.gardenspa.viewmodel.GardenWorkViewModelFactory
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.roundToInt
 
 @Composable
 fun Calendar(innerPadding: PaddingValues, navController: NavController) {
     val application = LocalContext.current.applicationContext as BookeeperApp
     val plantsVm: PlantsViewmodel = viewModel(factory = PlantsViewmodelFactory(application.repository))
     val proceduresVm: ProceduresViewmodel = viewModel(factory = ProceduresViewmodelFactory(application.repository))
+    val gardenWorkVm: GardenWorkViewModel = viewModel(factory = GardenWorkViewModelFactory(application.repository))
     val plants by plantsVm.plants.collectAsState()
     val procedures by proceduresVm.procedures.collectAsState()
+    val gardenWorkEntries by gardenWorkVm.entries.collectAsState()
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var visibleMonth by remember { mutableStateOf(YearMonth.from(selectedDate)) }
     val treatments = scheduledTreatmentsOn(plants, procedures, selectedDate)
+    val selectedGardenWork = gardenWorkEntries.filter { it.workDate == selectedDate.toString() }
+    val datesWithGardenWork = gardenWorkEntries.mapNotNull { entry ->
+        runCatching { LocalDate.parse(entry.workDate) }.getOrNull()
+    }.toSet()
     val markedDates = (1..visibleMonth.lengthOfMonth()).mapNotNull { day ->
         visibleMonth.atDay(day).takeIf { scheduledTreatmentsOn(plants, procedures, it).isNotEmpty() }
-    }.toSet()
+    }.toSet() + datesWithGardenWork
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(innerPadding),
@@ -78,7 +98,7 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController) {
                     Text("План ухода", color = Mist)
                     Text("Календарь", style = MaterialTheme.typography.headlineLarge, color = Cream)
                 }
-                PrimaryAction("+ Растение", { navController.navigate(AppDestinations.plantAdd(selectedDate.toString())) })
+                PrimaryAction("+ Процедура", { navController.navigate(AppDestinations.plantAdd(selectedDate.toString())) })
             }
         }
         item {
@@ -93,6 +113,23 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController) {
         }
         item {
             SectionTitle(selectedDate.format(DateTimeFormatter.ofPattern("d MMMM", Locale.forLanguageTag("ru"))))
+        }
+        if (selectedGardenWork.isNotEmpty()) {
+            item {
+                GlassCard(Modifier.fillMaxWidth()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Садовая активность", color = Cream, style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            "≈ ${selectedGardenWork.sumOf { it.calories }.roundToInt()} ккал",
+                            color = Leaf300,
+                            style = MaterialTheme.typography.headlineLarge
+                        )
+                        selectedGardenWork.forEach { entry ->
+                            Text("${entry.activityName}: ${entry.minutes} мин", color = Mist)
+                        }
+                    }
+                }
+            }
         }
         if (treatments.isEmpty()) {
             item { EmptyGlassState("Свободный день", "На выбранную дату процедур нет") }
@@ -191,6 +228,10 @@ private fun TreatmentCard(
     onOpen: () -> Unit
 ) {
     val context = LocalContext.current
+    var completionRequested by remember(treatment.plant.id, treatment.originalDate) {
+        mutableStateOf(false)
+    }
+    val completed = treatment.completed || completionRequested
     GlassCard(Modifier.fillMaxWidth(), onClick = onOpen) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (treatment.rescheduled) Text("Перенесено с ${treatment.originalDate}", color = Warning, fontSize = 12.sp)
@@ -211,15 +252,53 @@ private fun TreatmentCard(
                             datePicker.minDate = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
                         }.show()
                     },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f).height(52.dp)
                 )
-                PrimaryAction(
-                    "Выполнено",
-                    onComplete,
-                    Modifier.weight(1f),
-                    enabled = !treatment.completed
-                )
+                Button(
+                    onClick = {
+                        completionRequested = true
+                        onComplete()
+                    },
+                    enabled = !completed,
+                    modifier = Modifier.weight(1f).height(52.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Leaf300,
+                        contentColor = Forest950,
+                        disabledContainerColor = Leaf300,
+                        disabledContentColor = Forest950
+                    ),
+                    contentPadding = PaddingValues(horizontal = 22.dp, vertical = 0.dp)
+                ) {
+                    CompletionButtonContent(completed)
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun CompletionButtonContent(completed: Boolean) {
+    Box(contentAlignment = Alignment.Center) {
+        AnimatedVisibility(
+            visible = !completed,
+            enter = fadeIn(),
+            exit = fadeOut() + scaleOut(targetScale = 0.35f)
+        ) {
+            Text("Выполнено", fontWeight = FontWeight.SemiBold)
+        }
+        AnimatedVisibility(
+            visible = completed,
+            enter = fadeIn() + scaleIn(
+                initialScale = 0.15f,
+                animationSpec = spring(
+                    dampingRatio = 0.45f,
+                    stiffness = 300f
+                )
+            ),
+            exit = fadeOut()
+        ) {
+            Text("✓", fontSize = 24.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

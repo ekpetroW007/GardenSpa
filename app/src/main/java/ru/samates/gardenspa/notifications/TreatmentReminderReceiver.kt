@@ -28,30 +28,42 @@ class TreatmentReminderReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                showTomorrowReminders(context.applicationContext)
+                showTreatmentReminders(context.applicationContext)
             } finally {
                 pendingResult.finish()
             }
         }
     }
 
-    private suspend fun showTomorrowReminders(context: Context) {
+    private suspend fun showTreatmentReminders(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
             PackageManager.PERMISSION_GRANTED
         ) return
 
         val application = context as BookeeperApp
-        val tomorrow = LocalDate.now().plusDays(1)
-        val treatments = scheduledTreatmentsOn(
-            plants = application.repository.getAllPlantsOnce(),
-            procedures = application.repository.getAllProceduresOnce(),
-            date = tomorrow
-        ).filterNot { it.completed }
+        val today = LocalDate.now()
+        val plants = application.repository.getAllPlantsOnce()
+        val procedures = application.repository.getAllProceduresOnce()
+        val treatments = listOf(0, 1, 5).flatMap { daysBefore ->
+            scheduledTreatmentsOn(
+                plants = plants,
+                procedures = procedures,
+                date = today.plusDays(daysBefore.toLong())
+            ).filter { treatment ->
+                !treatment.completed && treatment.plant.reminderDaysBefore == daysBefore
+            }
+        }.distinctBy { it.plant.id to it.originalDate }
         val notificationManager = context.getSystemService(NotificationManager::class.java)
 
         treatments.forEach { treatment ->
             val plant = treatment.plant
+            val timing = when (plant.reminderDaysBefore) {
+                0 -> "Сегодня"
+                1 -> "Завтра"
+                5 -> "Через 5 дней"
+                else -> "Скоро"
+            }
             val details = buildString {
                 append(plant.taskName)
                 append(" — ")
@@ -69,9 +81,9 @@ class TreatmentReminderReceiver : BroadcastReceiver() {
             )
             val notification = NotificationCompat.Builder(context, TreatmentReminderScheduler.CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle("Запланированная обработка")
-                .setContentText("Запланированная обработка: $details")
-                .setStyle(NotificationCompat.BigTextStyle().bigText("Запланированная обработка: $details"))
+                .setContentTitle("$timing — запланированная процедура")
+                .setContentText(details)
+                .setStyle(NotificationCompat.BigTextStyle().bigText("$timing: $details"))
                 .setContentIntent(openApp)
                 .setAutoCancel(true)
                 .build()
