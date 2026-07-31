@@ -437,7 +437,7 @@ private fun AddDrugDialog(
                 OutlinedTextField(
                     value = purpose,
                     onValueChange = { purpose = it },
-                    label = { Text("Назначение") },
+                    label = { Text("Назначение (необязательно)") },
                     keyboardOptions = SentenceKeyboardOptions,
                     minLines = 2,
                     colors = glassTextFieldColors(),
@@ -447,7 +447,7 @@ private fun AddDrugDialog(
                 OutlinedTextField(
                     value = rate,
                     onValueChange = { rate = it },
-                    label = { Text("Норма расхода") },
+                    label = { Text("Норма расхода (необязательно)") },
                     keyboardOptions = SentenceKeyboardOptions,
                     singleLine = true,
                     colors = glassTextFieldColors(),
@@ -459,7 +459,7 @@ private fun AddDrugDialog(
         confirmButton = {
             TextButton(
                 onClick = { onSave(name, purpose, rate) },
-                enabled = name.isNotBlank() && purpose.isNotBlank() && rate.isNotBlank()
+                enabled = name.isNotBlank()
             ) {
                 Text("Добавить", color = Leaf300)
             }
