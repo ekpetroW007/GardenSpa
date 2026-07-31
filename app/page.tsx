@@ -37,6 +37,13 @@ const steps = [
   },
 ];
 
+const videoChapters = [
+  { time: "00:00", label: "Главный экран и задачи" },
+  { time: "00:07", label: "Сады и добавление растений" },
+  { time: "00:27", label: "Календарь обработок" },
+  { time: "00:33", label: "Препараты и рецепты" },
+];
+
 function BrandMark() {
   return (
     <span className="brand-mark" aria-hidden="true">
@@ -96,11 +103,12 @@ export default function Home() {
           </a>
           <div className="nav-links">
             <a href="#possibilities">Возможности</a>
+            <a href="#video">Видео</a>
             <a href="#how">Как это работает</a>
             <a href="#privacy">Приватность</a>
           </div>
-          <a href="#possibilities" className="nav-cta">
-            Познакомиться <ArrowIcon />
+          <a href="#video" className="nav-cta">
+            Смотреть видео <ArrowIcon />
           </a>
         </nav>
 
@@ -113,8 +121,8 @@ export default function Home() {
               о каждом растении — без суеты и лишних напоминаний.
             </p>
             <div className="hero-actions">
-              <a className="button button-primary" href="#how">
-                Как это работает <ArrowIcon />
+              <a className="button button-primary" href="#video">
+                Смотреть видео <ArrowIcon />
               </a>
               <span className="platform-note">
                 <span className="android-dot" />
@@ -183,6 +191,45 @@ export default function Home() {
                 <a href="#how">Подробнее <ArrowIcon /></a>
               </article>
             ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="video-guide" id="video">
+        <div className="shell video-guide-grid">
+          <div className="video-guide-copy">
+            <span className="section-label section-label-dark">GardenSpa в действии</span>
+            <h2>Посмотрите, как устроен <em>ежедневный уход.</em></h2>
+            <p>
+              Короткая демонстрация реального приложения: от создания сада и
+              растения до календаря обработок, препаратов и домашних рецептов.
+            </p>
+            <div className="video-chapters" aria-label="Содержание видео">
+              {videoChapters.map((chapter) => (
+                <div key={chapter.time}>
+                  <span>{chapter.time}</span>
+                  <p>{chapter.label}</p>
+                </div>
+              ))}
+            </div>
+            <p className="video-note">Без звука · касания отмечены на экране · 59 секунд</p>
+          </div>
+          <div className="video-stage">
+            <span className="video-ring video-ring-one" aria-hidden="true" />
+            <span className="video-ring video-ring-two" aria-hidden="true" />
+            <div className="video-phone">
+              <video
+                className="guide-video"
+                controls
+                playsInline
+                preload="metadata"
+                poster="/screenshots/app-home.png"
+                aria-label="Видеоинструкция по приложению GardenSpa"
+              >
+                <source src="/videos/gardenspa-guide.mp4" type="video/mp4" />
+                Ваш браузер не поддерживает воспроизведение видео.
+              </video>
+            </div>
           </div>
         </div>
       </section>
