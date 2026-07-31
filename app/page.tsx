@@ -127,7 +127,7 @@ export default function Home() {
             <PhonePreview screen="home" />
             <div className="floating-note floating-note-top">
               <span className="note-icon note-icon-leaf" />
-              <span><small>Сегодня в календаре</small><strong>Первая подкормка</strong></span>
+              <span><small>Статус на сегодня</small><strong>Всё идёт по плану</strong></span>
             </div>
             <div className="floating-note floating-note-bottom">
               <span className="pulse-dot" />
