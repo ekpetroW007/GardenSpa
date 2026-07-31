@@ -19,6 +19,7 @@ class PreferencesManager(context: Context) {
     companion object {
         val IS_REGISTERED = booleanPreferencesKey("is_registered")
         val USER_LOGIN = stringPreferencesKey("user_login")
+        val USER_WEIGHT_KG = stringPreferencesKey("user_weight_kg")
     }
 
     suspend fun setRegistered(isRegistered: Boolean) {
@@ -33,6 +34,12 @@ class PreferencesManager(context: Context) {
         }
     }
 
+    suspend fun setUserWeightKg(weightKg: Double) {
+        dataStore.edit { preferences ->
+            preferences[USER_WEIGHT_KG] = weightKg.toString()
+        }
+    }
+
     val isRegistered: Flow<Boolean> = dataStore.data
         .map { preferences ->
             preferences[IS_REGISTERED] ?: false
@@ -41,5 +48,10 @@ class PreferencesManager(context: Context) {
     val userLogin: Flow<String> = dataStore.data
         .map { preferences ->
             preferences[USER_LOGIN] ?: "Гость"
+        }
+
+    val userWeightKg: Flow<Double> = dataStore.data
+        .map { preferences ->
+            preferences[USER_WEIGHT_KG]?.toDoubleOrNull() ?: 70.0
         }
 }

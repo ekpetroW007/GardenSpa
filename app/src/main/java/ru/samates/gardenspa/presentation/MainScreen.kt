@@ -19,6 +19,7 @@ fun MainScreen(
     userViewModel: UserViewModel
 ) {
     val userLogin by userViewModel.userLogin.collectAsState()
+    val userWeightKg by userViewModel.userWeightKg.collectAsState()
     val selectedScreen = viewModel.selectedScreen
     BotanicalBackground {
         Scaffold(
@@ -37,9 +38,12 @@ fun MainScreen(
                     navController = navController,
                     onScreenSelected = viewModel::changeScreen,
                     modifier = Modifier.padding(innerPadding),
-                    userLogin = userLogin
+                    userLogin = userLogin,
+                    userWeightKg = userWeightKg,
+                    onWeightChanged = userViewModel::updateWeightKg
                 )
                 "Препараты" -> Drugs(navController, innerPadding)
+                "Рецепты" -> FolkRecipes(innerPadding)
                 "Мои сады" -> MyGardens(navController, innerPadding)
                 "Календарь" -> Calendar(innerPadding, navController)
             }

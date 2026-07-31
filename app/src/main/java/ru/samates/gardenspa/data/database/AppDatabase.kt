@@ -15,9 +15,10 @@ import ru.samates.gardenspa.data.database.entity.*
         GardenEntity::class,
         PlantEntity::class,
         TaskEntity::class,
-        ProcedureEntity::class
+        ProcedureEntity::class,
+        GardenWorkEntity::class
     ],
-    version = 4,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -27,6 +28,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun plantDao(): PlantDAO
     abstract fun taskDao(): TaskDAO
     abstract fun procedureDao(): ProcedureDAO
+    abstract fun gardenWorkDao(): GardenWorkDAO
 
     companion object {
         @Volatile
@@ -39,7 +41,13 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "bookeper_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(
+                        MIGRATION_1_2,
+                        MIGRATION_2_3,
+                        MIGRATION_3_4,
+                        MIGRATION_4_5,
+                        MIGRATION_5_6
+                    )
                     .build()
                 INSTANCE = instance
                 instance
@@ -87,6 +95,37 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE plants ADD COLUMN plant_card_id TEXT NOT NULL DEFAULT ''")
                 database.execSQL("UPDATE plants SET plant_card_id = 'legacy-' || id")
+            }
+        }
+
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS garden_work_entries (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        work_date TEXT NOT NULL,
+                        activity_code TEXT NOT NULL,
+                        activity_name TEXT NOT NULL,
+                        minutes INTEGER NOT NULL,
+                        met REAL NOT NULL,
+                        weight_kg REAL NOT NULL,
+                        calories REAL NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_garden_work_entries_work_date " +
+                        "ON garden_work_entries(work_date)"
+                )
+            }
+        }
+
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE plants ADD COLUMN reminder_days_before INTEGER NOT NULL DEFAULT 1"
+                )
             }
         }
 

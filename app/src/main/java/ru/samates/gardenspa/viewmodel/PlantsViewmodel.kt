@@ -91,7 +91,8 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
         repeatDaysOfWeek: String = "",
         repeatEndType: String = "NEVER",
         repeatEndDate: String? = null,
-        repeatCount: Int? = null
+        repeatCount: Int? = null,
+        reminderDaysBefore: Int = 1
     ) {
         viewModelScope.launch {
             try {
@@ -110,6 +111,7 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                     repeatEndType = repeatEndType,
                     repeatEndDate = repeatEndDate,
                     repeatCount = repeatCount,
+                    reminderDaysBefore = reminderDaysBefore,
                     plantCardId = UUID.randomUUID().toString()
                 )
                 repository.insertPlant(newPlant)
@@ -135,6 +137,7 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
         repeatEndType: String = "NEVER",
         repeatEndDate: String? = null,
         repeatCount: Int? = null,
+        reminderDaysBefore: Int = 1,
         onSaved: () -> Unit = {}
     ) {
         viewModelScope.launch {
@@ -165,6 +168,7 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                         repeatEndType = repeatEndType,
                         repeatEndDate = repeatEndDate,
                         repeatCount = repeatCount,
+                        reminderDaysBefore = reminderDaysBefore,
                         plantCardId = cardId
                     )
                 }

@@ -15,6 +15,9 @@ class UserViewModel(private val preferencesManager: PreferencesManager) : ViewMo
     private val _userLogin = MutableStateFlow("Гость")
     val userLogin: StateFlow<String> = _userLogin
 
+    private val _userWeightKg = MutableStateFlow(70.0)
+    val userWeightKg: StateFlow<Double> = _userWeightKg
+
     init {
         viewModelScope.launch {
             preferencesManager.isRegistered.collect { registered ->
@@ -27,12 +30,24 @@ class UserViewModel(private val preferencesManager: PreferencesManager) : ViewMo
                 _userLogin.value = login
             }
         }
+
+        viewModelScope.launch {
+            preferencesManager.userWeightKg.collect { weightKg ->
+                _userWeightKg.value = weightKg
+            }
+        }
     }
 
     fun registerUser(login: String) {
         viewModelScope.launch {
             preferencesManager.setUserLogin(login)
             preferencesManager.setRegistered(true)
+        }
+    }
+
+    fun updateWeightKg(weightKg: Double) {
+        viewModelScope.launch {
+            preferencesManager.setUserWeightKg(weightKg)
         }
     }
 }
