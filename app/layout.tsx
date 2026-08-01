@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import "./globals.css";
 
-const title = "GardenSpa — ваш сад в своём ритме";
+const title = "GardenSpa — приложение для садовода и ухода за растениями";
 const description =
-  "Персональный Android-помощник для садовода: растения, процедуры, календарь ухода и препараты в одном спокойном месте.";
+  "GardenSpa — Android-приложение для садоводов: дневник растений, календарь полива, подкормок и обработок, напоминания и учёт препаратов. Работает офлайн.";
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
@@ -15,7 +15,6 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title,
     description,
-    keywords: ["GardenSpa", "сад", "растения", "календарь ухода", "Android"],
     icons: {
       icon: "/icon.png",
       shortcut: "/icon.png",
@@ -23,7 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     openGraph: {
       title,
-      description: "Спокойный помощник для тех, кто растит с любовью.",
+      description: "Садовый дневник, календарь ухода за растениями и напоминания в одном Android-приложении.",
       type: "website",
       locale: "ru_RU",
       images: [
@@ -31,14 +30,14 @@ export async function generateMetadata(): Promise<Metadata> {
           url: `${origin}/og.png`,
           width: 1732,
           height: 909,
-          alt: "GardenSpa — ваш сад в своём ритме",
+          alt: "GardenSpa — приложение для садовода и ухода за растениями",
         },
       ],
     },
     twitter: {
       card: "summary_large_image",
       title,
-      description: "Спокойный помощник для тех, кто растит с любовью.",
+      description: "Садовый дневник, календарь ухода за растениями и напоминания в одном Android-приложении.",
       images: [`${origin}/og.png`],
     },
   };
