@@ -37,6 +37,9 @@ test("server-renders the GardenSpa landing page", async () => {
   assert.match(html, /Только на вашем телефоне/);
   assert.match(html, /Android-приложение для садоводов и дачников/);
   assert.match(html, /Садовый дневник/);
+  assert.match(html, /https:\/\/www\.rustore\.ru\/catalog\/app\/ru\.samates\.gardenspa/);
+  assert.match(html, /Скачать в RuStore/);
+  assert.match(html, /\/rustore-gardenspa-qr\.png/);
   assert.match(html, /\/screenshots\/app-home\.png/);
   assert.match(html, /\/screenshots\/app-calendar\.png/);
   assert.match(html, /\/og\.png/);
@@ -62,4 +65,5 @@ test("removes starter UI and keeps the finished metadata", async () => {
     access(new URL("../app/_sites-preview/SkeletonPreview.tsx", import.meta.url)),
   );
   await access(new URL("public/og.png", templateRoot));
+  await access(new URL("public/rustore-gardenspa-qr.png", templateRoot));
 });
