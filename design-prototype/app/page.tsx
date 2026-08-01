@@ -1,3 +1,5 @@
+const RUSTORE_URL = "https://www.rustore.ru/catalog/app/ru.samates.gardenspa";
+
 const features = [
   {
     number: "01",
@@ -109,8 +111,13 @@ export default function Home() {
             <a href="#how">Как работает</a>
             <a href="#privacy">Приватность</a>
           </div>
-          <a href="#video" className="nav-cta">
-            Смотреть видео <ArrowIcon />
+          <a
+            href={RUSTORE_URL}
+            className="nav-cta"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Скачать <ArrowIcon />
           </a>
         </nav>
 
@@ -123,12 +130,33 @@ export default function Home() {
               и обработок. Планируйте работы и получайте напоминания — без суеты.
             </p>
             <div className="hero-actions">
-              <a className="button button-primary" href="#video">
-                Смотреть видео <ArrowIcon />
+              <a
+                className="button button-primary"
+                href={RUSTORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Скачать в RuStore <ArrowIcon />
               </a>
-              <span className="platform-note">
-                <span className="android-dot" />
-                Приложение для Android
+              <a className="video-link" href="#video">Смотреть видео <span aria-hidden="true">↓</span></a>
+            </div>
+            <div className="hero-qr">
+              <a
+                href={RUSTORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Открыть страницу GardenSpa в RuStore"
+              >
+                <img
+                  src="/rustore-gardenspa-qr.png"
+                  alt="QR-код для скачивания GardenSpa из RuStore"
+                  width={630}
+                  height={630}
+                />
+              </a>
+              <span>
+                <small>Для Android</small>
+                <strong>Наведите камеру и скачайте GardenSpa</strong>
               </span>
             </div>
           </div>
@@ -295,9 +323,35 @@ export default function Home() {
           <span className="section-label section-label-dark">GardenSpa</span>
           <h2>Уход за растениями — по плану.<br /><em>Ваш сад — в своём ритме.</em></h2>
           <p>Садовый дневник и календарь ухода для тех, кто растит с любовью.</p>
-          <a className="button button-primary" href="#top">
-            Вернуться в начало <span aria-hidden="true">↑</span>
-          </a>
+          <div className="closing-download">
+            <a
+              href={RUSTORE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Открыть страницу GardenSpa в RuStore"
+            >
+              <img
+                src="/rustore-gardenspa-qr.png"
+                alt="QR-код GardenSpa в RuStore"
+                width={630}
+                height={630}
+                loading="lazy"
+              />
+            </a>
+            <div className="closing-download-copy">
+              <span>Android · RuStore</span>
+              <strong>Скачайте GardenSpa</strong>
+              <small>Отсканируйте QR-код или откройте RuStore по кнопке</small>
+              <a
+                className="button button-primary"
+                href={RUSTORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Скачать в RuStore <ArrowIcon />
+              </a>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -308,7 +362,7 @@ export default function Home() {
             <span>Garden<span>Spa</span></span>
           </a>
           <p>Приложение для садоводов и ухода за растениями</p>
-          <span>Android · 2026</span>
+          <a href={RUSTORE_URL} target="_blank" rel="noopener noreferrer">RuStore · Android · 2026</a>
         </div>
       </footer>
     </main>
