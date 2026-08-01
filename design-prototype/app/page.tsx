@@ -1,20 +1,20 @@
 const features = [
   {
     number: "01",
-    title: "Сады и растения",
-    text: "Соберите домашние цветы, теплицу и участок в понятные пространства. У каждого растения — своё место и свой ритм.",
+    title: "Садовый дневник",
+    text: "Добавляйте домашние цветы, растения на даче и в теплице. У каждого сада и растения будет своя понятная карточка.",
     accent: "leaf",
   },
   {
     number: "02",
-    title: "Календарь заботы",
-    text: "Полив, подкормка, обработка или пересадка появляются в календаре именно тогда, когда нужны.",
+    title: "Календарь ухода",
+    text: "Планируйте полив, подкормку, обработку и пересадку. GardenSpa вовремя напомнит о предстоящих садовых работах.",
     accent: "sun",
   },
   {
     number: "03",
-    title: "Препараты под рукой",
-    text: "Сохраните назначение и норму расхода, чтобы не искать упаковку в тот момент, когда пора действовать.",
+    title: "Учёт препаратов",
+    text: "Сохраняйте назначение и норму расхода препаратов, связывайте их с растениями и запланированными обработками.",
     accent: "drop",
   },
 ];
@@ -22,18 +22,18 @@ const features = [
 const steps = [
   {
     number: "1",
-    title: "Создайте свой сад",
-    text: "Дом, дача, теплица или отдельная коллекция — организуйте растения так, как удобно вам.",
+    title: "Создайте садовый дневник",
+    text: "Добавьте дом, дачу, теплицу или отдельную коллекцию, а затем сохраните нужные растения.",
   },
   {
     number: "2",
-    title: "Добавьте заботу",
-    text: "Назначьте процедуру, препарат и удобный интервал повторения.",
+    title: "Запланируйте уход",
+    text: "Выберите полив, подкормку, пересадку или обработку, препарат и удобный интервал повторения.",
   },
   {
     number: "3",
-    title: "Следуйте ритму",
-    text: "GardenSpa соберёт предстоящие дела в спокойный недельный календарь.",
+    title: "Получайте напоминания",
+    text: "GardenSpa соберёт садовые работы в календаре и напомнит, когда растению потребуется уход.",
   },
 ];
 
@@ -80,8 +80,8 @@ function PhonePreview({
           }
           alt={
             isCalendar
-              ? "Реальный экран календаря приложения GardenSpa"
-              : "Реальный главный экран приложения GardenSpa"
+              ? "Календарь ухода за растениями в приложении GardenSpa"
+              : "Садовый дневник и растения в приложении GardenSpa"
           }
           width={1080}
           height={2400}
@@ -106,7 +106,7 @@ export default function Home() {
           <div className="nav-links">
             <a href="#possibilities">Возможности</a>
             <a href="#video">Видео</a>
-            <a href="#how">Как это работает</a>
+            <a href="#how">Как работает</a>
             <a href="#privacy">Приватность</a>
           </div>
           <a href="#video" className="nav-cta">
@@ -116,11 +116,11 @@ export default function Home() {
 
         <div className="hero-content shell">
           <div className="hero-copy">
-            <div className="kicker"><span /> Персональный помощник садовода</div>
-            <h1>Ваш сад.<br /><em>В своём ритме.</em></h1>
+            <div className="kicker"><span /> Android-приложение для садоводов и дачников</div>
+            <h1>Приложение для ухода<br /><em>за садом и растениями.</em></h1>
             <p>
-              GardenSpa помогает вовремя поливать, подкармливать и заботиться
-              о каждом растении — без суеты и лишних напоминаний.
+              GardenSpa объединяет садовый дневник, календарь полива, подкормок
+              и обработок. Планируйте работы и получайте напоминания — без суеты.
             </p>
             <div className="hero-actions">
               <a className="button button-primary" href="#video">
@@ -147,29 +147,29 @@ export default function Home() {
         </div>
 
         <div className="hero-foot shell">
-          <span>Сады</span><i />
-          <span>Растения</span><i />
-          <span>Календарь</span><i />
-          <span>Препараты</span>
+          <span>Садовый дневник</span><i />
+          <span>Календарь ухода</span><i />
+          <span>Напоминания</span><i />
+          <span>Учёт препаратов</span>
         </div>
       </section>
 
       <section className="intro section-light">
         <div className="shell intro-grid">
           <div>
-            <span className="section-label">Забота без перегруза</span>
-            <h2>Всё важное о растениях — <em>в одном спокойном месте.</em></h2>
+            <span className="section-label">Уход без перегруза</span>
+            <h2>Календарь ухода за растениями — <em>в одном спокойном месте.</em></h2>
           </div>
           <div className="intro-copy">
             <p>
-              Когда растений становится больше, память превращается в бесконечный
-              список: кого полить, чем обработать, что пересадить. GardenSpa
-              бережно собирает эту заботу в понятную систему.
+              Когда растений становится больше, трудно помнить, что и когда
+              поливать, чем подкармливать и обрабатывать. GardenSpa превращает
+              разрозненные дела в понятный план садовых работ.
             </p>
             <div className="intro-facts">
-              <span><b>01</b> Без облака</span>
+              <span><b>01</b> Работает без интернета</span>
               <span><b>02</b> Без рекламы</span>
-              <span><b>03</b> Без лишнего шума</span>
+              <span><b>03</b> Данные на телефоне</span>
             </div>
           </div>
         </div>
@@ -178,8 +178,8 @@ export default function Home() {
       <section className="possibilities section-light" id="possibilities">
         <div className="shell">
           <div className="section-head">
-            <span className="section-label">Возможности</span>
-            <p>Три опоры для уверенного ухода</p>
+            <span className="section-label">Возможности приложения для садовода</span>
+            <p>Дневник растений, календарь работ и препараты в одной системе</p>
           </div>
           <div className="feature-grid">
             {features.map((feature) => (
@@ -201,11 +201,11 @@ export default function Home() {
         <div className="shell video-guide-grid">
           <div className="video-guide-copy">
             <span className="section-label section-label-dark">GardenSpa в действии</span>
-            <h2>Посмотрите, как устроен <em>ежедневный уход.</em></h2>
+            <h2>Как работает <em>календарь садовых работ.</em></h2>
             <p>
-              Полный сценарий в реальном приложении: добавляем для смородины
-              обработку серой, настраиваем 3 повтора через 5 дней, получаем
-              уведомление и отмечаем задачу выполненной.
+              Реальный сценарий ухода за растением: добавляем для смородины
+              обработку серой, настраиваем три повтора через пять дней, получаем
+              напоминание и отмечаем садовую работу выполненной.
             </p>
             <div className="video-chapters" aria-label="Содержание видео">
               {videoChapters.map((chapter) => (
@@ -247,7 +247,7 @@ export default function Home() {
           </div>
           <div className="how-copy">
             <span className="section-label section-label-dark">Просто начать</span>
-            <h2>От первого растения — к своему <em>ритму заботы.</em></h2>
+            <h2>Настройте уход за садом <em>за три шага.</em></h2>
             <div className="steps">
               {steps.map((step) => (
                 <div className="step" key={step.number}>
@@ -271,11 +271,12 @@ export default function Home() {
             <span className="privacy-core"><BrandMark /></span>
           </div>
           <div className="privacy-copy">
-            <span className="section-label">Личное остаётся личным</span>
-            <h2>Ваш сад живёт <em>на вашем телефоне.</em></h2>
+            <span className="section-label">Офлайн-приложение для садовода</span>
+            <h2>Данные о растениях остаются <em>на вашем телефоне.</em></h2>
             <p>
-              GardenSpa не требует облака или сервера. Сады, растения,
-              процедуры и препараты хранятся локально — там, где им и место.
+              GardenSpa работает без интернета, облака и сервера. Садовый
+              дневник, растения, запланированные процедуры и препараты
+              хранятся локально на устройстве.
             </p>
             <div className="privacy-points">
               <span><i>✓</i> Локальное хранение</span>
@@ -292,8 +293,8 @@ export default function Home() {
         <div className="shell closing-content">
           <BrandMark />
           <span className="section-label section-label-dark">GardenSpa</span>
-          <h2>Больше времени любоваться.<br /><em>Меньше — вспоминать.</em></h2>
-          <p>Спокойный помощник для тех, кто растит с любовью.</p>
+          <h2>Уход за растениями — по плану.<br /><em>Ваш сад — в своём ритме.</em></h2>
+          <p>Садовый дневник и календарь ухода для тех, кто растит с любовью.</p>
           <a className="button button-primary" href="#top">
             Вернуться в начало <span aria-hidden="true">↑</span>
           </a>
@@ -306,7 +307,7 @@ export default function Home() {
             <BrandMark />
             <span>Garden<span>Spa</span></span>
           </a>
-          <p>Персональный помощник садовода</p>
+          <p>Приложение для садоводов и ухода за растениями</p>
           <span>Android · 2026</span>
         </div>
       </footer>
