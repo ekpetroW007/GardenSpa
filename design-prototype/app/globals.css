@@ -87,7 +87,7 @@ a {
   z-index: 20;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 22px;
   border-bottom: 1px solid rgba(255, 255, 255, .14);
 }
 
@@ -98,6 +98,10 @@ a {
   font-size: 21px;
   font-weight: 560;
   letter-spacing: -.6px;
+}
+
+.nav > .brand {
+  margin-right: auto;
 }
 
 .brand > span:last-child > span {
@@ -162,6 +166,31 @@ a {
 .nav-links a:hover,
 .nav-links a:focus-visible {
   color: var(--leaf-200);
+}
+
+.nav-qr {
+  width: 62px;
+  height: 62px;
+  display: block;
+  flex: 0 0 auto;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, .2);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .08);
+  line-height: 0;
+  transition: transform .2s ease, border-color .2s ease;
+}
+
+.nav-qr:hover,
+.nav-qr:focus-visible {
+  transform: scale(1.04);
+  border-color: var(--leaf-300);
+}
+
+.nav-qr img {
+  width: 52px;
+  height: 52px;
+  border-radius: 7px;
 }
 
 .nav-cta {
@@ -305,20 +334,6 @@ h2 em {
   border-color: var(--leaf-300);
 }
 
-.hero-qr {
-  width: 82px;
-  height: 82px;
-  display: block;
-  flex: 0 0 auto;
-  padding: 5px;
-  border: 1px solid rgba(255, 255, 255, .13);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, .07);
-  backdrop-filter: blur(16px);
-  line-height: 0;
-  transition: transform .2s ease, border-color .2s ease;
-}
-
 .closing-download > a {
   display: block;
   flex: 0 0 auto;
@@ -327,22 +342,9 @@ h2 em {
   transition: transform .2s ease;
 }
 
-.hero-qr:hover,
-.hero-qr:focus-visible,
 .closing-download > a:hover,
 .closing-download > a:focus-visible {
   transform: scale(1.035);
-}
-
-.hero-qr:hover,
-.hero-qr:focus-visible {
-  border-color: rgba(205, 232, 167, .58);
-}
-
-.hero-qr img {
-  width: 72px;
-  height: 72px;
-  border-radius: 9px;
 }
 
 .hero-phone {
@@ -1568,6 +1570,10 @@ footer {
     display: none;
   }
 
+  .nav-qr {
+    display: none;
+  }
+
   .hero {
     min-height: 1080px;
   }
@@ -1712,10 +1718,6 @@ footer {
   .hero-actions {
     flex-direction: column;
     gap: 18px;
-  }
-
-  .hero-qr {
-    display: none;
   }
 
   .hero-phone {
