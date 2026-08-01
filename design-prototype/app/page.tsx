@@ -139,9 +139,8 @@ export default function Home() {
                 Скачать в RuStore <ArrowIcon />
               </a>
               <a className="video-link" href="#video">Смотреть видео <span aria-hidden="true">↓</span></a>
-            </div>
-            <div className="hero-qr">
               <a
+                className="hero-qr"
                 href={RUSTORE_URL}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -154,10 +153,6 @@ export default function Home() {
                   height={630}
                 />
               </a>
-              <span>
-                <small>Для Android</small>
-                <strong>Наведите камеру и скачайте GardenSpa</strong>
-              </span>
             </div>
           </div>
           <div className="hero-phone">
