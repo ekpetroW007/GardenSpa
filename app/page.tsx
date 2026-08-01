@@ -112,6 +112,20 @@ export default function Home() {
             <a href="#privacy">Приватность</a>
           </div>
           <a
+            className="nav-qr"
+            href={RUSTORE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Открыть страницу GardenSpa в RuStore"
+          >
+            <img
+              src="/rustore-gardenspa-qr.png"
+              alt="QR-код GardenSpa в RuStore"
+              width={630}
+              height={630}
+            />
+          </a>
+          <a
             href={RUSTORE_URL}
             className="nav-cta"
             target="_blank"
@@ -139,20 +153,6 @@ export default function Home() {
                 Скачать в RuStore <ArrowIcon />
               </a>
               <a className="video-link" href="#video">Смотреть видео <span aria-hidden="true">↓</span></a>
-              <a
-                className="hero-qr"
-                href={RUSTORE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Открыть страницу GardenSpa в RuStore"
-              >
-                <img
-                  src="/rustore-gardenspa-qr.png"
-                  alt="QR-код для скачивания GardenSpa из RuStore"
-                  width={630}
-                  height={630}
-                />
-              </a>
             </div>
           </div>
           <div className="hero-phone">
