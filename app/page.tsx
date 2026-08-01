@@ -38,10 +38,12 @@ const steps = [
 ];
 
 const videoChapters = [
-  { time: "00:00", label: "Главный экран и задачи" },
-  { time: "00:07", label: "Сады и добавление растений" },
-  { time: "00:27", label: "Календарь обработок" },
-  { time: "00:33", label: "Препараты и рецепты" },
+  { time: "00:00", label: "Открытие календаря" },
+  { time: "00:07", label: "Новое растение «Смородина»" },
+  { time: "00:18", label: "Действие и препарат «Сера»" },
+  { time: "00:25", label: "3 повтора через 5 дней" },
+  { time: "00:39", label: "Сохранение и уведомление" },
+  { time: "00:51", label: "Карточка и отметка «Выполнено»" },
 ];
 
 function BrandMark() {
@@ -201,8 +203,9 @@ export default function Home() {
             <span className="section-label section-label-dark">GardenSpa в действии</span>
             <h2>Посмотрите, как устроен <em>ежедневный уход.</em></h2>
             <p>
-              Короткая демонстрация реального приложения: от создания сада и
-              растения до календаря обработок, препаратов и домашних рецептов.
+              Полный сценарий в реальном приложении: добавляем для смородины
+              обработку серой, настраиваем 3 повтора через 5 дней, получаем
+              уведомление и отмечаем задачу выполненной.
             </p>
             <div className="video-chapters" aria-label="Содержание видео">
               {videoChapters.map((chapter) => (
@@ -212,7 +215,7 @@ export default function Home() {
                 </div>
               ))}
             </div>
-            <p className="video-note">Без звука · касания отмечены на экране · 59 секунд</p>
+            <p className="video-note">Без звука · каждое касание выделено кругом · 63 секунды</p>
           </div>
           <div className="video-stage">
             <span className="video-ring video-ring-one" aria-hidden="true" />
