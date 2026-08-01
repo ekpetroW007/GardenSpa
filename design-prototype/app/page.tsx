@@ -215,7 +215,7 @@ export default function Home() {
                 </div>
               ))}
             </div>
-            <p className="video-note">Без звука · каждое касание выделено кругом · 63 секунды</p>
+            <p className="video-note">Без звука · каждое касание выделено кругом · 74 секунды</p>
           </div>
           <div className="video-stage">
             <span className="video-ring video-ring-one" aria-hidden="true" />
