@@ -40,7 +40,7 @@ test("server-renders the GardenSpa landing page", async () => {
   assert.match(html, /https:\/\/www\.rustore\.ru\/catalog\/app\/ru\.samates\.gardenspa/);
   assert.match(html, /Скачать в RuStore/);
   assert.match(html, /\/rustore-gardenspa-qr\.png/);
-  assert.match(html, /\/screenshots\/app-home\.png/);
+  assert.match(html, /\/screenshots\/app-home-v1-0-24\.png/);
   assert.match(html, /\/screenshots\/app-calendar\.png/);
   assert.match(html, /\/og\.png/);
   assert.doesNotMatch(html, /codex-preview|SkeletonPreview|Starter Project/);
