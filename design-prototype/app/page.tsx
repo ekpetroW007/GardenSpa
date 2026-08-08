@@ -78,7 +78,7 @@ function PhonePreview({
           src={
             isCalendar
               ? "/screenshots/app-calendar.png"
-              : "/screenshots/app-home.png"
+              : "/screenshots/app-home-v1-0-24.png"
           }
           alt={
             isCalendar
@@ -249,7 +249,7 @@ export default function Home() {
                 controls
                 playsInline
                 preload="metadata"
-                poster="/screenshots/app-home.png"
+                poster="/screenshots/app-home-v1-0-24.png"
                 aria-label="Видеоинструкция по приложению GardenSpa"
               >
                 <source src="/videos/gardenspa-guide.mp4" type="video/mp4" />
