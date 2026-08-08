@@ -8,6 +8,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,11 +31,14 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import ru.samates.gardenspa.BookeeperApp
+import ru.samates.gardenspa.domain.ScheduledTreatment
 import ru.samates.gardenspa.domain.scheduledTreatmentsOn
 import ru.samates.gardenspa.domain.gardenWorkDate
 import ru.samates.gardenspa.domain.nextGardenWorkReset
+import ru.samates.gardenspa.notifications.TreatmentReminderScheduler
 import ru.samates.gardenspa.presentation.navigation.AppDestinations
 import ru.samates.gardenspa.ui.theme.Cream
+import ru.samates.gardenspa.ui.theme.Forest950
 import ru.samates.gardenspa.ui.theme.Leaf300
 import ru.samates.gardenspa.ui.theme.Mist
 import ru.samates.gardenspa.viewmodel.DrugsViewmodel
@@ -168,18 +175,65 @@ fun Profile(
         if (todayTreatments.isEmpty()) {
             item { EmptyGlassState("На сегодня всё", "Новых процедур не запланировано") }
         } else {
-            items(todayTreatments.size) { index ->
-                val treatment = todayTreatments[index]
-                GlassCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { navController.navigate(AppDestinations.plantDetails(treatment.plant.id)) }
-                ) {
-                    Column {
-                        Text(treatment.plant.plantName, style = MaterialTheme.typography.titleLarge, color = Cream)
-                        Text(treatment.plant.taskName, color = Leaf300)
-                        Text("${treatment.plant.gardenName} · ${treatment.plant.drugName}", color = Mist)
+            items(todayTreatments, key = { "today:${it.plant.id}:${it.originalDate}" }) { treatment ->
+                TodayTreatmentCard(
+                    treatment = treatment,
+                    onOpen = { navController.navigate(AppDestinations.plantDetails(treatment.plant.id)) },
+                    onComplete = {
+                        proceduresVm.markCompleted(
+                            treatment.plant.id,
+                            treatment.plant.taskName,
+                            treatment.originalDate,
+                            treatment.scheduledDate
+                        ) {
+                            TreatmentReminderScheduler.cancelTreatmentNotification(
+                                app,
+                                treatment.plant.id,
+                                treatment.originalDate.toString()
+                            )
+                        }
                     }
-                }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TodayTreatmentCard(
+    treatment: ScheduledTreatment,
+    onOpen: () -> Unit,
+    onComplete: () -> Unit
+) {
+    var completionRequested by remember(treatment.plant.id, treatment.originalDate) {
+        mutableStateOf(false)
+    }
+    val completed = treatment.completed || completionRequested
+
+    GlassCard(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onOpen
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(treatment.plant.plantName, style = MaterialTheme.typography.titleLarge, color = Cream)
+            Text(treatment.plant.taskName, color = Leaf300)
+            Text("${treatment.plant.gardenName} · ${treatment.plant.drugName}", color = Mist)
+            Button(
+                onClick = {
+                    completionRequested = true
+                    onComplete()
+                },
+                enabled = !completed,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Leaf300,
+                    contentColor = Forest950,
+                    disabledContainerColor = Leaf300,
+                    disabledContentColor = Forest950
+                )
+            ) {
+                CompletionButtonContent(completed)
             }
         }
     }

@@ -87,7 +87,7 @@ a {
   z-index: 20;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 22px;
   border-bottom: 1px solid rgba(255, 255, 255, .14);
 }
 
@@ -98,6 +98,10 @@ a {
   font-size: 21px;
   font-weight: 560;
   letter-spacing: -.6px;
+}
+
+.nav > .brand {
+  margin-right: auto;
 }
 
 .brand > span:last-child > span {
@@ -162,6 +166,31 @@ a {
 .nav-links a:hover,
 .nav-links a:focus-visible {
   color: var(--leaf-200);
+}
+
+.nav-qr {
+  width: 62px;
+  height: 62px;
+  display: block;
+  flex: 0 0 auto;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, .2);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .08);
+  line-height: 0;
+  transition: transform .2s ease, border-color .2s ease;
+}
+
+.nav-qr:hover,
+.nav-qr:focus-visible {
+  transform: scale(1.04);
+  border-color: var(--leaf-300);
+}
+
+.nav-qr img {
+  width: 52px;
+  height: 52px;
+  border-radius: 7px;
 }
 
 .nav-cta {
@@ -287,20 +316,35 @@ h2 em {
   background: var(--leaf-200);
 }
 
-.platform-note {
+.video-link {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  font-size: 12px;
-  color: rgba(244, 243, 232, .62);
+  gap: 10px;
+  padding: 10px 0 7px;
+  border-bottom: 1px solid rgba(244, 243, 232, .34);
+  color: rgba(244, 243, 232, .78);
+  font-size: 13px;
+  font-weight: 650;
+  transition: color .2s ease, border-color .2s ease;
 }
 
-.android-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #a8d87a;
-  box-shadow: 0 0 0 5px rgba(168, 216, 122, .1);
+.video-link:hover,
+.video-link:focus-visible {
+  color: var(--leaf-200);
+  border-color: var(--leaf-300);
+}
+
+.closing-download > a {
+  display: block;
+  flex: 0 0 auto;
+  line-height: 0;
+  border-radius: 11px;
+  transition: transform .2s ease;
+}
+
+.closing-download > a:hover,
+.closing-download > a:focus-visible {
+  transform: scale(1.035);
 }
 
 .hero-phone {
@@ -1341,7 +1385,7 @@ h2 em {
 }
 
 .closing {
-  min-height: 650px;
+  min-height: 790px;
   position: relative;
   overflow: hidden;
   display: grid;
@@ -1371,6 +1415,7 @@ h2 em {
   display: flex;
   flex-direction: column;
   align-items: center;
+  padding: 72px 0;
 }
 
 .closing-content > .brand-mark {
@@ -1385,7 +1430,63 @@ h2 em {
 .closing p {
   color: rgba(244, 243, 232, .66);
   font-size: 14px;
-  margin: 25px 0 30px;
+  margin: 25px 0 24px;
+}
+
+.closing-download {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 26px;
+  background: rgba(255, 255, 255, .08);
+  box-shadow: 0 22px 65px rgba(0, 0, 0, .2);
+  backdrop-filter: blur(18px);
+  text-align: left;
+}
+
+.closing-download img {
+  width: 132px;
+  height: 132px;
+  border-radius: 13px;
+}
+
+.closing-download-copy {
+  width: 245px;
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.closing-download-copy > span {
+  color: var(--leaf-300);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 1.7px;
+  text-transform: uppercase;
+}
+
+.closing-download-copy > strong {
+  margin-top: 5px;
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 400;
+}
+
+.closing-download-copy > small {
+  margin-top: 5px;
+  color: rgba(244, 243, 232, .62);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.closing-download-copy .button {
+  min-height: 40px;
+  gap: 14px;
+  margin-top: 13px;
+  padding: 0 18px;
+  font-size: 11px;
 }
 
 footer {
@@ -1407,6 +1508,16 @@ footer {
 
 .footer-inner > span {
   text-align: right;
+}
+
+.footer-inner > a:last-child {
+  text-align: right;
+  transition: color .2s ease;
+}
+
+.footer-inner > a:last-child:hover,
+.footer-inner > a:last-child:focus-visible {
+  color: var(--leaf-300);
 }
 
 .footer-brand {
@@ -1456,6 +1567,10 @@ footer {
   }
 
   .nav-links {
+    display: none;
+  }
+
+  .nav-qr {
     display: none;
   }
 
@@ -1721,7 +1836,23 @@ footer {
   }
 
   .closing {
-    min-height: 580px;
+    min-height: 860px;
+  }
+
+  .closing-download {
+    flex-direction: column;
+    padding: 18px;
+    text-align: center;
+  }
+
+  .closing-download img {
+    width: 148px;
+    height: 148px;
+  }
+
+  .closing-download-copy {
+    width: min(260px, 72vw);
+    align-items: center;
   }
 
   .footer-inner {
@@ -1731,7 +1862,8 @@ footer {
   }
 
   .footer-inner p,
-  .footer-inner > span {
+  .footer-inner > span,
+  .footer-inner > a:last-child {
     margin: 0;
     text-align: center;
   }

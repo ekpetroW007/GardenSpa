@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -35,7 +36,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -278,7 +281,7 @@ private fun TreatmentCard(
 }
 
 @Composable
-private fun CompletionButtonContent(completed: Boolean) {
+internal fun CompletionButtonContent(completed: Boolean) {
     Box(contentAlignment = Alignment.Center) {
         AnimatedVisibility(
             visible = !completed,
@@ -298,7 +301,53 @@ private fun CompletionButtonContent(completed: Boolean) {
             ),
             exit = fadeOut()
         ) {
-            Text("✓", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            TwigCheckMark()
         }
+    }
+}
+
+@Composable
+internal fun TwigCheckMark() {
+    val twigBrown = Color(0xFF7A4B2C)
+    val twigHighlight = Color(0xFFA06B43)
+
+    Canvas(Modifier.size(width = 34.dp, height = 28.dp)) {
+        val joint = Offset(size.width * 0.43f, size.height * 0.73f)
+        val leftStart = Offset(size.width * 0.18f, size.height * 0.43f)
+        val rightEnd = Offset(size.width * 0.83f, size.height * 0.18f)
+        val branchWidth = 4.dp.toPx()
+        val detailWidth = 1.7.dp.toPx()
+
+        drawLine(twigBrown, leftStart, joint, branchWidth, StrokeCap.Round)
+        drawLine(twigBrown, joint, rightEnd, branchWidth, StrokeCap.Round)
+
+        drawLine(
+            twigBrown,
+            Offset(size.width * 0.29f, size.height * 0.56f),
+            Offset(size.width * 0.19f, size.height * 0.67f),
+            detailWidth,
+            StrokeCap.Round
+        )
+        drawLine(
+            twigBrown,
+            Offset(size.width * 0.61f, size.height * 0.50f),
+            Offset(size.width * 0.58f, size.height * 0.31f),
+            detailWidth,
+            StrokeCap.Round
+        )
+        drawLine(
+            twigHighlight,
+            Offset(size.width * 0.23f, size.height * 0.43f),
+            Offset(size.width * 0.41f, size.height * 0.66f),
+            detailWidth,
+            StrokeCap.Round
+        )
+        drawLine(
+            twigHighlight,
+            Offset(size.width * 0.47f, size.height * 0.65f),
+            Offset(size.width * 0.78f, size.height * 0.23f),
+            detailWidth,
+            StrokeCap.Round
+        )
     }
 }
