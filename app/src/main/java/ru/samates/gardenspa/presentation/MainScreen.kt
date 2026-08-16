@@ -3,8 +3,6 @@ package ru.samates.gardenspa.presentation
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -18,8 +16,6 @@ fun MainScreen(
     navController: NavController,
     userViewModel: UserViewModel
 ) {
-    val userLogin by userViewModel.userLogin.collectAsState()
-    val userWeightKg by userViewModel.userWeightKg.collectAsState()
     val selectedScreen = viewModel.selectedScreen
     BotanicalBackground {
         Scaffold(
@@ -38,9 +34,7 @@ fun MainScreen(
                     navController = navController,
                     onScreenSelected = viewModel::changeScreen,
                     modifier = Modifier.padding(innerPadding),
-                    userLogin = userLogin,
-                    userWeightKg = userWeightKg,
-                    onWeightChanged = userViewModel::updateWeightKg
+                    userViewModel = userViewModel
                 )
                 "Препараты" -> Drugs(navController, innerPadding)
                 "Рецепты" -> FolkRecipes(innerPadding)

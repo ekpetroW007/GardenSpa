@@ -28,7 +28,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         preferencesManager = PreferencesManager(this)
-        userViewModel = UserViewModel(preferencesManager)
+        userViewModel = UserViewModel(preferencesManager, (application as ru.samates.gardenspa.BookeeperApp).climateService)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=

@@ -50,6 +50,7 @@ import ru.samates.gardenspa.BookeeperApp
 import ru.samates.gardenspa.domain.ScheduledTreatment
 import ru.samates.gardenspa.domain.recurrenceDescription
 import ru.samates.gardenspa.domain.scheduledTreatmentsOn
+import ru.samates.gardenspa.domain.toDrugDisplayName
 import ru.samates.gardenspa.notifications.TreatmentReminderScheduler
 import ru.samates.gardenspa.presentation.navigation.AppDestinations
 import ru.samates.gardenspa.ui.theme.Cream
@@ -245,7 +246,7 @@ private fun TreatmentCard(
                 }
             }
             Text(treatment.plant.taskName, color = Cream)
-            Text("${treatment.plant.drugName} · ${treatment.plant.recurrenceDescription()}", color = Mist, fontSize = 13.sp)
+            Text("${treatment.plant.drugName.toDrugDisplayName()} · ${treatment.plant.recurrenceDescription()}", color = Mist, fontSize = 13.sp)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SecondaryAction(
                     "Перенести",

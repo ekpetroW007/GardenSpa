@@ -6,6 +6,8 @@ import androidx.compose.runtime.getValue
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import ru.samates.gardenspa.presentation.DrugAdd
 import ru.samates.gardenspa.presentation.DrugInfo
 import ru.samates.gardenspa.presentation.GardenAdd
@@ -57,10 +59,20 @@ fun AppNavigation(userViewModel: UserViewModel) {
             val consumptionRate = backStackEntry.arguments?.getString("consumptionRate")
             DrugInfo(navController = navController, drugName, purpose, consumptionRate)
         }
-        composable(route = AppDestinations.PLANT_ADD) { backStackEntry ->
+        composable(
+            route = AppDestinations.PLANT_ADD,
+            arguments = listOf(
+                navArgument("gardenId") {
+                    type = NavType.IntType
+                    defaultValue = -1
+                }
+            )
+        ) { backStackEntry ->
             PlantAdd(
                 navController = navController,
-                selectedDate = backStackEntry.arguments?.getString("selectedDate").orEmpty()
+                selectedDate = backStackEntry.arguments?.getString("selectedDate").orEmpty(),
+                preselectedGardenId = backStackEntry.arguments?.getInt("gardenId")?.takeIf { it > 0 },
+                userViewModel = userViewModel
             )
         }
         composable(route = AppDestinations.PLANT_EDIT) { backStackEntry ->
@@ -68,7 +80,9 @@ fun AppNavigation(userViewModel: UserViewModel) {
             PlantAdd(
                 navController = navController,
                 selectedDate = "",
-                plantId = plantId
+                plantId = plantId,
+                preselectedGardenId = null,
+                userViewModel = userViewModel
             )
         }
         composable(route = AppDestinations.PLANT_DETAILS) { backStackEntry ->

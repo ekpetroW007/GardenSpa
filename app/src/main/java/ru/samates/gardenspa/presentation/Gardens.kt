@@ -33,6 +33,7 @@ import ru.samates.gardenspa.BookeeperApp
 import ru.samates.gardenspa.data.database.entity.GardenEntity
 import ru.samates.gardenspa.data.database.entity.PlantEntity
 import ru.samates.gardenspa.domain.PlantCard
+import ru.samates.gardenspa.domain.toDrugDisplayName
 import ru.samates.gardenspa.domain.toPlantCards
 import ru.samates.gardenspa.presentation.navigation.AppDestinations
 import ru.samates.gardenspa.ui.theme.Cream
@@ -84,7 +85,11 @@ fun MyGardens(navController: NavController, innerPadding: PaddingValues) {
                 onDelete = { gardenPendingDelete = garden },
                 onExport = { exportGardenToFile(context, garden.name, gardenPlantRows) },
                 onPlantOpen = { navController.navigate(AppDestinations.plantDetails(it)) },
-                onAddPlant = { navController.navigate(AppDestinations.plantAdd(java.time.LocalDate.now().toString())) }
+                onAddPlant = {
+                    navController.navigate(
+                        AppDestinations.plantAdd(java.time.LocalDate.now().toString(), garden.id)
+                    )
+                }
             )
         }
     }
@@ -167,7 +172,7 @@ private fun exportGardenToFile(context: Context, gardenName: String, plants: Lis
             appendLine("Сад: $gardenName")
             appendLine("Дата экспорта: ${formatter.format(Date())}")
             appendLine("=".repeat(40))
-            plants.forEach { appendLine("${it.plantName} — ${it.taskName} — ${it.drugName}") }
+            plants.forEach { appendLine("${it.plantName} — ${it.taskName} — ${it.drugName.toDrugDisplayName()}") }
             appendLine("Всего растений: ${plants.toPlantCards().size}")
         }
         val fileStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
