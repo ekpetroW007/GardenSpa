@@ -13,6 +13,8 @@ import androidx.core.content.ContextCompat
 import ru.samates.gardenspa.BookeeperApp
 import ru.samates.gardenspa.R
 import ru.samates.gardenspa.domain.scheduledTreatmentsOn
+import ru.samates.gardenspa.domain.NO_DRUG_REQUIRED_LABEL
+import ru.samates.gardenspa.domain.toDrugDisplayName
 import ru.samates.gardenspa.others.MainActivity
 import java.time.LocalDate
 import kotlinx.coroutines.CoroutineScope
@@ -69,7 +71,10 @@ class TreatmentReminderReceiver : BroadcastReceiver() {
                 append(" — ")
                 append(plant.plantName)
                 if (plant.gardenName.isNotBlank()) append(", ${plant.gardenName}")
-                if (plant.drugName.isNotBlank()) append(", препарат: ${plant.drugName}")
+                val drugName = plant.drugName.toDrugDisplayName()
+                if (drugName.isNotBlank()) {
+                    append(if (drugName == NO_DRUG_REQUIRED_LABEL) ", $drugName" else ", препарат: $drugName")
+                }
             }
             val openApp = PendingIntent.getActivity(
                 context,

@@ -28,6 +28,8 @@ import ru.samates.gardenspa.BookeeperApp
 import ru.samates.gardenspa.data.database.entity.resolvedCardId
 import ru.samates.gardenspa.domain.recurrenceDescription
 import ru.samates.gardenspa.domain.toPlantCards
+import ru.samates.gardenspa.domain.toDrugDisplayName
+import ru.samates.gardenspa.domain.toDrugDisplayText
 import ru.samates.gardenspa.notifications.TreatmentReminderScheduler
 import ru.samates.gardenspa.presentation.navigation.AppDestinations
 import ru.samates.gardenspa.ui.theme.Cream
@@ -69,7 +71,10 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                         GlassCard(Modifier.fillMaxWidth()) {
                             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Text(plant.plantName, style = MaterialTheme.typography.headlineLarge, color = Cream)
-                                Text("Уход начат ${plant.creationDate}", color = Mist)
+                                if (plant.programId != null) {
+                                    Text("Готовая программа · версия ${plant.programVersion ?: 1}", color = Leaf300)
+                                }
+                                Text("Уход начат ${cardRows.minOfOrNull { it.creationDate } ?: plant.creationDate}", color = Mist)
                                 Row(
                                     Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -82,7 +87,7 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                                         modifier = Modifier.weight(1f).basicMarquee()
                                     )
                                     Text(
-                                        text = "Препарат: ${plant.drugName}",
+                                        text = plant.drugName.toDrugDisplayText(),
                                         color = Leaf300,
                                         maxLines = 1,
                                         softWrap = false,
@@ -91,7 +96,11 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                                     )
                                 }
                                 Text(
-                                    text = "Процедур: ${cardRows.size}   Частота обработки: ${plant.recurrenceDescription()}",
+                                    text = if (plant.programId != null) {
+                                        "Процедур: ${cardRows.size} · индивидуальное расписание"
+                                    } else {
+                                        "Процедур: ${cardRows.size}   Частота обработки: ${plant.recurrenceDescription()}"
+                                    },
                                     color = Cream,
                                     maxLines = 1,
                                     softWrap = false,
@@ -115,8 +124,12 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                         GlassCard(Modifier.fillMaxWidth()) {
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(procedure.taskName, color = Cream, style = MaterialTheme.typography.titleMedium)
-                                Text(procedure.drugName, color = Leaf300)
+                                Text(procedure.drugName.toDrugDisplayName(), color = Leaf300)
+                                Text("Дата начала: ${procedure.creationDate}", color = Mist)
                                 Text(procedure.recurrenceDescription(), color = Mist)
+                                if (procedure.programNote.isNotBlank()) {
+                                    Text(procedure.programNote, color = Cream, modifier = Modifier.padding(top = 4.dp))
+                                }
                             }
                         }
                     }

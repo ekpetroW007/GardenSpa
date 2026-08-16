@@ -7,6 +7,8 @@ import ru.samates.gardenspa.data.database.entity.PlantEntity
 import ru.samates.gardenspa.data.database.entity.resolvedCardId
 import ru.samates.gardenspa.data.repository.BookeeperRepository
 import ru.samates.gardenspa.domain.RepeatType
+import ru.samates.gardenspa.domain.GeneratedCareProgram
+import ru.samates.gardenspa.domain.NO_DRUG_REQUIRED_LABEL
 import java.time.LocalDate
 import java.util.UUID
 import kotlinx.coroutines.flow.SharingStarted
@@ -169,7 +171,13 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                         repeatEndDate = repeatEndDate,
                         repeatCount = repeatCount,
                         reminderDaysBefore = reminderDaysBefore,
-                        plantCardId = cardId
+                        plantCardId = cardId,
+                        programId = previous?.programId,
+                        programVersion = previous?.programVersion,
+                        programStepId = previous?.programStepId,
+                        programImportKey = previous?.programImportKey,
+                        programNote = previous?.programNote.orEmpty(),
+                        userLockedDate = previous?.programId != null || previous?.userLockedDate == true
                     )
                 }
 
@@ -177,6 +185,95 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                 onSaved()
             } catch (e: Exception) {
                 Log.d("savePlantCard", e.toString())
+            }
+        }
+    }
+
+    fun importCareProgram(
+        program: GeneratedCareProgram,
+        gardenId: Int?,
+        gardenName: String,
+        reminderDaysBefore: Int = 1,
+        onSaved: (List<String>) -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            try {
+                val rows = program.steps.map { step ->
+                    val recurrence = step.recurrence
+                    PlantEntity(
+                        plantName = program.plantName,
+                        taskName = step.title,
+                        wateringInterval = recurrence?.interval ?: 1,
+                        creationDate = step.scheduledDate.toString(),
+                        drugId = null,
+                        gardenId = gardenId,
+                        drugName = step.productDescription ?: NO_DRUG_REQUIRED_LABEL,
+                        gardenName = gardenName,
+                        repeatType = recurrence?.type?.name ?: RepeatType.NONE.name,
+                        repeatInterval = recurrence?.interval ?: 1,
+                        repeatDaysOfWeek = if (recurrence?.type == RepeatType.WEEKLY) {
+                            step.scheduledDate.dayOfWeek.value.toString()
+                        } else {
+                            ""
+                        },
+                        repeatEndType = if (recurrence == null) "NEVER" else "COUNT",
+                        repeatCount = recurrence?.count,
+                        reminderDaysBefore = reminderDaysBefore,
+                        plantCardId = program.instanceId,
+                        programId = program.templateId,
+                        programVersion = program.templateVersion,
+                        programStepId = step.templateStepId,
+                        programImportKey = "${program.instanceId}:${program.templateId}:v${program.templateVersion}:${step.templateStepId}",
+                        programNote = listOfNotNull(
+                            step.productDescription?.let { "Категория средства: $it" },
+                            step.note,
+                            step.explanation
+                        ).filter(String::isNotBlank).joinToString("\n"),
+                        userLockedDate = false
+                    )
+                }
+                repository.replacePlantCard(program.instanceId, rows)
+                onSaved(rows.map { it.taskName })
+            } catch (e: Exception) {
+                Log.d("importCareProgram", e.toString())
+                onError(e.message ?: "Не удалось добавить программу")
+            }
+        }
+    }
+
+    fun updateImportedProgramCard(
+        plantName: String,
+        existingRows: List<PlantEntity>,
+        taskNames: List<String>,
+        taskDates: List<LocalDate>,
+        gardenId: Int?,
+        gardenName: String,
+        onSaved: () -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            try {
+                val first = existingRows.firstOrNull() ?: return@launch
+                if (taskNames.size != existingRows.size || taskDates.size != existingRows.size) return@launch
+                val updated = existingRows.mapIndexed { index, row ->
+                    row.copy(
+                        plantName = plantName.trim(),
+                        taskName = taskNames[index].trim(),
+                        creationDate = taskDates[index].toString(),
+                        gardenId = gardenId,
+                        gardenName = gardenName,
+                        repeatDaysOfWeek = if (row.repeatType == RepeatType.WEEKLY.name) {
+                            taskDates[index].dayOfWeek.value.toString()
+                        } else {
+                            row.repeatDaysOfWeek
+                        },
+                        userLockedDate = true
+                    )
+                }
+                repository.replacePlantCard(first.resolvedCardId, updated)
+                onSaved()
+            } catch (e: Exception) {
+                Log.d("updateImportedProgramCard", e.toString())
             }
         }
     }

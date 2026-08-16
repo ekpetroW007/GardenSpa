@@ -18,7 +18,7 @@ import ru.samates.gardenspa.data.database.entity.*
         ProcedureEntity::class,
         GardenWorkEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -46,7 +46,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_2_3,
                         MIGRATION_3_4,
                         MIGRATION_4_5,
-                        MIGRATION_5_6
+                        MIGRATION_5_6,
+                        MIGRATION_6_7
                     )
                     .build()
                 INSTANCE = instance
@@ -125,6 +126,21 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL(
                     "ALTER TABLE plants ADD COLUMN reminder_days_before INTEGER NOT NULL DEFAULT 1"
+                )
+            }
+        }
+
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE plants ADD COLUMN program_id TEXT")
+                database.execSQL("ALTER TABLE plants ADD COLUMN program_version INTEGER")
+                database.execSQL("ALTER TABLE plants ADD COLUMN program_step_id TEXT")
+                database.execSQL("ALTER TABLE plants ADD COLUMN program_import_key TEXT")
+                database.execSQL("ALTER TABLE plants ADD COLUMN program_note TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE plants ADD COLUMN user_locked_date INTEGER NOT NULL DEFAULT 0")
+                database.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_plants_program_import_key " +
+                        "ON plants(program_import_key)"
                 )
             }
         }
