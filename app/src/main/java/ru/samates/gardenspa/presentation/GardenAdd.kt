@@ -21,7 +21,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import ru.samates.gardenspa.BookeeperApp
 import ru.samates.gardenspa.ui.theme.Cream
-import ru.samates.gardenspa.ui.theme.Mist
+import ru.samates.gardenspa.ui.theme.Danger
 import ru.samates.gardenspa.viewmodel.GardensViewmodel
 import ru.samates.gardenspa.viewmodel.GardensViewmodelFactory
 
@@ -30,6 +30,8 @@ fun GardenAdd(navController: NavController) {
     val app = LocalContext.current.applicationContext as BookeeperApp
     val viewModel: GardensViewmodel = viewModel(factory = GardensViewmodelFactory(app.repository))
     var name by remember { mutableStateOf("") }
+    var saving by remember { mutableStateOf(false) }
+    var saveError by remember { mutableStateOf(false) }
 
     BotanicalBackground {
         Column(Modifier.fillMaxSize()) {
@@ -42,7 +44,6 @@ fun GardenAdd(navController: NavController) {
                 GlassCard(Modifier.fillMaxWidth()) {
                     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         Text("Дайте саду понятное имя", style = MaterialTheme.typography.titleLarge, color = Cream)
-                        Text("Например: Дом, Теплица или Северная грядка", color = Mist)
                         OutlinedTextField(
                             value = name,
                             onValueChange = { name = it },
@@ -54,14 +55,23 @@ fun GardenAdd(navController: NavController) {
                             modifier = Modifier.fillMaxWidth()
                         )
                         PrimaryAction(
-                            text = "Создать сад",
-                            enabled = name.isNotBlank(),
+                            text = if (saving) "Создаём…" else "Создать сад",
+                            enabled = name.isNotBlank() && !saving,
                             onClick = {
-                                viewModel.gardenAdd(name.trim())
-                                navController.popBackStack()
+                                saving = true
+                                saveError = false
+                                viewModel.gardenAdd(
+                                    name = name.trim(),
+                                    onSaved = {
+                                        navController.previousBackStackEntry?.savedStateHandle?.set("selectedScreen", "Мои сады")
+                                        navController.popBackStack()
+                                    },
+                                    onError = { saving = false; saveError = true }
+                                )
                             },
                             modifier = Modifier.fillMaxWidth()
                         )
+                        if (saveError) Text("Не удалось создать сад. Попробуйте ещё раз.", color = Danger)
                     }
                 }
             }

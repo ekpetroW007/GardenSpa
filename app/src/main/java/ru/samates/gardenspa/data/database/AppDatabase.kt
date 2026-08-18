@@ -8,6 +8,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import ru.samates.gardenspa.data.database.dao.*
 import ru.samates.gardenspa.data.database.entity.*
+import ru.samates.gardenspa.domain.FolkFertilizerRecipe
+import ru.samates.gardenspa.domain.FolkFertilizers
 
 @Database(
     entities = [
@@ -16,9 +18,9 @@ import ru.samates.gardenspa.data.database.entity.*
         PlantEntity::class,
         TaskEntity::class,
         ProcedureEntity::class,
-        GardenWorkEntity::class
+        FolkFertilizerRecipe::class
     ],
-    version = 7,
+    version = 14,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -28,7 +30,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun plantDao(): PlantDAO
     abstract fun taskDao(): TaskDAO
     abstract fun procedureDao(): ProcedureDAO
-    abstract fun gardenWorkDao(): GardenWorkDAO
+    abstract fun folkRecipeDao(): FolkRecipeDAO
 
     companion object {
         @Volatile
@@ -47,8 +49,16 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_3_4,
                         MIGRATION_4_5,
                         MIGRATION_5_6,
-                        MIGRATION_6_7
+                        MIGRATION_6_7,
+                        MIGRATION_7_8,
+                        MIGRATION_8_9,
+                        MIGRATION_9_10,
+                        MIGRATION_10_11,
+                        MIGRATION_11_12,
+                        MIGRATION_12_13,
+                        MIGRATION_13_14
                     )
+                    .addCallback(DEFAULT_RECIPES_CALLBACK)
                     .build()
                 INSTANCE = instance
                 instance
@@ -141,6 +151,96 @@ abstract class AppDatabase : RoomDatabase() {
                 database.execSQL(
                     "CREATE UNIQUE INDEX IF NOT EXISTS index_plants_program_import_key " +
                         "ON plants(program_import_key)"
+                )
+            }
+        }
+
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE plants ADD COLUMN plant_details TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "UPDATE plants SET repeat_end_type = 'UNTIL_DATE', repeat_end_date = date('now', '-1 day') " +
+                        "WHERE program_id IS NOT NULL AND program_step_id NOT LIKE '%pruning%' " +
+                        "AND drugNameInPlant IN ('Препарат не требуется', 'Не требуется')"
+                )
+            }
+        }
+
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE garden ADD COLUMN climate_data TEXT NOT NULL DEFAULT ''")
+                database.execSQL("DROP TABLE IF EXISTS garden_work_entries")
+            }
+        }
+
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE plants ADD COLUMN reminder_offsets_minutes TEXT NOT NULL DEFAULT '1440'")
+                database.execSQL("UPDATE plants SET reminder_offsets_minutes = CAST(reminder_days_before * 1440 AS TEXT)")
+            }
+        }
+
+        private val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                createRecipeTable(database)
+                insertDefaultRecipes(database)
+            }
+        }
+
+        private val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                insertRecipes(database, FolkFertilizers.previousPhotoRecipes)
+            }
+        }
+
+        private val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                (FolkFertilizers.previousPhotoRecipes + FolkFertilizers.homePhotoRecipes).map(FolkFertilizerRecipe::id).distinct().forEach { id ->
+                    database.execSQL("DELETE FROM folk_recipe WHERE id = ?", arrayOf(id))
+                }
+                insertRecipes(database, FolkFertilizers.homePhotoRecipes)
+            }
+        }
+
+        private val DEFAULT_RECIPES_CALLBACK = object : Callback() {
+            override fun onCreate(database: SupportSQLiteDatabase) {
+                super.onCreate(database)
+                insertDefaultRecipes(database)
+            }
+        }
+
+        private fun createRecipeTable(database: SupportSQLiteDatabase) {
+            database.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS folk_recipe (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    purpose TEXT NOT NULL,
+                    ingredients TEXT NOT NULL,
+                    preparation TEXT NOT NULL,
+                    consumptionRate TEXT NOT NULL,
+                    warning TEXT NOT NULL,
+                    sourceName TEXT NOT NULL,
+                    sourceUrl TEXT NOT NULL
+                )
+                """.trimIndent()
+            )
+        }
+
+        private fun insertDefaultRecipes(database: SupportSQLiteDatabase) {
+            insertRecipes(database, FolkFertilizers.recipes)
+        }
+
+        private fun insertRecipes(database: SupportSQLiteDatabase, recipes: List<FolkFertilizerRecipe>) {
+            recipes.forEach { recipe ->
+                database.execSQL(
+                    "INSERT OR IGNORE INTO folk_recipe (id, name, purpose, ingredients, preparation, consumptionRate, warning, sourceName, sourceUrl) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    arrayOf(recipe.id, recipe.name, recipe.purpose, recipe.ingredients, recipe.preparation, recipe.consumptionRate, recipe.warning, recipe.sourceName, recipe.sourceUrl)
                 )
             }
         }

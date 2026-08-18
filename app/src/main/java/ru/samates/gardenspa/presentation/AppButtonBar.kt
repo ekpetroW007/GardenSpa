@@ -31,7 +31,7 @@ import ru.samates.gardenspa.ui.theme.GlassStroke
 import ru.samates.gardenspa.ui.theme.Leaf300
 import ru.samates.gardenspa.ui.theme.Mist
 
-private enum class NavigationIcon { HOME, GARDEN, CALENDAR, DRUG, RECIPE }
+private enum class NavigationIcon { HOME, GARDEN, CALENDAR, REFERENCE }
 
 private data class NavigationEntry(val label: String, val icon: NavigationIcon)
 
@@ -41,8 +41,7 @@ fun AppButtonBar(selectedScreen: String = "Главная", onClick: (String) ->
         NavigationEntry("Главная", NavigationIcon.HOME),
         NavigationEntry("Мои сады", NavigationIcon.GARDEN),
         NavigationEntry("Календарь", NavigationIcon.CALENDAR),
-        NavigationEntry("Препараты", NavigationIcon.DRUG),
-        NavigationEntry("Рецепты", NavigationIcon.RECIPE)
+        NavigationEntry("Справочник", NavigationIcon.REFERENCE)
     )
     Surface(
         modifier = Modifier
@@ -127,7 +126,7 @@ private fun NavigationGlyph(icon: NavigationIcon, selected: Boolean) {
                 )
                 drawLine(iconColor, Offset(center.x, center.y - 8f * unit), Offset(center.x, center.y + 8f * unit), stroke.width)
             }
-            NavigationIcon.DRUG -> {
+            NavigationIcon.REFERENCE -> {
                 val diamond = Path().apply {
                     moveTo(center.x, center.y - 9f * unit)
                     lineTo(center.x + 9f * unit, center.y)
@@ -136,35 +135,6 @@ private fun NavigationGlyph(icon: NavigationIcon, selected: Boolean) {
                     close()
                 }
                 drawPath(diamond, color = iconColor, style = stroke)
-            }
-            NavigationIcon.RECIPE -> {
-                val leaf = Path().apply {
-                    moveTo(center.x - 8f * unit, center.y + 7f * unit)
-                    cubicTo(
-                        center.x - 7f * unit,
-                        center.y - 6f * unit,
-                        center.x + 4f * unit,
-                        center.y - 10f * unit,
-                        center.x + 9f * unit,
-                        center.y - 9f * unit
-                    )
-                    cubicTo(
-                        center.x + 10f * unit,
-                        center.y,
-                        center.x + 3f * unit,
-                        center.y + 8f * unit,
-                        center.x - 8f * unit,
-                        center.y + 7f * unit
-                    )
-                }
-                drawPath(leaf, color = iconColor, style = stroke)
-                drawLine(
-                    iconColor,
-                    Offset(center.x - 7f * unit, center.y + 7f * unit),
-                    Offset(center.x + 6f * unit, center.y - 6f * unit),
-                    stroke.width,
-                    StrokeCap.Round
-                )
             }
         }
     }

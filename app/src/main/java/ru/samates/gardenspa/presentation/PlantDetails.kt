@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -26,8 +28,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import ru.samates.gardenspa.BookeeperApp
 import ru.samates.gardenspa.data.database.entity.resolvedCardId
+import ru.samates.gardenspa.domain.pendingProgramTreatments
 import ru.samates.gardenspa.domain.recurrenceDescription
-import ru.samates.gardenspa.domain.toPlantCards
 import ru.samates.gardenspa.domain.toDrugDisplayName
 import ru.samates.gardenspa.domain.toDrugDisplayText
 import ru.samates.gardenspa.notifications.TreatmentReminderScheduler
@@ -52,7 +54,7 @@ fun PlantDetails(navController: NavController, plantId: Int) {
     val cardRows = selectedPlant?.let { selected ->
         plants.filter { it.resolvedCardId == selected.resolvedCardId }.sortedBy { it.id }
     }.orEmpty()
-    val plant = cardRows.firstOrNull()
+    val plant = selectedPlant
     val cardPlantIds = cardRows.map { it.id }.toSet()
     val history = procedures.filter { it.plantId in cardPlantIds && it.status == "COMPLETED" }
     var deleteConfirmationOpen by remember { mutableStateOf(false) }
@@ -71,6 +73,9 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                         GlassCard(Modifier.fillMaxWidth()) {
                             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Text(plant.plantName, style = MaterialTheme.typography.headlineLarge, color = Cream)
+                                if (plant.plantDetails.isNotBlank()) {
+                                    Text(plant.plantDetails, color = Mist, style = MaterialTheme.typography.bodyLarge)
+                                }
                                 if (plant.programId != null) {
                                     Text("Готовая программа · версия ${plant.programVersion ?: 1}", color = Leaf300)
                                 }
@@ -112,7 +117,7 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                                     modifier = Modifier.fillMaxWidth()
                                 )
                                 DangerAction(
-                                    text = "Удалить растение",
+                                    text = "Удалить процедуру",
                                     onClick = { deleteConfirmationOpen = true },
                                     modifier = Modifier.fillMaxWidth()
                                 )
@@ -156,44 +161,95 @@ fun PlantDetails(navController: NavController, plantId: Int) {
     }
 
     if (deleteConfirmationOpen && plant != null) {
-        DeleteConfirmationDialog(
-            itemName = plant.plantName,
-            onConfirm = {
-                deleteConfirmationOpen = false
-                plantsVm.deletePlantCard(plant) {
-                    TreatmentReminderScheduler.refreshNow(app)
-                    navController.popBackStack()
-                }
-            },
-            onDismiss = { deleteConfirmationOpen = false }
-        )
+        val onDeleted = {
+            deleteConfirmationOpen = false
+            TreatmentReminderScheduler.refreshNow(app)
+            navController.popBackStack()
+            Unit
+        }
+        if (plant.programId != null) {
+            ProgramProcedureDeleteDialog(
+                procedureName = plant.taskName,
+                onDeleteProcedure = { plantsVm.deletePlant(plant.id, onDeleted) },
+                onDeleteProgram = { plantsVm.deletePlantCard(plant, onDeleted) },
+                onDismiss = { deleteConfirmationOpen = false }
+            )
+        } else {
+            DeleteConfirmationDialog(
+                itemName = plant.taskName,
+                onConfirm = { plantsVm.deletePlant(plant.id, onDeleted) },
+                onDismiss = { deleteConfirmationOpen = false }
+            )
+        }
     }
+}
+
+@Composable
+private fun ProgramProcedureDeleteDialog(
+    procedureName: String,
+    onDeleteProcedure: () -> Unit,
+    onDeleteProgram: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = ru.samates.gardenspa.ui.theme.Forest900,
+        titleContentColor = Cream,
+        textContentColor = Cream,
+        title = { Text("Что удалить?") },
+        text = { Text("Процедура «$procedureName» входит в готовую программу.", color = Mist) },
+        confirmButton = {
+            Column(Modifier.fillMaxWidth()) {
+                TextButton(onClick = onDeleteProcedure, modifier = Modifier.fillMaxWidth()) {
+                    Text("Удалить только эту процедуру", color = ru.samates.gardenspa.ui.theme.Danger)
+                }
+                TextButton(onClick = onDeleteProgram, modifier = Modifier.fillMaxWidth()) {
+                    Text("Удалить всю программу", color = ru.samates.gardenspa.ui.theme.Danger)
+                }
+                TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+                    Text("Отмена", color = Leaf300)
+                }
+            }
+        },
+        dismissButton = {}
+    )
 }
 
 @Composable
 fun AllPlants(navController: NavController) {
     val app = LocalContext.current.applicationContext as BookeeperApp
     val plantsVm: PlantsViewmodel = viewModel(factory = PlantsViewmodelFactory(app.repository))
+    val proceduresVm: ProceduresViewmodel = viewModel(factory = ProceduresViewmodelFactory(app.repository))
     val plants by plantsVm.plants.collectAsState()
-    val plantCards = plants.toPlantCards()
+    val procedures by proceduresVm.procedures.collectAsState()
+    val manualProcedures = plants.filter { it.programId == null }
+    val programProcedures = pendingProgramTreatments(plants, procedures)
     BotanicalBackground {
         Column(Modifier.fillMaxSize()) {
-            ScreenHeader("Все растения", "${plantCards.size} в вашей коллекции", onBack = { navController.popBackStack() })
+            ScreenHeader("Все процедуры", "${manualProcedures.size + programProcedures.size} всего", onBack = { navController.popBackStack() })
             LazyColumn(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(18.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                if (plantCards.isEmpty()) item { EmptyGlassState("Растений пока нет", "Добавьте первое растение из календаря") }
-                items(plantCards, key = { it.cardId }) { card ->
-                    val plant = card.primary
+                if (manualProcedures.isEmpty() && programProcedures.isEmpty()) {
+                    item { EmptyGlassState("Процедур пока нет", "Добавьте первую процедуру из календаря") }
+                }
+                items(programProcedures, key = { "program:${it.plant.id}:${it.originalDate}" }) { treatment ->
+                    val plant = treatment.plant
                     GlassCard(Modifier.fillMaxWidth(), onClick = { navController.navigate(AppDestinations.plantDetails(plant.id)) }) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Column(Modifier.weight(1f)) {
-                                Text(plant.plantName, style = MaterialTheme.typography.titleLarge, color = Cream)
-                                Text(plant.gardenName, color = Leaf300)
-                                Text(card.procedures.joinToString(" · ") { it.taskName }, color = Mist, maxLines = 2)
-                            }
-                            Text("›", color = Leaf300, style = MaterialTheme.typography.headlineMedium)
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(plant.taskName, style = MaterialTheme.typography.titleLarge, color = Cream)
+                            Text("${plant.plantName} · ${plant.gardenName}", color = Leaf300)
+                            Text("${if (treatment.rescheduled) "Перенесено на" else "Запланировано на"} ${treatment.scheduledDate}", color = Mist)
+                        }
+                    }
+                }
+                items(manualProcedures, key = { "manual:${it.id}" }) { plant ->
+                    GlassCard(Modifier.fillMaxWidth(), onClick = { navController.navigate(AppDestinations.plantDetails(plant.id)) }) {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(plant.taskName, style = MaterialTheme.typography.titleLarge, color = Cream)
+                            Text("${plant.plantName} · ${plant.gardenName}", color = Leaf300)
+                            Text("С ${plant.creationDate} · ${plant.recurrenceDescription()}", color = Mist)
                         }
                     }
                 }

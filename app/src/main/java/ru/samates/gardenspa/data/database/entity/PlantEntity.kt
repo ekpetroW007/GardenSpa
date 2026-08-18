@@ -34,6 +34,9 @@ data class PlantEntity(
     @ColumnInfo(name = "name")
     val plantName: String,
 
+    @ColumnInfo(name = "plant_details", defaultValue = "''")
+    val plantDetails: String = "",
+
     @ColumnInfo(name = "task")
     val taskName: String,
 
@@ -75,6 +78,9 @@ data class PlantEntity(
 
     @ColumnInfo(name = "reminder_days_before", defaultValue = "1")
     val reminderDaysBefore: Int = 1,
+
+    @ColumnInfo(name = "reminder_offsets_minutes", defaultValue = "'1440'")
+    val reminderOffsetsMinutes: String = "1440",
 
     @ColumnInfo(name = "plant_card_id", defaultValue = "''")
     val plantCardId: String = "",

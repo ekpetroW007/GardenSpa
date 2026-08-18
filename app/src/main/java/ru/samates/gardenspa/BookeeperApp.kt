@@ -6,7 +6,6 @@ import ru.samates.gardenspa.data.database.AppDatabase
 import ru.samates.gardenspa.data.climate.ClimateService
 import ru.samates.gardenspa.data.repository.BookeeperRepository
 import ru.samates.gardenspa.notifications.TreatmentReminderScheduler
-import ru.samates.gardenspa.notifications.GardenWorkReminderScheduler
 
 class BookeeperApp : Application() {
     private val database by lazy { AppDatabase.getInstance(this) }
@@ -18,7 +17,7 @@ class BookeeperApp : Application() {
             gardenDAO = database.gardenDao(),
             taskDAO = database.taskDao(),
             procedureDAO = database.procedureDao(),
-            gardenWorkDAO = database.gardenWorkDao()
+            folkRecipeDAO = database.folkRecipeDao()
         )
     }
 
@@ -28,6 +27,5 @@ class BookeeperApp : Application() {
         super.onCreate()
         TreatmentReminderScheduler.schedule(this)
         TreatmentReminderScheduler.refreshOnceToday(this)
-        GardenWorkReminderScheduler.schedule(this)
     }
 }

@@ -26,6 +26,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,6 +43,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -62,34 +67,25 @@ import ru.samates.gardenspa.viewmodel.PlantsViewmodel
 import ru.samates.gardenspa.viewmodel.PlantsViewmodelFactory
 import ru.samates.gardenspa.viewmodel.ProceduresViewmodel
 import ru.samates.gardenspa.viewmodel.ProceduresViewmodelFactory
-import ru.samates.gardenspa.viewmodel.GardenWorkViewModel
-import ru.samates.gardenspa.viewmodel.GardenWorkViewModelFactory
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import kotlin.math.roundToInt
 
 @Composable
 fun Calendar(innerPadding: PaddingValues, navController: NavController) {
     val application = LocalContext.current.applicationContext as BookeeperApp
     val plantsVm: PlantsViewmodel = viewModel(factory = PlantsViewmodelFactory(application.repository))
     val proceduresVm: ProceduresViewmodel = viewModel(factory = ProceduresViewmodelFactory(application.repository))
-    val gardenWorkVm: GardenWorkViewModel = viewModel(factory = GardenWorkViewModelFactory(application.repository))
     val plants by plantsVm.plants.collectAsState()
     val procedures by proceduresVm.procedures.collectAsState()
-    val gardenWorkEntries by gardenWorkVm.entries.collectAsState()
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var visibleMonth by remember { mutableStateOf(YearMonth.from(selectedDate)) }
     val treatments = scheduledTreatmentsOn(plants, procedures, selectedDate)
-    val selectedGardenWork = gardenWorkEntries.filter { it.workDate == selectedDate.toString() }
-    val datesWithGardenWork = gardenWorkEntries.mapNotNull { entry ->
-        runCatching { LocalDate.parse(entry.workDate) }.getOrNull()
-    }.toSet()
     val markedDates = (1..visibleMonth.lengthOfMonth()).mapNotNull { day ->
         visibleMonth.atDay(day).takeIf { scheduledTreatmentsOn(plants, procedures, it).isNotEmpty() }
-    }.toSet() + datesWithGardenWork
+    }.toSet()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(innerPadding),
@@ -118,23 +114,6 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController) {
         item {
             SectionTitle(selectedDate.format(DateTimeFormatter.ofPattern("d MMMM", Locale.forLanguageTag("ru"))))
         }
-        if (selectedGardenWork.isNotEmpty()) {
-            item {
-                GlassCard(Modifier.fillMaxWidth()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Садовая активность", color = Cream, style = MaterialTheme.typography.titleLarge)
-                        Text(
-                            "≈ ${selectedGardenWork.sumOf { it.calories }.roundToInt()} ккал",
-                            color = Leaf300,
-                            style = MaterialTheme.typography.headlineLarge
-                        )
-                        selectedGardenWork.forEach { entry ->
-                            Text("${entry.activityName}: ${entry.minutes} мин", color = Mist)
-                        }
-                    }
-                }
-            }
-        }
         if (treatments.isEmpty()) {
             item { EmptyGlassState("Свободный день", "На выбранную дату процедур нет") }
         }
@@ -159,6 +138,18 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController) {
                     }
                     selectedDate = newDate
                     visibleMonth = YearMonth.from(newDate)
+                },
+                onDeleteOccurrence = {
+                    proceduresVm.deleteOccurrence(treatment.plant, treatment.originalDate) {
+                        TreatmentReminderScheduler.cancelTreatmentNotification(application, treatment.plant.id, treatment.originalDate.toString())
+                        TreatmentReminderScheduler.refreshNow(application)
+                    }
+                },
+                onDeleteFollowing = {
+                    proceduresVm.deleteThisAndFollowing(treatment.plant, treatment.originalDate) {
+                        TreatmentReminderScheduler.cancelTreatmentNotification(application, treatment.plant.id, treatment.originalDate.toString())
+                        TreatmentReminderScheduler.refreshNow(application)
+                    }
                 }
             )
         }
@@ -229,6 +220,8 @@ private fun TreatmentCard(
     treatment: ScheduledTreatment,
     onComplete: () -> Unit,
     onReschedule: (LocalDate) -> Unit,
+    onDeleteOccurrence: () -> Unit,
+    onDeleteFollowing: () -> Unit,
     onOpen: () -> Unit
 ) {
     val context = LocalContext.current
@@ -236,16 +229,34 @@ private fun TreatmentCard(
         mutableStateOf(false)
     }
     val completed = treatment.completed || completionRequested
+    val userText = if (treatment.plant.programId == null) treatment.plant.taskName else treatment.plant.plantDetails
+    var menuExpanded by remember(treatment.plant.id, treatment.originalDate) { mutableStateOf(false) }
+    var deleteFollowing by remember(treatment.plant.id, treatment.originalDate) { mutableStateOf<Boolean?>(null) }
     GlassCard(Modifier.fillMaxWidth(), onClick = onOpen) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (treatment.rescheduled) Text("Перенесено с ${treatment.originalDate}", color = Warning, fontSize = 12.sp)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
-                    Text(treatment.plant.plantName, style = MaterialTheme.typography.titleLarge, color = Cream)
+                    Text(if (treatment.plant.programId == null) treatment.plant.plantName else treatment.plant.taskName, style = MaterialTheme.typography.titleLarge, color = Cream)
                     Text(treatment.plant.gardenName, color = Leaf300)
                 }
+                Box {
+                    IconButton(onClick = { menuExpanded = true }, modifier = Modifier.semantics { contentDescription = "Действия с обработкой" }) {
+                        Text("⋮", color = Cream, fontSize = 24.sp)
+                    }
+                    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Удалить эту обработку") },
+                            onClick = { menuExpanded = false; deleteFollowing = false }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Удалить эту и все последующие") },
+                            onClick = { menuExpanded = false; deleteFollowing = true }
+                        )
+                    }
+                }
             }
-            Text(treatment.plant.taskName, color = Cream)
+            if (userText.isNotBlank()) Text(userText, color = Cream)
             Text("${treatment.plant.drugName.toDrugDisplayName()} · ${treatment.plant.recurrenceDescription()}", color = Mist, fontSize = 13.sp)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SecondaryAction(
@@ -278,6 +289,17 @@ private fun TreatmentCard(
                 }
             }
         }
+    }
+
+    deleteFollowing?.let { following ->
+        DeleteConfirmationDialog(
+            itemName = if (following) "Эта и все последующие обработки" else "Обработка на ${treatment.scheduledDate}",
+            onConfirm = {
+                deleteFollowing = null
+                if (following) onDeleteFollowing() else onDeleteOccurrence()
+            },
+            onDismiss = { deleteFollowing = null }
+        )
     }
 }
 

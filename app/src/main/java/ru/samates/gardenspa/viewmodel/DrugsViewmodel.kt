@@ -8,11 +8,19 @@ import ru.samates.gardenspa.data.repository.BookeeperRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import ru.samates.gardenspa.domain.FolkFertilizerRecipe
 
 class DrugsViewmodel(
     private val repository: BookeeperRepository
 ) : ViewModel() {
     val drugs = repository.allDrugs
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000L),
+            initialValue = emptyList()
+        )
+
+    val recipes = repository.allRecipes
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000L),
@@ -64,6 +72,26 @@ class DrugsViewmodel(
                 repository.deleteDrug(id)
             } catch (e: Exception) {
                 Log.d("deleteDrug", e.toString())
+            }
+        }
+    }
+
+    fun updateRecipe(recipe: FolkFertilizerRecipe) {
+        viewModelScope.launch {
+            try {
+                repository.updateRecipe(recipe)
+            } catch (e: Exception) {
+                Log.d("updateRecipe", e.toString())
+            }
+        }
+    }
+
+    fun deleteRecipe(recipe: FolkFertilizerRecipe) {
+        viewModelScope.launch {
+            try {
+                repository.deleteRecipe(recipe)
+            } catch (e: Exception) {
+                Log.d("deleteRecipe", e.toString())
             }
         }
     }
