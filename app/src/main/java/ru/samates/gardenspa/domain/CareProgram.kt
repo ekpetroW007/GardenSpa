@@ -13,7 +13,17 @@ enum class CultivationType(val displayName: String) {
 
 enum class CareAnchor {
     START_DATE,
-    SAFE_SPRING_DATE
+    SAFE_SPRING_DATE,
+    SAFE_AUTUMN_DATE
+}
+
+enum class NaturalZone(val displayName: String) {
+    TUNDRA_AND_FOREST_TUNDRA("Тундра и лесотундра"),
+    TAIGA("Тайга"),
+    MIXED_AND_BROADLEAF_FORESTS("Смешанные и широколиственные леса"),
+    FOREST_STEPPE("Лесостепь"),
+    STEPPE_AND_SEMI_DESERT("Степь и полупустыня"),
+    HUMID_SUBTROPICS("Влажные субтропики")
 }
 
 data class WeatherLimits(
@@ -47,8 +57,13 @@ data class PlantCareTemplate(
     val aliases: Set<String>,
     val version: Int,
     val supportedCultivationTypes: Set<CultivationType>,
+    val supportedNaturalZones: Set<NaturalZone> = NaturalZone.entries.toSet(),
     val openGroundStartOffsetDays: Int = 3,
     val greenhouseStartOffsetDays: Int = -14,
+    val zoneStartOffsetDays: Map<NaturalZone, Int> = emptyMap(),
+    val openGroundEndOffsetDays: Int = -14,
+    val greenhouseEndOffsetDays: Int = 14,
+    val zoneEndOffsetDays: Map<NaturalZone, Int> = emptyMap(),
     val steps: List<CareStepTemplate>
 )
 
@@ -56,7 +71,8 @@ data class CareProgramContext(
     val startDate: LocalDate,
     val cultivationType: CultivationType,
     val climate: ClimateFingerprint,
-    val forecast: List<ForecastWeatherDay> = emptyList()
+    val forecast: List<ForecastWeatherDay> = emptyList(),
+    val includeOnlyOnOrAfter: LocalDate? = null
 )
 
 data class GeneratedCareStep(
@@ -79,8 +95,11 @@ data class GeneratedCareProgram(
     val templateVersion: Int,
     val plantName: String,
     val cultivationType: CultivationType,
+    val naturalZone: NaturalZone,
     val recommendedStartDate: LocalDate,
+    val recommendedEndDate: LocalDate,
     val chosenStartDate: LocalDate,
+    val remainingFromDate: LocalDate?,
     val climateSummary: String,
     val warning: String?,
     val steps: List<GeneratedCareStep>
@@ -100,7 +119,7 @@ data class ProgramStartProposal(
     fun resolve(choice: ProgramStartChoice): LocalDate = when (choice) {
         ProgramStartChoice.RECOMMENDED_DATE -> recommendedDate
         ProgramStartChoice.NEXT_YEAR -> recommendedDate.plusYears(1)
-        ProgramStartChoice.USER_DATE -> selectedDate.plusDays(1)
+        ProgramStartChoice.USER_DATE -> selectedDate
     }
 }
 
@@ -134,40 +153,29 @@ fun recommendedStartDate(
     year: Int
 ): LocalDate {
     val springBase = climate.safeSpringDate(year)
-    return when (cultivationType) {
+    val cultivationOffset = when (cultivationType) {
         CultivationType.OPEN_GROUND -> springBase.plusDays(template.openGroundStartOffsetDays.toLong())
         CultivationType.GREENHOUSE -> springBase.plusDays(template.greenhouseStartOffsetDays.toLong())
     }
+    return cultivationOffset.plusDays(template.zoneStartOffsetDays[climate.naturalZone()]?.toLong() ?: 0L)
+}
+
+fun recommendedEndDate(
+    template: PlantCareTemplate,
+    cultivationType: CultivationType,
+    climate: ClimateFingerprint,
+    year: Int
+): LocalDate {
+    val autumnBase = climate.safeAutumnDate(year)
+    val cultivationOffset = when (cultivationType) {
+        CultivationType.OPEN_GROUND -> template.openGroundEndOffsetDays
+        CultivationType.GREENHOUSE -> template.greenhouseEndOffsetDays
+    }
+    return autumnBase.plusDays((cultivationOffset + (template.zoneEndOffsetDays[climate.naturalZone()] ?: 0)).toLong())
 }
 
 object PlantCareCatalog {
-    private val templates = listOf(
-        PlantCareTemplate(
-            id = "tomato",
-            canonicalName = "Томат",
-            aliases = setOf("томат", "томаты", "помидор", "помидоры"),
-            version = 2,
-            supportedCultivationTypes = CultivationType.entries.toSet(),
-            steps = listOf(
-                CareStepTemplate("root_check", "Проверить укоренение", offsetDays = 5, note = "Осмотрите растение и почву, не повреждая корни."),
-                CareStepTemplate("first_feeding", "Первая подкормка", offsetDays = 12, windowBeforeDays = 2, windowAfterDays = 3, weatherLimits = WeatherLimits(maximumPrecipitationMm = 5.0, maximumWindMetersPerSecond = 8.0), note = "Используйте только подходящее растению средство по инструкции производителя."),
-                CareStepTemplate("support", "Проверить подвязку и опору", offsetDays = 14, note = "Подвязка не должна пережимать стебель."),
-                CareStepTemplate("leaf_inspection", "Осмотреть листья на признаки стресса", offsetDays = 7, recurrence = CareRecurrence(RepeatType.WEEKLY, 1, 10), note = "Отметьте пятна, повреждения и вредителей; лечение выбирайте после определения причины.")
-            ) + standardTreatmentSteps("томатов")
-        ),
-        PlantCareTemplate(
-            id = "cucumber",
-            canonicalName = "Огурец",
-            aliases = setOf("огурец", "огурцы"),
-            version = 2,
-            supportedCultivationTypes = CultivationType.entries.toSet(),
-            steps = listOf(
-                CareStepTemplate("adaptation_check", "Проверить состояние после посадки", offsetDays = 4, note = "Проверьте тургор листьев и влажность почвы."),
-                CareStepTemplate("guide_shoots", "Проверить опору для побегов", offsetDays = 10, note = "Направляйте побеги без резких перегибов."),
-                CareStepTemplate("moisture_check", "Проверить влажность почвы", offsetDays = 2, recurrence = CareRecurrence(RepeatType.CUSTOM, 3, 20), note = "Поливайте только при необходимости с учётом осадков и состояния почвы."),
-                CareStepTemplate("leaf_inspection", "Осмотреть листья", offsetDays = 7, recurrence = CareRecurrence(RepeatType.WEEKLY, 1, 10), note = "Ищите изменение окраски, пятна и следы вредителей.")
-            ) + standardTreatmentSteps("огурцов")
-        ),
+    private val baseTemplates = popularAnnualCareTemplates() + listOf(
         PlantCareTemplate(
             id = "garden-strawberry",
             canonicalName = "Земляника садовая",
@@ -179,30 +187,6 @@ object PlantCareCatalog {
                 CareStepTemplate("mulch_check", "Проверить мульчу", offsetDays = 5, recurrence = CareRecurrence(RepeatType.MONTHLY, 1, 4), note = "Мульча не должна закрывать центр розетки."),
                 CareStepTemplate("leaf_inspection", "Осмотреть листья и ягоды", offsetDays = 7, recurrence = CareRecurrence(RepeatType.WEEKLY, 1, 10), note = "Удаляйте только явно повреждённые части чистым инструментом.")
             ) + standardTreatmentSteps("садовой земляники")
-        ),
-        PlantCareTemplate(
-            id = "apple",
-            canonicalName = "Яблоня",
-            aliases = setOf("яблоня", "яблони", "яблоко"),
-            version = 2,
-            supportedCultivationTypes = setOf(CultivationType.OPEN_GROUND),
-            steps = listOf(
-                CareStepTemplate("crown_inspection", "Осмотреть крону и ствол", offsetDays = 0, note = "Зафиксируйте повреждения коры, сухие ветви и необычные пятна."),
-                CareStepTemplate("trunk_circle", "Проверить приствольный круг", offsetDays = 7, recurrence = CareRecurrence(RepeatType.MONTHLY, 1, 6), note = "Не повреждайте поверхностные корни при рыхлении."),
-                CareStepTemplate("moisture_check", "Проверить необходимость полива", offsetDays = 10, recurrence = CareRecurrence(RepeatType.CUSTOM, 14, 12), note = "Учитывайте возраст дерева, осадки и влажность почвы.")
-            ) + standardTreatmentSteps("яблони")
-        ),
-        PlantCareTemplate(
-            id = "hydrangea",
-            canonicalName = "Гортензия",
-            aliases = setOf("гортензия", "гортензии"),
-            version = 2,
-            supportedCultivationTypes = setOf(CultivationType.OPEN_GROUND),
-            steps = listOf(
-                CareStepTemplate("moisture_check", "Проверить влажность почвы", offsetDays = 0, recurrence = CareRecurrence(RepeatType.CUSTOM, 3, 24), note = "Ориентируйтесь на фактическую влажность, а не только на календарь."),
-                CareStepTemplate("mulch_check", "Проверить слой мульчи", offsetDays = 5, recurrence = CareRecurrence(RepeatType.MONTHLY, 1, 5), note = "Не укладывайте мульчу вплотную к основанию побегов."),
-                CareStepTemplate("leaf_inspection", "Осмотреть листья и побеги", offsetDays = 7, recurrence = CareRecurrence(RepeatType.WEEKLY, 1, 12), note = "Отмечайте увядание, пятна и повреждения, прежде чем выбирать обработку.")
-            ) + standardTreatmentSteps("гортензии")
         ),
         seasonalVegetable(
             id = "potato",
@@ -297,6 +281,7 @@ object PlantCareCatalog {
             cropSpecificNote = "Проверяйте посадки на пожелтение, повреждения и переувлажнение."
         )
     )
+    private val templates = expandProgramVarieties(baseTemplates)
 
     private fun standardTreatmentSteps(cropLabel: String): List<CareStepTemplate> = listOf(
         CareStepTemplate(
@@ -377,10 +362,25 @@ object PlantCareCatalog {
 
     fun find(userInput: String): PlantCareTemplate? {
         val normalized = normalizePlantName(userInput)
-        return templates.firstOrNull { template ->
+        return templates.filter { template ->
             normalized == normalizePlantName(template.canonicalName) ||
                 template.aliases.any { normalizePlantName(it) == normalized }
-        }
+        }.singleOrNull()
+    }
+
+    fun findById(id: String): PlantCareTemplate? = templates.firstOrNull { it.id == id } ?: baseTemplates.firstOrNull { it.id == id }
+
+    fun suggestions(userInput: String, limit: Int = 6): List<PlantCareTemplate> {
+        val normalized = normalizePlantName(userInput)
+        if (normalized.isBlank()) return emptyList()
+        return templates.asSequence()
+            .filter { template ->
+                normalizePlantName(template.canonicalName).startsWith(normalized) ||
+                    template.aliases.any { normalizePlantName(it).startsWith(normalized) }
+            }
+            .sortedWith(compareByDescending<PlantCareTemplate> { normalizePlantName(it.canonicalName).startsWith(normalized) }.thenBy { it.canonicalName })
+            .take(limit)
+            .toList()
     }
 
     fun all(): List<PlantCareTemplate> = templates
@@ -395,6 +395,10 @@ class CareProgramGenerator {
         require(context.cultivationType in template.supportedCultivationTypes) {
             "Для выбранного способа выращивания программа пока не подготовлена"
         }
+        val naturalZone = context.climate.naturalZone()
+        require(naturalZone in template.supportedNaturalZones) {
+            "Для природной зоны «${naturalZone.displayName}» программа этого растения пока не подготовлена"
+        }
 
         val recommendedStart = recommendedStartDate(
             template = template,
@@ -407,12 +411,15 @@ class CareProgramGenerator {
         } else {
             null
         }
+        val calculatedEnd = recommendedEndDate(template, context.cultivationType, context.climate, context.startDate.year)
+        val recommendedEnd = if (calculatedEnd.isBefore(context.startDate)) calculatedEnd.plusYears(1) else calculatedEnd
         val forecastByDate = context.forecast.associateBy { it.date }
 
-        val generatedSteps = template.steps.map { step ->
+        val generatedSteps = template.steps.filter { step -> "pruning" in step.id || step.productDescription != null }.map { step ->
             val anchorDate = when (step.anchor) {
                 CareAnchor.START_DATE -> context.startDate
                 CareAnchor.SAFE_SPRING_DATE -> recommendedStart
+                CareAnchor.SAFE_AUTUMN_DATE -> recommendedEnd
             }
             val initialDate = anchorDate.plusDays(step.offsetDays.toLong())
             val windowStart = initialDate.minusDays(step.windowBeforeDays.toLong())
@@ -442,7 +449,7 @@ class CareProgramGenerator {
                 hasLimits ->
                     "Дата рассчитана по программе; прогноз будет полезно проверить ближе к сроку."
                 else ->
-                    "Дата рассчитана относительно ${if (step.anchor == CareAnchor.START_DATE) "начала ухода" else "безопасного начала сезона"}."
+                    "Дата рассчитана относительно ${step.anchor.displayAnchorName()}."
             }
 
             GeneratedCareStep(
@@ -458,7 +465,7 @@ class CareProgramGenerator {
                 productDescription = step.productDescription,
                 note = step.note
             )
-        }
+        }.mapNotNull { it.keepFrom(context.includeOnlyOnOrAfter) }.sortedBy { it.scheduledDate }
 
         return GeneratedCareProgram(
             instanceId = instanceId,
@@ -466,8 +473,11 @@ class CareProgramGenerator {
             templateVersion = template.version,
             plantName = template.canonicalName,
             cultivationType = context.cultivationType,
+            naturalZone = naturalZone,
             recommendedStartDate = recommendedStart,
-            chosenStartDate = context.startDate,
+            recommendedEndDate = recommendedEnd,
+            chosenStartDate = context.includeOnlyOnOrAfter ?: context.startDate,
+            remainingFromDate = context.includeOnlyOnOrAfter,
             climateSummary = context.climate.displayName(),
             warning = warning,
             steps = generatedSteps
@@ -477,10 +487,46 @@ class CareProgramGenerator {
     private fun candidateOffsets(beforeDays: Int, afterDays: Int): List<Int> =
         (-beforeDays..afterDays).sortedWith(compareBy<Int> { it.absoluteValue }.thenBy { it })
 
+    private fun GeneratedCareStep.keepFrom(cutoff: LocalDate?): GeneratedCareStep? {
+        if (cutoff == null || !scheduledDate.isBefore(cutoff)) return this
+        val schedule = recurrence ?: return null
+        var nextDate = scheduledDate
+        var skippedOccurrences = 0
+        while (nextDate.isBefore(cutoff) && skippedOccurrences < schedule.count) {
+            nextDate = nextDate.nextOccurrence(schedule)
+            skippedOccurrences++
+        }
+        if (skippedOccurrences >= schedule.count) return null
+        val dateShift = java.time.temporal.ChronoUnit.DAYS.between(scheduledDate, nextDate)
+        return copy(
+            scheduledDate = nextDate,
+            windowStart = windowStart.plusDays(dateShift),
+            windowEnd = windowEnd.plusDays(dateShift),
+            recurrence = schedule.copy(count = schedule.count - skippedOccurrences),
+            weatherAdjusted = false,
+            needsWeatherConfirmation = needsWeatherConfirmation || productDescription != null,
+            explanation = "Пропущено прошедших выполнений: $skippedOccurrences. В календарь добавлены только оставшиеся процедуры с $cutoff."
+        )
+    }
+
+    private fun LocalDate.nextOccurrence(recurrence: CareRecurrence): LocalDate = when (recurrence.type) {
+        RepeatType.NONE -> this
+        RepeatType.DAILY, RepeatType.CUSTOM -> plusDays(recurrence.interval.toLong())
+        RepeatType.WEEKLY -> plusWeeks(recurrence.interval.toLong())
+        RepeatType.MONTHLY -> plusMonths(recurrence.interval.toLong())
+        RepeatType.YEARLY -> plusYears(recurrence.interval.toLong())
+    }
+
     private fun ForecastWeatherDay.satisfies(limits: WeatherLimits): Boolean =
         (limits.minimumNightTemperatureC == null || minimumTemperatureC >= limits.minimumNightTemperatureC) &&
             (limits.maximumPrecipitationMm == null || precipitationMm <= limits.maximumPrecipitationMm) &&
             (limits.maximumWindMetersPerSecond == null || maximumWindMetersPerSecond <= limits.maximumWindMetersPerSecond)
+}
+
+private fun CareAnchor.displayAnchorName(): String = when (this) {
+    CareAnchor.START_DATE -> "начала ухода"
+    CareAnchor.SAFE_SPRING_DATE -> "безопасного начала сезона"
+    CareAnchor.SAFE_AUTUMN_DATE -> "окончания сезона и подготовки к зиме"
 }
 
 fun normalizePlantName(value: String): String = Normalizer

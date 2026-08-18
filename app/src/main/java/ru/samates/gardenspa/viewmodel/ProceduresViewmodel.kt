@@ -3,8 +3,11 @@ package ru.samates.gardenspa.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import ru.samates.gardenspa.data.database.entity.PlantEntity
 import ru.samates.gardenspa.data.database.entity.ProcedureEntity
+import ru.samates.gardenspa.data.database.entity.resolvedCardId
 import ru.samates.gardenspa.data.repository.BookeeperRepository
+import ru.samates.gardenspa.domain.truncateProgramFrom
 import java.time.LocalDate
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
@@ -60,6 +63,33 @@ class ProceduresViewmodel(private val repository: BookeeperRepository) : ViewMod
                     status = "PLANNED"
                 )
             )
+            onSaved()
+        }
+    }
+
+    fun deleteOccurrence(plant: PlantEntity, originalDate: LocalDate, onSaved: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.insertProcedure(
+                ProcedureEntity(
+                    plantId = plant.id,
+                    procedureName = plant.taskName,
+                    scheduledDate = originalDate.toString(),
+                    status = "CANCELLED"
+                )
+            )
+            onSaved()
+        }
+    }
+
+    fun deleteThisAndFollowing(plant: PlantEntity, originalDate: LocalDate, onSaved: () -> Unit = {}) {
+        viewModelScope.launch {
+            if (plant.programId == null) {
+                repository.updatePlant(plant.copy(repeatEndType = "UNTIL_DATE", repeatEndDate = originalDate.minusDays(1).toString()))
+            } else {
+                val cardId = plant.resolvedCardId
+                val retained = repository.getAllPlantsOnce().filter { it.resolvedCardId == cardId }.truncateProgramFrom(originalDate)
+                repository.replacePlantCard(cardId, retained)
+            }
             onSaved()
         }
     }

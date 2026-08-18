@@ -3,6 +3,7 @@ package ru.samates.gardenspa
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import ru.samates.gardenspa.domain.NO_DRUG_REQUIRED_LABEL
+import ru.samates.gardenspa.domain.NOT_SELECTED_LABEL
 import ru.samates.gardenspa.domain.toDrugDisplayName
 import ru.samates.gardenspa.domain.toDrugDisplayText
 
@@ -17,6 +18,12 @@ class DrugDisplayTextTest {
     fun currentNoDrugLabelIsIdempotent() {
         assertEquals(NO_DRUG_REQUIRED_LABEL, NO_DRUG_REQUIRED_LABEL.toDrugDisplayName())
         assertEquals(NO_DRUG_REQUIRED_LABEL, NO_DRUG_REQUIRED_LABEL.toDrugDisplayText())
+    }
+
+    @Test
+    fun missingDrugIsShownWithoutADeletedName() {
+        assertEquals(NOT_SELECTED_LABEL, "Не выбран".toDrugDisplayName())
+        assertEquals(NOT_SELECTED_LABEL, NOT_SELECTED_LABEL.toDrugDisplayText())
     }
 
     @Test

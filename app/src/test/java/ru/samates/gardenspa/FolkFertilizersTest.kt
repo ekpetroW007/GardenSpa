@@ -7,6 +7,24 @@ import ru.samates.gardenspa.domain.FolkFertilizers
 
 class FolkFertilizersTest {
     @Test
+    fun newPhotoTableReplacesThePreviousSevenRecipes() {
+        val currentIds = FolkFertilizers.recipes.map { it.id }.toSet()
+
+        assertEquals(7, FolkFertilizers.previousPhotoRecipes.size)
+        assertEquals(10, FolkFertilizers.homePhotoRecipes.size)
+        assertTrue(FolkFertilizers.previousPhotoRecipes.none { it.id in currentIds })
+        assertTrue(FolkFertilizers.homePhotoRecipes.all { it.id in currentIds })
+    }
+
+    @Test
+    fun recipesCanBeSeededWithoutLosingRows() {
+        val recipes = FolkFertilizers.recipes
+
+        assertEquals(recipes.size, recipes.map { it.id }.distinct().size)
+        assertTrue(recipes.all { it.id.isNotBlank() && it.name.isNotBlank() })
+    }
+
+    @Test
     fun magicPlantDrinkContainsTheRequestedIngredients() {
         val recipe = FolkFertilizers.recipes.single { it.id == "magic_plant_drink_tank_mix" }
 

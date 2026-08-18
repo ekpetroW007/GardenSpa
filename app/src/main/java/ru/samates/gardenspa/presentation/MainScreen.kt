@@ -5,39 +5,34 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import ru.samates.gardenspa.viewmodel.MainScreenViewmodel
-import ru.samates.gardenspa.viewmodel.UserViewModel
 
 @Composable
 fun MainScreen(
-    viewModel: MainScreenViewmodel = viewModel(),
     navController: NavController,
-    userViewModel: UserViewModel
+    selectedScreen: String,
+    onScreenSelected: (String) -> Unit
 ) {
-    val selectedScreen = viewModel.selectedScreen
+    val currentScreen = if (selectedScreen == "Препараты" || selectedScreen == "Рецепты") "Справочник" else selectedScreen
     BotanicalBackground {
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
-                if (selectedScreen == "Главная") {
+                if (currentScreen == "Главная") {
                     TopBar()
                 }
             },
             bottomBar = {
-                AppButtonBar(selectedScreen = selectedScreen, onClick = viewModel::changeScreen)
+                AppButtonBar(selectedScreen = currentScreen, onClick = onScreenSelected)
             }
         ) { innerPadding ->
-            when (selectedScreen) {
+            when (currentScreen) {
                 "Главная", "Профиль" -> Profile(
                     navController = navController,
-                    onScreenSelected = viewModel::changeScreen,
-                    modifier = Modifier.padding(innerPadding),
-                    userViewModel = userViewModel
+                    onScreenSelected = onScreenSelected,
+                    modifier = Modifier.padding(innerPadding)
                 )
-                "Препараты" -> Drugs(navController, innerPadding)
-                "Рецепты" -> FolkRecipes(innerPadding)
+                "Справочник" -> Drugs(navController, innerPadding)
                 "Мои сады" -> MyGardens(navController, innerPadding)
                 "Календарь" -> Calendar(innerPadding, navController)
             }

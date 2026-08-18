@@ -15,33 +15,22 @@ import ru.samates.gardenspa.presentation.MainScreen
 import ru.samates.gardenspa.presentation.PlantAdd
 import ru.samates.gardenspa.presentation.PlantDetails
 import ru.samates.gardenspa.presentation.AllPlants
-import ru.samates.gardenspa.presentation.Registration
-import ru.samates.gardenspa.viewmodel.UserViewModel
 
 @Composable
-fun AppNavigation(userViewModel: UserViewModel) {
+fun AppNavigation() {
     val navController = rememberNavController()
-
-    val isRegistered by userViewModel.isRegistered.collectAsState()
-
-    val startDestination = if (isRegistered) {
-        AppDestinations.MAINSCREEN_ROUTE
-    } else {
-        AppDestinations.REGISTRATION_ROUTE
-    }
 
     NavHost(
         navController = navController,
-        startDestination = startDestination
+        startDestination = AppDestinations.MAINSCREEN_ROUTE
     ) {
-        composable(route = AppDestinations.REGISTRATION_ROUTE) {
-            Registration(
+        composable(route = AppDestinations.MAINSCREEN_ROUTE) { backStackEntry ->
+            val selectedScreen by backStackEntry.savedStateHandle.getStateFlow("selectedScreen", "Главная").collectAsState()
+            MainScreen(
                 navController = navController,
-                userViewModel = userViewModel
+                selectedScreen = selectedScreen,
+                onScreenSelected = { backStackEntry.savedStateHandle["selectedScreen"] = it }
             )
-        }
-        composable(route = AppDestinations.MAINSCREEN_ROUTE) {
-            MainScreen(navController = navController, userViewModel = userViewModel)
         }
         composable(route = AppDestinations.DRUG_ADD_ROUTE) {
             DrugAdd(navController = navController)
@@ -71,8 +60,7 @@ fun AppNavigation(userViewModel: UserViewModel) {
             PlantAdd(
                 navController = navController,
                 selectedDate = backStackEntry.arguments?.getString("selectedDate").orEmpty(),
-                preselectedGardenId = backStackEntry.arguments?.getInt("gardenId")?.takeIf { it > 0 },
-                userViewModel = userViewModel
+                preselectedGardenId = backStackEntry.arguments?.getInt("gardenId")?.takeIf { it > 0 }
             )
         }
         composable(route = AppDestinations.PLANT_EDIT) { backStackEntry ->
@@ -81,8 +69,7 @@ fun AppNavigation(userViewModel: UserViewModel) {
                 navController = navController,
                 selectedDate = "",
                 plantId = plantId,
-                preselectedGardenId = null,
-                userViewModel = userViewModel
+                preselectedGardenId = null
             )
         }
         composable(route = AppDestinations.PLANT_DETAILS) { backStackEntry ->

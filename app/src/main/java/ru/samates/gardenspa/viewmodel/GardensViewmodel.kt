@@ -19,15 +19,17 @@ class GardensViewmodel(
             initialValue = emptyList()
         )
 
-    fun gardenAdd(name: String) {
+    fun gardenAdd(name: String, onSaved: () -> Unit = {}, onError: () -> Unit = {}) {
         viewModelScope.launch {
             try {
                 val newGarden = GardenEntity(
                     name = name
                 )
                 repository.insertGarden(newGarden)
+                onSaved()
             } catch (e: Exception) {
                 Log.d("addGarden", e.toString())
+                onError()
             }
         }
     }
@@ -38,6 +40,17 @@ class GardensViewmodel(
                 repository.deleteGarden(id)
             } catch (e: Exception) {
                 Log.d("deleteGarden", e.toString())
+            }
+        }
+    }
+
+    fun updateClimate(id: Int, climateData: String, onSaved: () -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                repository.updateGardenClimate(id, climateData)
+                onSaved()
+            } catch (e: Exception) {
+                Log.d("updateGardenClimate", e.toString())
             }
         }
     }
