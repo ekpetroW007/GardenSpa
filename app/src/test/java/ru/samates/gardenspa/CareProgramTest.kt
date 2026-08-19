@@ -17,6 +17,7 @@ import ru.samates.gardenspa.domain.PlantCareCatalog
 import ru.samates.gardenspa.domain.PlantNameCatalog
 import ru.samates.gardenspa.domain.ProgramStartChoice
 import ru.samates.gardenspa.domain.ProgramStartPlanner
+import ru.samates.gardenspa.domain.ReadyProgramDrugCatalog
 import ru.samates.gardenspa.domain.naturalZone
 import ru.samates.gardenspa.domain.recommendedEndDate
 import ru.samates.gardenspa.domain.recommendedStartDate
@@ -183,6 +184,19 @@ class CareProgramTest {
                 val description = requireNotNull(step.productDescription)
                 "разрешённое" in description && "бренд" !in description.lowercase()
             })
+        }
+    }
+
+    @Test
+    fun everyProgramProductStepHasAlternativesFromDifferentManufacturers() {
+        val availableDrugs = ReadyProgramDrugCatalog.defaultDrugs
+
+        PlantCareCatalog.all().forEach { template ->
+            template.steps.filter { it.productDescription != null }.forEach { step ->
+                val options = ReadyProgramDrugCatalog.recommendedFor(template.id, step.id, availableDrugs)
+                assertTrue("${template.canonicalName} / ${step.title}: нужно минимум два препарата", options.size >= 2)
+                assertTrue("${template.canonicalName} / ${step.title}: нужны разные производители", options.map { it.name.substringAfterLast("—").trim() }.distinct().size >= 2)
+            }
         }
     }
 

@@ -53,6 +53,7 @@ import ru.samates.gardenspa.domain.CareProgramGenerator
 import ru.samates.gardenspa.domain.CultivationType
 import ru.samates.gardenspa.domain.GeneratedCareProgram
 import ru.samates.gardenspa.domain.FolkFertilizerRecipe
+import ru.samates.gardenspa.domain.NO_DRUG_REQUIRED_LABEL
 import ru.samates.gardenspa.domain.ReminderUnit
 import ru.samates.gardenspa.domain.PlantCareCatalog
 import ru.samates.gardenspa.domain.PlantNameCatalog
@@ -60,6 +61,7 @@ import ru.samates.gardenspa.domain.ProgramStartChoice
 import ru.samates.gardenspa.domain.ProgramStartPlanner
 import ru.samates.gardenspa.domain.ProgramStartProposal
 import ru.samates.gardenspa.domain.ProcedureStep
+import ru.samates.gardenspa.domain.ReadyProgramDrugCatalog
 import ru.samates.gardenspa.domain.customReminderMinutes
 import ru.samates.gardenspa.domain.decodeGardenClimate
 import ru.samates.gardenspa.domain.decodeReminderOffsets
@@ -163,6 +165,7 @@ fun PlantAdd(
     var cultivationType by remember { mutableStateOf(CultivationType.OPEN_GROUND) }
     var programStartDate by remember(startDate) { mutableStateOf(startDate) }
     var generatedProgram by remember { mutableStateOf<GeneratedCareProgram?>(null) }
+    var selectedProgramDrugs by remember { mutableStateOf<Map<String, DrugEntity>>(emptyMap()) }
     var programLoading by remember { mutableStateOf(false) }
     var programImporting by remember { mutableStateOf(false) }
     var programError by remember { mutableStateOf<String?>(null) }
@@ -706,7 +709,10 @@ fun PlantAdd(
                         includeOnlyOnOrAfter = includeOnlyOnOrAfter
                     )
                 )
-            }.onSuccess { generatedProgram = it }
+            }.onSuccess {
+                generatedProgram = it
+                selectedProgramDrugs = emptyMap()
+            }
                 .onFailure { programError = it.message ?: "Не удалось составить программу" }
             programLoading = false
         }
@@ -715,8 +721,11 @@ fun PlantAdd(
     generatedProgram?.let { program ->
         CareProgramPreviewDialog(
             program = program,
+            drugs = drugs,
+            selectedDrugs = selectedProgramDrugs,
             importing = programImporting,
-            canImport = selectedGarden != null,
+            hasGarden = selectedGarden != null,
+            onDrugSelected = { stepId, drug -> selectedProgramDrugs = selectedProgramDrugs + (stepId to drug) },
             onDismiss = {
                 if (!programImporting) {
                     generatedProgram = null
@@ -732,6 +741,7 @@ fun PlantAdd(
                 val reminderData = encodeReminderOffsets(reminderOffsets)
                 plantsVm.importCareProgram(
                     program = program,
+                    selectedDrugs = selectedProgramDrugs,
                     plantDetails = plantDetails,
                     gardenId = selectedGarden?.id,
                     gardenName = selectedGarden?.name ?: "Не выбрано",
@@ -866,12 +876,17 @@ private fun ProgramStartChoiceDialog(
 @Composable
 private fun CareProgramPreviewDialog(
     program: GeneratedCareProgram,
+    drugs: List<DrugEntity>,
+    selectedDrugs: Map<String, DrugEntity>,
     importing: Boolean,
-    canImport: Boolean,
+    hasGarden: Boolean,
+    onDrugSelected: (String, DrugEntity) -> Unit,
     onDismiss: () -> Unit,
     onNextYear: () -> Unit,
     onImport: () -> Unit
 ) {
+    val missingDrugCount = program.steps.count { it.productDescription != null && it.templateStepId !in selectedDrugs }
+    val canImport = hasGarden && missingDrugCount == 0
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Forest900,
@@ -895,21 +910,52 @@ private fun CareProgramPreviewDialog(
                 program.warning?.let { Text(it, color = Danger) }
                 if (program.steps.isEmpty()) {
                     Text("Процедур на этот год не осталось. Можно добавить процедуры на следующий год или добавить их вручную.", color = Mist)
-                } else if (!canImport) {
+                } else if (!hasGarden) {
                     Text("Перед добавлением в календарь выберите или добавьте сад.", color = Danger)
+                } else if (missingDrugCount > 0) {
+                    Text("Выберите препарат для каждого этапа: осталось $missingDrugCount.", color = Danger)
                 }
                 program.steps.forEach { step ->
+                    val selectedDrug = selectedDrugs[step.templateStepId]
+                    val recommendedDrugs = remember(program.templateId, step.templateStepId, drugs) {
+                        ReadyProgramDrugCatalog.recommendedFor(program.templateId, step.templateStepId, drugs)
+                    }
                     GlassCard(Modifier.fillMaxWidth()) {
                         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                             Text(step.title, color = Cream, style = MaterialTheme.typography.titleMedium)
                             Text(step.scheduledDate.toString(), color = Leaf300)
-                            step.recurrence?.let { recurrence ->
-                                Text("Повтор: ${recurrence.count} раз", color = Mist)
+                            val recurrence = step.recurrence
+                            val intervalUnit = when (recurrence?.type) {
+                                RepeatType.WEEKLY -> "нед."
+                                RepeatType.MONTHLY -> "мес."
+                                RepeatType.YEARLY -> "г."
+                                else -> "дн."
                             }
+                            Text(if (recurrence == null) "Кратность: однократно" else "Кратность: ${recurrence.count}; интервал: ${recurrence.interval} $intervalUnit", color = Mist)
                             step.productDescription?.let { description ->
                                 Text("Какое средство потребуется", color = Leaf300)
                                 Text(description, color = Cream)
-                            }
+                                SelectionMenu(
+                                    label = "Препарат для этапа",
+                                    value = selectedDrug?.name ?: "Выберите препарат",
+                                    options = recommendedDrugs,
+                                    optionLabel = DrugEntity::name,
+                                    onSelected = { onDrugSelected(step.templateStepId, it) }
+                                )
+                                if (recommendedDrugs.isEmpty()) Text("В справочнике пока нет подходящих препаратов для этого этапа.", color = Danger)
+                                selectedDrug?.let { drug ->
+                                    Text("Назначение: ${drug.purpose.ifBlank { "Не указано" }}", color = Cream)
+                                    Text("Норма применения: ${drug.consumptionRate.ifBlank { "Не указана" }}", color = Mist)
+                                }
+                            } ?: OutlinedTextField(
+                                value = NO_DRUG_REQUIRED_LABEL,
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Препарат") },
+                                colors = glassTextFieldColors(),
+                                shape = CompactGlassShape,
+                                modifier = Modifier.fillMaxWidth()
+                            )
                             Text(step.explanation, color = Mist)
                             if (step.needsWeatherConfirmation) {
                                 Text("Проверьте погоду перед выполнением", color = Danger)
@@ -922,7 +968,7 @@ private fun CareProgramPreviewDialog(
                     color = Mist
                 )
                 Text(
-                    "В программе указаны категории средств без брендов. Конкретный препарат и дозировку выбирайте по актуальной инструкции.",
+                    "Для каждого этапа показаны подходящие варианты разных производителей. Перед применением сверяйтесь с актуальной инструкцией на упаковке.",
                     color = Mist
                 )
                 if (importing) {
@@ -946,7 +992,7 @@ private fun CareProgramPreviewDialog(
                 Text(
                     when {
                         program.steps.isEmpty() -> "Добавить вручную"
-                        !canImport -> "Вернуться к настройке"
+                        !hasGarden -> "Вернуться к настройке"
                         else -> "Отказаться от программы"
                     },
                     color = Mist
