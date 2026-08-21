@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import ru.samates.gardenspa.data.database.entity.PlantEntity
+import ru.samates.gardenspa.data.database.entity.DrugEntity
 import ru.samates.gardenspa.data.database.entity.resolvedCardId
 import ru.samates.gardenspa.data.repository.BookeeperRepository
 import ru.samates.gardenspa.domain.RepeatType
@@ -200,6 +201,7 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
 
     fun importCareProgram(
         program: GeneratedCareProgram,
+        selectedDrugs: Map<String, DrugEntity>,
         plantDetails: String,
         gardenId: Int?,
         gardenName: String,
@@ -210,17 +212,21 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
     ) {
         viewModelScope.launch {
             try {
+                require(program.steps.filter { it.productDescription != null }.all { it.templateStepId in selectedDrugs }) {
+                    "Выберите препарат для каждого этапа программы"
+                }
                 val rows = program.steps.map { step ->
                     val recurrence = step.recurrence
+                    val selectedDrug = selectedDrugs[step.templateStepId]
                     PlantEntity(
                         plantName = program.plantName,
                         plantDetails = plantDetails.trim(),
                         taskName = step.title,
                         wateringInterval = recurrence?.interval ?: 1,
                         creationDate = step.scheduledDate.toString(),
-                        drugId = null,
+                        drugId = selectedDrug?.id,
                         gardenId = gardenId,
-                        drugName = step.productDescription ?: NO_DRUG_REQUIRED_LABEL,
+                        drugName = selectedDrug?.name ?: NO_DRUG_REQUIRED_LABEL,
                         gardenName = gardenName,
                         repeatType = recurrence?.type?.name ?: RepeatType.NONE.name,
                         repeatInterval = recurrence?.interval ?: 1,
@@ -240,6 +246,9 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                         programImportKey = "${program.instanceId}:${program.templateId}:v${program.templateVersion}:${step.templateStepId}",
                         programNote = listOfNotNull(
                             step.productDescription?.let { "Категория средства: $it" },
+                            selectedDrug?.let { "Препарат: ${it.name}" },
+                            selectedDrug?.purpose?.takeIf(String::isNotBlank)?.let { "Назначение: $it" },
+                            selectedDrug?.consumptionRate?.takeIf(String::isNotBlank)?.let { "Норма применения: $it" },
                             step.note,
                             step.explanation
                         ).filter(String::isNotBlank).joinToString("\n"),
