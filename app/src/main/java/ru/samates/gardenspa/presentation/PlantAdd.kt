@@ -62,6 +62,7 @@ import ru.samates.gardenspa.domain.CareProgramContext
 import ru.samates.gardenspa.domain.CareProgramGenerator
 import ru.samates.gardenspa.domain.CultivationType
 import ru.samates.gardenspa.domain.GeneratedCareProgram
+import ru.samates.gardenspa.domain.NO_REMAINING_CARE_MESSAGE
 import ru.samates.gardenspa.domain.PlantCareCatalog
 import ru.samates.gardenspa.domain.ProgramStartChoice
 import ru.samates.gardenspa.domain.ProgramStartPlanner
@@ -165,6 +166,7 @@ fun PlantAdd(
     var programImporting by remember { mutableStateOf(false) }
     var programError by remember { mutableStateOf<String?>(null) }
     var pendingStartProposal by remember { mutableStateOf<ProgramStartProposal?>(null) }
+    var unavailableContinuationNextYear by remember { mutableStateOf<LocalDate?>(null) }
     var manualSetupOpen by remember(plantId) { mutableStateOf(editing) }
     var photoUri by remember(plantId) { mutableStateOf<String?>(null) }
     val matchedTemplate = remember(plantName) { PlantCareCatalog.find(plantName) }
@@ -240,11 +242,15 @@ fun PlantAdd(
             }
     }
 
-    fun calculateProgramForStart(effectiveStartDate: LocalDate) {
+    fun calculateProgramForStart(
+        effectiveStartDate: LocalDate,
+        continuationNextYearDate: LocalDate? = null
+    ) {
         val template = matchedTemplate ?: return
         val location = selectedLocation ?: return
         val climate = selectedClimate ?: return
         pendingStartProposal = null
+        unavailableContinuationNextYear = null
         programStartDate = effectiveStartDate
         programLoading = true
         programError = null
@@ -262,10 +268,19 @@ fun PlantAdd(
                         forecast = forecast
                     )
                 )
-            }.onSuccess { generatedProgram = it }
-                .onFailure {
-                    programError = it.message ?: "Не удалось составить программу"
+            }.onSuccess {
+                unavailableContinuationNextYear = null
+                generatedProgram = it
+            }.onFailure {
+                val message = it.message ?: "Не удалось составить программу"
+                if (message == NO_REMAINING_CARE_MESSAGE && continuationNextYearDate != null) {
+                    unavailableContinuationNextYear = continuationNextYearDate
+                    programError = null
+                } else {
+                    unavailableContinuationNextYear = null
+                    programError = message
                 }
+            }
             programLoading = false
         }
     }
@@ -492,7 +507,7 @@ fun PlantAdd(
                                     )
                                     editingRows.getOrNull(index)?.programNote
                                         ?.takeIf(String::isNotBlank)
-                                        ?.let { Text(it, color = Mist) }
+                                        ?.let { LinkifiedText(it, color = Mist) }
                                 }
                             }
                             if (!editingProgram) {
@@ -686,7 +701,32 @@ fun PlantAdd(
         ProgramStartChoiceDialog(
             proposal = proposal,
             onDismiss = { pendingStartProposal = null },
-            onChoice = { choice -> calculateProgramForStart(proposal.resolve(choice)) }
+            onChoice = { choice ->
+                val continuationNextYearDate = if (choice == ProgramStartChoice.USER_DATE) {
+                    proposal.resolve(ProgramStartChoice.NEXT_YEAR)
+                } else {
+                    null
+                }
+                calculateProgramForStart(
+                    effectiveStartDate = proposal.resolve(choice),
+                    continuationNextYearDate = continuationNextYearDate
+                )
+            }
+        )
+    }
+
+    unavailableContinuationNextYear?.let { nextYearDate ->
+        ProgramContinuationUnavailableDialog(
+            nextYearDate = nextYearDate,
+            onNextYear = {
+                unavailableContinuationNextYear = null
+                calculateProgramForStart(nextYearDate)
+            },
+            onManual = {
+                unavailableContinuationNextYear = null
+                manualSetupOpen = true
+            },
+            onDismiss = { unavailableContinuationNextYear = null }
         )
     }
 }
@@ -712,7 +752,8 @@ private fun ProgramStartChoiceDialog(
             Text(
                 if (proposal.recommendationHasPassed) {
                     "Рекомендуемая дата начала работ для вашего региона ($recommendedText) уже прошла. " +
-                        "Перенести программу на следующий год или начать с выбранной вами даты?"
+                        "Перенести программу на следующий год или продолжить с выбранной даты? " +
+                        "При продолжении прошедшие работы будут исключены."
                 } else {
                     "Запланировать начало работ на рекомендуемую дату — $recommendedText?"
                 },
@@ -739,7 +780,41 @@ private fun ProgramStartChoiceDialog(
         },
         dismissButton = {
             TextButton(onClick = { onChoice(ProgramStartChoice.USER_DATE) }) {
-                Text("Начать с моей даты — $userStartText", color = Mist)
+                Text(
+                    if (proposal.selectedDate.isAfter(proposal.recommendedDate)) {
+                        "Продолжить с моей даты — $userStartText"
+                    } else {
+                        "Начать с моей даты — $userStartText"
+                    },
+                    color = Mist
+                )
+            }
+        }
+    )
+}
+
+@Composable
+private fun ProgramContinuationUnavailableDialog(
+    nextYearDate: LocalDate,
+    onNextYear: () -> Unit,
+    onManual: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Forest900,
+        titleContentColor = Cream,
+        textContentColor = Cream,
+        title = { Text("Программа на этот сезон завершена") },
+        text = { Text(NO_REMAINING_CARE_MESSAGE, color = Mist) },
+        confirmButton = {
+            TextButton(onClick = onNextYear) {
+                Text("Начать ${nextYearDate.format(programDateFormatter)}", color = Leaf300)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onManual) {
+                Text("Настроить вручную", color = Mist)
             }
         }
     )
@@ -786,6 +861,9 @@ private fun CareProgramPreviewDialog(
                                 Text(description, color = Cream)
                             }
                             Text(step.explanation, color = Mist)
+                            if (step.note.isNotBlank()) {
+                                LinkifiedText(step.note, color = Cream)
+                            }
                             if (step.needsWeatherConfirmation) {
                                 Text("Проверьте погоду перед выполнением", color = Danger)
                             }
@@ -797,7 +875,7 @@ private fun CareProgramPreviewDialog(
                     color = Mist
                 )
                 Text(
-                    "В программе указаны категории средств без брендов. Конкретный препарат и дозировку выбирайте по актуальной инструкции.",
+                    "Перед применением препарата сверяйте дозировку, допуск для культуры и меры защиты с актуальной инструкцией на упаковке.",
                     color = Mist
                 )
                 if (importing) {

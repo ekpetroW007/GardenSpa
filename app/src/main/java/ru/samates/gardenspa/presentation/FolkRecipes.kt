@@ -119,6 +119,12 @@ private fun FolkRecipeCard(
                     "Меры осторожности",
                     "Сначала проверьте состав на небольшом участке. Не смешивайте его с другими средствами без подтверждённой совместимости."
                 )
+                if (recipe.sourceUrl.isNotBlank()) {
+                    LinkifiedText(
+                        "Источник: ${recipe.sourceName}\n${recipe.sourceUrl}",
+                        color = Mist
+                    )
+                }
                 Text("Справочник GardenSpa · обновлено в августе 2026", color = Mist)
                 PrimaryAction(
                     text = if (alreadyAdded) "Уже добавлено" else "Добавить в мои средства",
