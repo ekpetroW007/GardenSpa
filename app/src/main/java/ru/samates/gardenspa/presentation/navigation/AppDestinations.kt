@@ -1,14 +1,14 @@
 package ru.samates.gardenspa.presentation.navigation
 
-import androidx.navigation.NavController
-
 object AppDestinations {
+    const val REGISTRATION_ROUTE = "registration"
     const val MAINSCREEN_ROUTE = "mainScreen"
 
     const val DRUG_ADD_ROUTE = "drugsAddScreen"
     const val DRUG_EDIT_ROUTE = "drugEditScreen/{drugId}"
 
     const val GARDEN_ADD = "gardenAddScreen"
+    const val GARDEN_LOCATION = "gardenLocation/{gardenId}"
 
     const val DRUG_INFO = "drugInfoScreen"
 
@@ -16,6 +16,7 @@ object AppDestinations {
     const val PLANT_EDIT = "plantEditScreen/{plantId}"
     const val PLANT_DETAILS = "plantDetails/{plantId}"
     const val ALL_PLANTS = "allPlants"
+    const val SETTINGS = "settings"
 
     fun plantAdd(selectedDate: String, gardenId: Int? = null): String = buildString {
         append("plantAddScreen/$selectedDate")
@@ -24,9 +25,5 @@ object AppDestinations {
     fun plantEdit(plantId: Int) = "plantEditScreen/$plantId"
     fun plantDetails(plantId: Int) = "plantDetails/$plantId"
     fun drugEdit(drugId: Int) = "drugEditScreen/$drugId"
-}
-
-fun NavController.navigateToCalendar() {
-    getBackStackEntry(AppDestinations.MAINSCREEN_ROUTE).savedStateHandle["selectedScreen"] = "Календарь"
-    popBackStack(AppDestinations.MAINSCREEN_ROUTE, inclusive = false)
+    fun gardenLocation(gardenId: Int) = "gardenLocation/$gardenId"
 }

@@ -1,9 +1,21 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.devtoolsKsp)
 }
+
+val localProperties = Properties().apply {
+    rootProject.file("local.properties")
+        .takeIf { it.isFile }
+        ?.inputStream()
+        ?.use(::load)
+}
+val openWeatherApiKey = System.getenv("OPENWEATHER_API_KEY")
+    ?.takeIf { it.isNotBlank() }
+    ?: localProperties.getProperty("OPENWEATHER_API_KEY").orEmpty()
 
 System.getenv("BOOKEEPER_BUILD_DIR")
     ?.takeIf { it.isNotBlank() }
@@ -17,9 +29,14 @@ android {
         applicationId = "ru.samates.gardenspa"
         minSdk = 26
         targetSdk = 34
-        versionCode = 29
-        versionName = "1.0.28"
+        versionCode = 33
+        versionName = "1.0.32"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField(
+            "String",
+            "OPENWEATHER_API_KEY",
+            "\"${openWeatherApiKey.trim().replace("\\", "\\\\").replace("\"", "\\\"")}\""
+        )
 
     }
 
@@ -41,6 +58,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
 }
@@ -49,6 +67,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
     implementation("androidx.datastore:datastore-preferences:1.1.7")
     implementation("androidx.datastore:datastore-preferences-core:1.0.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
@@ -62,6 +81,8 @@ dependencies {
     implementation("androidx.preference:preference-ktx:1.2.1")
     implementation("io.github.boguszpawlowski.composecalendar:composecalendar:1.4.0")
     implementation("io.github.boguszpawlowski.composecalendar:kotlinx-datetime:1.4.0")
+    implementation("org.maplibre.gl:android-sdk:11.8.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.runtime.livedata)

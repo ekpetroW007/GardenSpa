@@ -20,6 +20,17 @@
         android:theme="@style/Theme.MyApplication"
         tools:targetApi="31">
 
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+
         <activity
             android:name="ru.samates.gardenspa.others.MainActivity"
             android:exported="true"
@@ -38,5 +49,21 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+        <receiver
+            android:name="ru.samates.gardenspa.notifications.GardenWorkReminderReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name="ru.samates.gardenspa.notifications.WeatherRescheduleReceiver"
+            android:enabled="true"
+            android:exported="false" />
+        <service
+            android:name="ru.samates.gardenspa.notifications.WeatherReminderJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
     </application>
 </manifest>

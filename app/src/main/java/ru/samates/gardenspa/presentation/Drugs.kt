@@ -11,11 +11,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -25,14 +23,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import ru.samates.gardenspa.BookeeperApp
 import ru.samates.gardenspa.data.database.entity.DrugEntity
-import ru.samates.gardenspa.domain.FolkFertilizerRecipe
 import ru.samates.gardenspa.presentation.navigation.AppDestinations
 import ru.samates.gardenspa.ui.theme.Cream
 import ru.samates.gardenspa.ui.theme.Danger
@@ -46,17 +44,10 @@ fun Drugs(navController: NavController, innerPadding: PaddingValues) {
     val application = LocalContext.current.applicationContext as BookeeperApp
     val drugsVm: DrugsViewmodel = viewModel(factory = DrugsViewmodelFactory(application.repository))
     val drugs by drugsVm.drugs.collectAsState()
-    val recipes by drugsVm.recipes.collectAsState()
     var query by remember { mutableStateOf("") }
-    var showRecipes by remember { mutableStateOf(false) }
     var drugForActions by remember { mutableStateOf<DrugEntity?>(null) }
     var drugPendingDelete by remember { mutableStateOf<DrugEntity?>(null) }
-    var recipeBeingEdited by remember { mutableStateOf<FolkFertilizerRecipe?>(null) }
-    var recipePendingDelete by remember { mutableStateOf<FolkFertilizerRecipe?>(null) }
-    val filteredDrugs = drugs.filter {
-        query.isBlank() || it.name.contains(query, true) || it.purpose.contains(query, true)
-    }
-    val filteredRecipes = recipes.filter {
+    val filtered = drugs.filter {
         query.isBlank() || it.name.contains(query, true) || it.purpose.contains(query, true)
     }
 
@@ -69,15 +60,9 @@ fun Drugs(navController: NavController, innerPadding: PaddingValues) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(Modifier.weight(1f)) {
                     Text("Библиотека ухода", color = Mist)
-                    Text("Справочник", style = MaterialTheme.typography.headlineLarge, color = Cream, autoSize = TextAutoSize.StepBased(24.sp, 34.sp), maxLines = 1)
+                    Text("Средства", style = MaterialTheme.typography.headlineLarge, color = Cream)
                 }
-                PrimaryAction("+ Препарат", { navController.navigate(AppDestinations.DRUG_ADD_ROUTE) })
-            }
-        }
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = !showRecipes, onClick = { showRecipes = false }, label = { Text("Препараты") }, modifier = Modifier.weight(1f))
-                FilterChip(selected = showRecipes, onClick = { showRecipes = true }, label = { Text("Рецепты") }, modifier = Modifier.weight(1f))
+                PrimaryAction("+ Добавить", { navController.navigate(AppDestinations.DRUG_ADD_ROUTE) })
             }
         }
         item {
@@ -85,7 +70,7 @@ fun Drugs(navController: NavController, innerPadding: PaddingValues) {
                 value = query,
                 onValueChange = { query = it },
                 placeholder = { Text("Поиск по названию или назначению") },
-                leadingIcon = { Text("⌕", color = Leaf300) },
+                leadingIcon = { Text("⌕", color = Leaf300, modifier = Modifier.semantics { contentDescription = "Поиск" }) },
                 keyboardOptions = SentenceKeyboardOptions,
                 singleLine = true,
                 colors = glassTextFieldColors(),
@@ -93,34 +78,19 @@ fun Drugs(navController: NavController, innerPadding: PaddingValues) {
                 modifier = Modifier.fillMaxWidth()
             )
         }
-        if (!showRecipes) {
-            if (filteredDrugs.isEmpty()) {
-                item { EmptyGlassState("Ничего не найдено", "Измените запрос или добавьте новый препарат") }
-            }
-            items(filteredDrugs, key = { it.id }) { drug ->
-                DrugCard(
-                    drug = drug,
-                    onOpen = {
-                        navController.navigate(
-                            "drugInfoScreen/${Uri.encode(drug.name)}/${Uri.encode(drug.purpose)}/${Uri.encode(drug.consumptionRate)}"
-                        )
-                    },
-                    onManage = { drugForActions = drug }
-                )
-            }
-        } else {
-            if (filteredRecipes.isEmpty()) {
-                item { EmptyGlassState("Ничего не найдено", "Измените поисковый запрос") }
-            }
-            items(filteredRecipes, key = FolkFertilizerRecipe::id) { recipe ->
-                val alreadyAdded = drugs.any { it.name.equals(recipe.name, ignoreCase = true) }
-                FolkRecipeCard(
-                    recipe = recipe,
-                    alreadyAdded = alreadyAdded,
-                    onAdd = { drugsVm.addDrug(recipe.name, recipe.purposeForDrug(), recipe.consumptionRate) },
-                    onEdit = { recipeBeingEdited = recipe }
-                )
-            }
+        if (filtered.isEmpty()) {
+            item { EmptyGlassState("Ничего не найдено", "Измените запрос или добавьте новый препарат") }
+        }
+        items(filtered, key = { it.id }) { drug ->
+            DrugCard(
+                drug = drug,
+                onOpen = {
+                    navController.navigate(
+                        "drugInfoScreen/${Uri.encode(drug.name)}/${Uri.encode(drug.purpose)}/${Uri.encode(drug.consumptionRate)}"
+                    )
+                },
+                onManage = { drugForActions = drug }
+            )
         }
     }
 
@@ -149,48 +119,21 @@ fun Drugs(navController: NavController, innerPadding: PaddingValues) {
             onDismiss = { drugPendingDelete = null }
         )
     }
-
-    recipeBeingEdited?.let { recipe ->
-        RecipeEditorDialog(
-            recipe = recipe,
-            onDismiss = { recipeBeingEdited = null },
-            onSave = {
-                drugsVm.updateRecipe(it)
-                recipeBeingEdited = null
-            },
-            onDelete = {
-                recipeBeingEdited = null
-                recipePendingDelete = recipe
-            }
-        )
-    }
-
-    recipePendingDelete?.let { recipe ->
-        DeleteConfirmationDialog(
-            itemName = recipe.name,
-            onConfirm = {
-                drugsVm.deleteRecipe(recipe)
-                recipePendingDelete = null
-            },
-            onDismiss = { recipePendingDelete = null }
-        )
-    }
 }
 
 @Composable
 fun DrugCard(drug: DrugEntity, onOpen: () -> Unit, onManage: () -> Unit) {
     GlassCard(Modifier.fillMaxWidth(), onClick = onOpen) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("◇", color = Leaf300, style = MaterialTheme.typography.headlineLarge)
             Column(Modifier.weight(1f)) {
                 Text(drug.name, style = MaterialTheme.typography.titleLarge, color = Cream)
                 Text(drug.purpose, color = Mist, maxLines = 2)
                 Text("Норма: ${drug.consumptionRate}", color = Leaf300, modifier = Modifier.padding(top = 6.dp))
             }
             Text(
-                "✎",
+                "Изменить",
                 color = Leaf300,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier.clickable(onClick = onManage)
             )
         }
@@ -210,7 +153,7 @@ private fun DrugActionsDialog(
         titleContentColor = Cream,
         textContentColor = Cream,
         title = { Text(drug.name) },
-        text = { Text("Что вы хотите сделать с препаратом?") },
+        text = { Text("Можно изменить сведения или удалить средство из вашего списка.") },
         confirmButton = {
             TextButton(onClick = onEdit) {
                 Text("Редактировать", color = Leaf300)

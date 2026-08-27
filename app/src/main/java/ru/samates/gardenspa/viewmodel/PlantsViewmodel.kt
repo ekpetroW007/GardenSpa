@@ -4,7 +4,6 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import ru.samates.gardenspa.data.database.entity.PlantEntity
-import ru.samates.gardenspa.data.database.entity.DrugEntity
 import ru.samates.gardenspa.data.database.entity.resolvedCardId
 import ru.samates.gardenspa.data.repository.BookeeperRepository
 import ru.samates.gardenspa.domain.RepeatType
@@ -24,11 +23,10 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
             initialValue = emptyList()
         )
 
-    fun deletePlant(id: Int, onDeleted: () -> Unit = {}) {
+    fun deletePlant(id: Int) {
         viewModelScope.launch {
             try {
                 repository.deletePlant(id)
-                onDeleted()
             } catch (e: Exception) {
                 Log.d("deletePlant", e.toString())
             }
@@ -90,21 +88,18 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
         gardenId: Int?,
         drugName: String,
         gardenName: String,
-        plantDetails: String = "",
         repeatType: String = "NONE",
         repeatInterval: Int = 1,
         repeatDaysOfWeek: String = "",
         repeatEndType: String = "NEVER",
         repeatEndDate: String? = null,
         repeatCount: Int? = null,
-        reminderDaysBefore: Int = 1,
-        reminderOffsetsMinutes: String = "1440"
+        reminderDaysBefore: Int = 1
     ) {
         viewModelScope.launch {
             try {
                 val newPlant = PlantEntity(
                     plantName = plantName,
-                    plantDetails = plantDetails.trim(),
                     wateringInterval = wateringInterval,
                     creationDate = creationDate,
                     taskName = taskName,
@@ -119,7 +114,6 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                     repeatEndDate = repeatEndDate,
                     repeatCount = repeatCount,
                     reminderDaysBefore = reminderDaysBefore,
-                    reminderOffsetsMinutes = reminderOffsetsMinutes,
                     plantCardId = UUID.randomUUID().toString()
                 )
                 repository.insertPlant(newPlant)
@@ -132,7 +126,6 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
     fun savePlantCard(
         plantId: Int?,
         plantName: String,
-        plantDetails: String,
         taskNames: List<String>,
         wateringInterval: Int,
         creationDate: String,
@@ -147,7 +140,7 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
         repeatEndDate: String? = null,
         repeatCount: Int? = null,
         reminderDaysBefore: Int = 1,
-        reminderOffsetsMinutes: String = "1440",
+        photoUri: String? = null,
         onSaved: () -> Unit = {}
     ) {
         viewModelScope.launch {
@@ -165,7 +158,6 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                     PlantEntity(
                         id = previous?.id ?: 0,
                         plantName = plantName,
-                        plantDetails = plantDetails.trim(),
                         taskName = taskName,
                         wateringInterval = wateringInterval,
                         creationDate = creationDate,
@@ -180,14 +172,14 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                         repeatEndDate = repeatEndDate,
                         repeatCount = repeatCount,
                         reminderDaysBefore = reminderDaysBefore,
-                        reminderOffsetsMinutes = reminderOffsetsMinutes,
                         plantCardId = cardId,
                         programId = previous?.programId,
                         programVersion = previous?.programVersion,
                         programStepId = previous?.programStepId,
                         programImportKey = previous?.programImportKey,
                         programNote = previous?.programNote.orEmpty(),
-                        userLockedDate = previous?.programId != null || previous?.userLockedDate == true
+                        userLockedDate = previous?.programId != null || previous?.userLockedDate == true,
+                        photoUri = photoUri ?: previous?.photoUri
                     )
                 }
 
@@ -201,32 +193,25 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
 
     fun importCareProgram(
         program: GeneratedCareProgram,
-        selectedDrugs: Map<String, DrugEntity>,
-        plantDetails: String,
         gardenId: Int?,
         gardenName: String,
         reminderDaysBefore: Int = 1,
-        reminderOffsetsMinutes: String = "1440",
+        photoUri: String? = null,
         onSaved: (List<String>) -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
         viewModelScope.launch {
             try {
-                require(program.steps.filter { it.productDescription != null }.all { it.templateStepId in selectedDrugs }) {
-                    "Выберите препарат для каждого этапа программы"
-                }
                 val rows = program.steps.map { step ->
                     val recurrence = step.recurrence
-                    val selectedDrug = selectedDrugs[step.templateStepId]
                     PlantEntity(
                         plantName = program.plantName,
-                        plantDetails = plantDetails.trim(),
                         taskName = step.title,
                         wateringInterval = recurrence?.interval ?: 1,
                         creationDate = step.scheduledDate.toString(),
-                        drugId = selectedDrug?.id,
+                        drugId = null,
                         gardenId = gardenId,
-                        drugName = selectedDrug?.name ?: NO_DRUG_REQUIRED_LABEL,
+                        drugName = step.productDescription ?: NO_DRUG_REQUIRED_LABEL,
                         gardenName = gardenName,
                         repeatType = recurrence?.type?.name ?: RepeatType.NONE.name,
                         repeatInterval = recurrence?.interval ?: 1,
@@ -238,7 +223,6 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                         repeatEndType = if (recurrence == null) "NEVER" else "COUNT",
                         repeatCount = recurrence?.count,
                         reminderDaysBefore = reminderDaysBefore,
-                        reminderOffsetsMinutes = reminderOffsetsMinutes,
                         plantCardId = program.instanceId,
                         programId = program.templateId,
                         programVersion = program.templateVersion,
@@ -246,13 +230,11 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                         programImportKey = "${program.instanceId}:${program.templateId}:v${program.templateVersion}:${step.templateStepId}",
                         programNote = listOfNotNull(
                             step.productDescription?.let { "Категория средства: $it" },
-                            selectedDrug?.let { "Препарат: ${it.name}" },
-                            selectedDrug?.purpose?.takeIf(String::isNotBlank)?.let { "Назначение: $it" },
-                            selectedDrug?.consumptionRate?.takeIf(String::isNotBlank)?.let { "Норма применения: $it" },
                             step.note,
                             step.explanation
                         ).filter(String::isNotBlank).joinToString("\n"),
-                        userLockedDate = false
+                        userLockedDate = false,
+                        photoUri = photoUri
                     )
                 }
                 repository.replacePlantCard(program.instanceId, rows)
@@ -266,13 +248,11 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
 
     fun updateImportedProgramCard(
         plantName: String,
-        plantDetails: String,
         existingRows: List<PlantEntity>,
         taskNames: List<String>,
         taskDates: List<LocalDate>,
         gardenId: Int?,
         gardenName: String,
-        reminderOffsetsMinutes: String? = null,
         onSaved: () -> Unit = {}
     ) {
         viewModelScope.launch {
@@ -282,12 +262,10 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                 val updated = existingRows.mapIndexed { index, row ->
                     row.copy(
                         plantName = plantName.trim(),
-                        plantDetails = plantDetails.trim(),
                         taskName = taskNames[index].trim(),
                         creationDate = taskDates[index].toString(),
                         gardenId = gardenId,
                         gardenName = gardenName,
-                        reminderOffsetsMinutes = reminderOffsetsMinutes ?: row.reminderOffsetsMinutes,
                         repeatDaysOfWeek = if (row.repeatType == RepeatType.WEEKLY.name) {
                             taskDates[index].dayOfWeek.value.toString()
                         } else {

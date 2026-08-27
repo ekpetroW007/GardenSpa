@@ -3,7 +3,7 @@ package ru.samates.gardenspa
 import ru.samates.gardenspa.data.database.entity.PlantEntity
 import ru.samates.gardenspa.data.database.entity.ProcedureEntity
 import ru.samates.gardenspa.domain.scheduledTreatmentsOn
-import ru.samates.gardenspa.domain.pendingProgramTreatments
+import ru.samates.gardenspa.domain.nearestIncompleteTreatment
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -86,44 +86,24 @@ class TreatmentScheduleTest {
     }
 
     @Test
-    fun cancelledOccurrenceIsHiddenWithoutChangingTheSeries() {
-        val cancelled = ProcedureEntity(
-            plantId = plant.id,
-            procedureName = plant.taskName,
-            scheduledDate = "2026-07-28",
-            status = "CANCELLED"
+    fun nearestIncompleteTreatmentSelectsTheFirstFutureWork() {
+        val fromDate = LocalDate.parse("2026-08-26")
+        val later = plant.copy(
+            id = 8,
+            creationDate = fromDate.plusDays(5).toString(),
+            repeatType = "NONE",
+            gardenId = 8
+        )
+        val sooner = plant.copy(
+            id = 9,
+            creationDate = fromDate.plusDays(1).toString(),
+            repeatType = "NONE",
+            gardenId = 9
         )
 
-        assertTrue(scheduledTreatmentsOn(listOf(plant), listOf(cancelled), LocalDate.parse("2026-07-28")).isEmpty())
-        assertTrue(scheduledTreatmentsOn(listOf(plant), listOf(cancelled), LocalDate.parse("2026-07-29")).isNotEmpty())
-    }
+        val nearest = nearestIncompleteTreatment(listOf(later, sooner), emptyList(), fromDate)
 
-    @Test
-    fun endingSeriesAlsoHidesFutureMovedOccurrences() {
-        val endedPlant = plant.copy(repeatEndType = "UNTIL_DATE", repeatEndDate = "2026-07-28")
-        val moved = ProcedureEntity(
-            plantId = plant.id,
-            procedureName = plant.taskName,
-            scheduledDate = "2026-07-29",
-            rescheduledDate = "2026-07-30"
-        )
-
-        assertTrue(scheduledTreatmentsOn(listOf(endedPlant), listOf(moved), LocalDate.parse("2026-07-30")).isEmpty())
-    }
-
-    @Test
-    fun readyProgramListContainsOnlyUnfinishedOccurrences() {
-        val programPlant = plant.copy(programId = "tomato", repeatEndType = "COUNT", repeatCount = 3)
-        val records = listOf(
-            ProcedureEntity(plantId = plant.id, procedureName = plant.taskName, scheduledDate = "2026-07-27", completedDate = "2026-07-27", status = "COMPLETED"),
-            ProcedureEntity(plantId = plant.id, procedureName = plant.taskName, scheduledDate = "2026-07-28", status = "CANCELLED"),
-            ProcedureEntity(plantId = plant.id, procedureName = plant.taskName, scheduledDate = "2026-07-29", rescheduledDate = "2026-07-31")
-        )
-
-        val pending = pendingProgramTreatments(listOf(programPlant, plant.copy(id = 8)), records)
-
-        assertEquals(1, pending.size)
-        assertEquals(LocalDate.parse("2026-07-29"), pending.single().originalDate)
-        assertEquals(LocalDate.parse("2026-07-31"), pending.single().scheduledDate)
+        assertEquals(9, nearest?.plant?.gardenId)
+        assertEquals(fromDate.plusDays(1), nearest?.scheduledDate)
     }
 }

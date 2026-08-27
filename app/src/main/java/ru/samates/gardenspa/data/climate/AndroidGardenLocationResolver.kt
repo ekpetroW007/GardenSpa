@@ -29,7 +29,7 @@ class AndroidGardenLocationResolver(context: Context) {
         val address = Geocoder(appContext, Locale("ru", "RU"))
             .getFromLocationName(query.trim(), 1)
             ?.firstOrNull()
-            ?: error("Не удалось найти населённый пункт. Уточните название.")
+            ?: error("Не удалось найти населённый пункт. Уточните название или введите координаты.")
         GardenLocation(
             latitude = address.latitude,
             longitude = address.longitude,
@@ -42,6 +42,18 @@ class AndroidGardenLocationResolver(context: Context) {
         )
     }
 
+    fun manualCoordinates(name: String, latitude: Double, longitude: Double): GardenLocation {
+        require(latitude in -90.0..90.0) { "Широта должна быть от -90 до 90" }
+        require(longitude in -180.0..180.0) { "Долгота должна быть от -180 до 180" }
+        return GardenLocation(
+            latitude = latitude,
+            longitude = longitude,
+            localityName = name.trim().ifBlank { "Выбранная точка" },
+            source = LocationSource.MANUAL_COORDINATES,
+            accuracyKm = 1.0
+        )
+    }
+
     @SuppressLint("MissingPermission")
     suspend fun resolveApproximateDeviceLocation(): GardenLocation {
         check(
@@ -51,7 +63,7 @@ class AndroidGardenLocationResolver(context: Context) {
         val locationManager = appContext.getSystemService(LocationManager::class.java)
         val location = bestLastKnownLocation(locationManager)
             ?: withTimeoutOrNull(12_000L) { requestSingleNetworkLocation(locationManager) }
-            ?: error("Не удалось определить местоположение. Введите населённый пункт.")
+            ?: error("Не удалось определить местоположение. Введите населённый пункт или координаты.")
         return GardenLocation(
             latitude = location.latitude,
             longitude = location.longitude,

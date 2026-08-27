@@ -26,7 +26,7 @@ fun DrugInfo(
 ) {
     BotanicalBackground {
         Column(Modifier.fillMaxSize()) {
-            ScreenHeader("Карточка препарата", "Безопасная памятка", onBack = { navController.popBackStack() })
+            ScreenHeader("Средство для обработки", "Безопасная памятка", onBack = { navController.popBackStack() })
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -36,7 +36,6 @@ fun DrugInfo(
             ) {
                 GlassCard(Modifier.fillMaxWidth()) {
                     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Text("◇", color = Leaf300, style = MaterialTheme.typography.headlineLarge)
                         Text(drugName.orEmpty(), style = MaterialTheme.typography.headlineLarge, color = Cream)
                         Text("Назначение", color = Leaf300, style = MaterialTheme.typography.labelLarge)
                         Text(purpose.orEmpty().ifBlank { "Не указано" }, color = Cream)
@@ -52,6 +51,7 @@ fun DrugInfo(
                             color = Mist,
                             modifier = Modifier.padding(top = 8.dp)
                         )
+                        Text("Сведения добавлены пользователем и не заменяют инструкцию на упаковке.", color = Leaf300, modifier = Modifier.padding(top = 8.dp))
                     }
                 }
                 PrimaryAction("Готово", { navController.popBackStack() }, Modifier.fillMaxWidth())

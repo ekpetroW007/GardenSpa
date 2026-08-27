@@ -52,20 +52,6 @@ fun PlantEntity.occursOn(date: LocalDate): Boolean {
     return occurrenceNumber(start, date, type, interval, repeatDaysOfWeek) <= maxCount
 }
 
-fun Iterable<PlantEntity>.truncateProgramFrom(cutoff: LocalDate): List<PlantEntity> = mapNotNull { procedure ->
-    val start = runCatching { LocalDate.parse(procedure.creationDate) }.getOrNull()
-    when {
-        start == null -> procedure
-        !start.isBefore(cutoff) -> null
-        runCatching { RepeatType.valueOf(procedure.repeatType) }.getOrDefault(RepeatType.NONE) == RepeatType.NONE -> procedure
-        else -> {
-            // ponytail: daily scan is bounded by one seasonal program; use recurrence arithmetic if multi-year programs are added.
-            val retainedCount = generateSequence(start) { it.plusDays(1) }.takeWhile { it.isBefore(cutoff) }.count { procedure.occursOn(it) }
-            procedure.copy(repeatEndType = RepeatEndType.COUNT.name, repeatEndDate = null, repeatCount = retainedCount).takeIf { retainedCount > 0 }
-        }
-    }
-}
-
 private fun occurrenceNumber(
     start: LocalDate,
     target: LocalDate,

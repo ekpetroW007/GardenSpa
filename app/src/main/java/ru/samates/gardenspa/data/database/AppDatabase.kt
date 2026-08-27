@@ -8,9 +8,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import ru.samates.gardenspa.data.database.dao.*
 import ru.samates.gardenspa.data.database.entity.*
-import ru.samates.gardenspa.domain.FolkFertilizerRecipe
-import ru.samates.gardenspa.domain.FolkFertilizers
-import ru.samates.gardenspa.domain.ReadyProgramDrugCatalog
+import ru.samates.gardenspa.domain.careTitleWithoutSeasonLabel
 
 @Database(
     entities = [
@@ -19,9 +17,9 @@ import ru.samates.gardenspa.domain.ReadyProgramDrugCatalog
         PlantEntity::class,
         TaskEntity::class,
         ProcedureEntity::class,
-        FolkFertilizerRecipe::class
+        GardenWorkEntity::class
     ],
-    version = 15,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -31,7 +29,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun plantDao(): PlantDAO
     abstract fun taskDao(): TaskDAO
     abstract fun procedureDao(): ProcedureDAO
-    abstract fun folkRecipeDao(): FolkRecipeDAO
+    abstract fun gardenWorkDao(): GardenWorkDAO
 
     companion object {
         @Volatile
@@ -52,15 +50,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_5_6,
                         MIGRATION_6_7,
                         MIGRATION_7_8,
-                        MIGRATION_8_9,
-                        MIGRATION_9_10,
-                        MIGRATION_10_11,
-                        MIGRATION_11_12,
-                        MIGRATION_12_13,
-                        MIGRATION_13_14,
-                        MIGRATION_14_15
+                        MIGRATION_8_9
                     )
-                    .addCallback(DEFAULT_DATA_CALLBACK)
                     .build()
                 INSTANCE = instance
                 instance
@@ -159,107 +150,86 @@ abstract class AppDatabase : RoomDatabase() {
 
         private val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL("ALTER TABLE plants ADD COLUMN plant_details TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE garden ADD COLUMN location_name TEXT")
+                database.execSQL("ALTER TABLE garden ADD COLUMN latitude REAL")
+                database.execSQL("ALTER TABLE garden ADD COLUMN longitude REAL")
+                database.execSQL("ALTER TABLE garden ADD COLUMN elevation_meters INTEGER")
+                database.execSQL("ALTER TABLE garden ADD COLUMN location_source TEXT")
+                database.execSQL("ALTER TABLE garden ADD COLUMN location_accuracy_km REAL")
+                database.execSQL("ALTER TABLE garden ADD COLUMN climate_safe_spring_day TEXT")
+                database.execSQL("ALTER TABLE garden ADD COLUMN climate_safe_autumn_day TEXT")
+                database.execSQL("ALTER TABLE garden ADD COLUMN climate_frost_free_days INTEGER")
+                database.execSQL("ALTER TABLE garden ADD COLUMN climate_gdd_5 REAL")
+                database.execSQL("ALTER TABLE garden ADD COLUMN climate_gdd_10 REAL")
+                database.execSQL("ALTER TABLE garden ADD COLUMN climate_warm_precipitation REAL")
+                database.execSQL("ALTER TABLE garden ADD COLUMN climate_winter_minimum_p10 REAL")
+                database.execSQL("ALTER TABLE garden ADD COLUMN climate_confidence TEXT")
+                database.execSQL("ALTER TABLE garden ADD COLUMN climate_source_years INTEGER")
+                database.execSQL("ALTER TABLE garden ADD COLUMN climate_updated_at TEXT")
+                database.execSQL("ALTER TABLE plants ADD COLUMN photo_uri TEXT")
             }
         }
 
         private val MIGRATION_8_9 = object : Migration(8, 9) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL(
-                    "UPDATE plants SET repeat_end_type = 'UNTIL_DATE', repeat_end_date = date('now', '-1 day') " +
-                        "WHERE program_id IS NOT NULL AND program_step_id NOT LIKE '%pruning%' " +
-                        "AND drugNameInPlant IN ('Препарат не требуется', 'Не требуется')"
+                    """
+                    DELETE FROM plants
+                    WHERE (program_id LIKE 'strawberry-%' AND program_step_id IN ('post_harvest_pruning', 'runner_pruning'))
+                       OR (program_id = 'zucchini-vining' AND program_step_id = 'pruning_training')
+                       OR (program_id = 'garlic-hardneck' AND program_step_id = 'scape_pruning')
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    "UPDATE plants SET name = 'Яблоня', program_id = 'apple' " +
+                        "WHERE program_id IN ('apple-standard-rootstock', 'apple-dwarf-rootstock')"
+                )
+                database.execSQL(
+                    "UPDATE plants SET name = 'Груша', program_id = 'pear' " +
+                        "WHERE program_id IN ('pear-standard-rootstock', 'pear-dwarf-rootstock')"
+                )
+                database.execSQL(
+                    "UPDATE plants SET name = 'Земляника', program_id = 'garden-strawberry' " +
+                        "WHERE program_id LIKE 'strawberry-%'"
+                )
+                database.execSQL(
+                    "UPDATE plants SET name = 'Кабачок', program_id = 'zucchini' " +
+                        "WHERE program_id IN ('zucchini-bush', 'zucchini-vining')"
+                )
+                database.execSQL(
+                    "UPDATE plants SET name = 'Чеснок', program_id = 'garlic' " +
+                        "WHERE program_id IN ('garlic-hardneck', 'garlic-softneck')"
+                )
+                cleanProgramTitles(database, "plants", "task", "program_id IS NOT NULL")
+                cleanProgramTitles(
+                    database,
+                    "procedure_history",
+                    "procedure_name",
+                    "plant_id IN (SELECT id FROM plants WHERE program_id IS NOT NULL)"
                 )
             }
         }
 
-        private val MIGRATION_9_10 = object : Migration(9, 10) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL("ALTER TABLE garden ADD COLUMN climate_data TEXT NOT NULL DEFAULT ''")
-                database.execSQL("DROP TABLE IF EXISTS garden_work_entries")
-            }
-        }
-
-        private val MIGRATION_10_11 = object : Migration(10, 11) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL("ALTER TABLE plants ADD COLUMN reminder_offsets_minutes TEXT NOT NULL DEFAULT '1440'")
-                database.execSQL("UPDATE plants SET reminder_offsets_minutes = CAST(reminder_days_before * 1440 AS TEXT)")
-            }
-        }
-
-        private val MIGRATION_11_12 = object : Migration(11, 12) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                createRecipeTable(database)
-                insertDefaultRecipes(database)
-            }
-        }
-
-        private val MIGRATION_12_13 = object : Migration(12, 13) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                insertRecipes(database, FolkFertilizers.previousPhotoRecipes)
-            }
-        }
-
-        private val MIGRATION_13_14 = object : Migration(13, 14) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                (FolkFertilizers.previousPhotoRecipes + FolkFertilizers.homePhotoRecipes).map(FolkFertilizerRecipe::id).distinct().forEach { id ->
-                    database.execSQL("DELETE FROM folk_recipe WHERE id = ?", arrayOf(id))
+        private fun cleanProgramTitles(
+            database: SupportSQLiteDatabase,
+            table: String,
+            titleColumn: String,
+            whereClause: String
+        ) {
+            database.query("SELECT id, $titleColumn FROM $table WHERE $whereClause").use { cursor ->
+                val idColumn = cursor.getColumnIndexOrThrow("id")
+                val valueColumn = cursor.getColumnIndexOrThrow(titleColumn)
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(idColumn)
+                    val title = cursor.getString(valueColumn)
+                    val cleaned = careTitleWithoutSeasonLabel(title)
+                    if (cleaned != title) {
+                        database.execSQL(
+                            "UPDATE $table SET $titleColumn = ? WHERE id = ?",
+                            arrayOf(cleaned, id)
+                        )
+                    }
                 }
-                insertRecipes(database, FolkFertilizers.homePhotoRecipes)
-            }
-        }
-
-        private val MIGRATION_14_15 = object : Migration(14, 15) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                insertDefaultDrugs(database)
-            }
-        }
-
-        private val DEFAULT_DATA_CALLBACK = object : Callback() {
-            override fun onCreate(database: SupportSQLiteDatabase) {
-                super.onCreate(database)
-                insertDefaultRecipes(database)
-                insertDefaultDrugs(database)
-            }
-        }
-
-        private fun createRecipeTable(database: SupportSQLiteDatabase) {
-            database.execSQL(
-                """
-                CREATE TABLE IF NOT EXISTS folk_recipe (
-                    id TEXT NOT NULL PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    purpose TEXT NOT NULL,
-                    ingredients TEXT NOT NULL,
-                    preparation TEXT NOT NULL,
-                    consumptionRate TEXT NOT NULL,
-                    warning TEXT NOT NULL,
-                    sourceName TEXT NOT NULL,
-                    sourceUrl TEXT NOT NULL
-                )
-                """.trimIndent()
-            )
-        }
-
-        private fun insertDefaultRecipes(database: SupportSQLiteDatabase) {
-            insertRecipes(database, FolkFertilizers.recipes)
-        }
-
-        private fun insertDefaultDrugs(database: SupportSQLiteDatabase) {
-            ReadyProgramDrugCatalog.defaultDrugs.forEach { drug ->
-                database.execSQL(
-                    "INSERT INTO drug (name, target, amount) SELECT ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM drug WHERE name = ? COLLATE NOCASE)",
-                    arrayOf(drug.name, drug.purpose, drug.consumptionRate, drug.name)
-                )
-            }
-        }
-
-        private fun insertRecipes(database: SupportSQLiteDatabase, recipes: List<FolkFertilizerRecipe>) {
-            recipes.forEach { recipe ->
-                database.execSQL(
-                    "INSERT OR IGNORE INTO folk_recipe (id, name, purpose, ingredients, preparation, consumptionRate, warning, sourceName, sourceUrl) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    arrayOf(recipe.id, recipe.name, recipe.purpose, recipe.ingredients, recipe.preparation, recipe.consumptionRate, recipe.warning, recipe.sourceName, recipe.sourceUrl)
-                )
             }
         }
 

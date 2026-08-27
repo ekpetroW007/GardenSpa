@@ -12,15 +12,10 @@ import ru.samates.gardenspa.domain.ClimateConfidence
 import ru.samates.gardenspa.domain.ClimateFingerprint
 import ru.samates.gardenspa.domain.CultivationType
 import ru.samates.gardenspa.domain.ForecastWeatherDay
-import ru.samates.gardenspa.domain.NaturalZone
 import ru.samates.gardenspa.domain.PlantCareCatalog
-import ru.samates.gardenspa.domain.PlantNameCatalog
 import ru.samates.gardenspa.domain.ProgramStartChoice
 import ru.samates.gardenspa.domain.ProgramStartPlanner
-import ru.samates.gardenspa.domain.ReadyProgramDrugCatalog
-import ru.samates.gardenspa.domain.naturalZone
-import ru.samates.gardenspa.domain.recommendedEndDate
-import ru.samates.gardenspa.domain.recommendedStartDate
+import ru.samates.gardenspa.domain.careTitleWithoutSeasonLabel
 
 class CareProgramTest {
     private val climate = ClimateFingerprint(
@@ -36,32 +31,17 @@ class CareProgramTest {
     )
 
     @Test
-    fun catalogRequiresAGroupWhereCareDiffers() {
-        assertEquals(38, PlantCareCatalog.all().size)
-        assertNull(PlantCareCatalog.find("  ПОМИДОР "))
-        assertNull(PlantCareCatalog.find("Клубника"))
-        assertNull(PlantCareCatalog.find("Болгарский перец"))
+    fun catalogRecognizesAliasesButNotUnknownPlants() {
+        assertEquals(16, PlantCareCatalog.all().size)
+        assertEquals("tomato", PlantCareCatalog.find("  ПОМИДОР ")?.id)
+        assertEquals("garden-strawberry", PlantCareCatalog.find("Клубника")?.id)
+        assertEquals("apple", PlantCareCatalog.find("Яблоня на карликовом подвое")?.id)
+        assertEquals("pear", PlantCareCatalog.find("Груша на сильнорослом подвое")?.id)
+        assertEquals("zucchini", PlantCareCatalog.find("Кабачок плетистый")?.id)
+        assertEquals("garlic", PlantCareCatalog.find("Чеснок стрелкующийся")?.id)
+        assertEquals("sweet-pepper", PlantCareCatalog.find("Болгарский перец")?.id)
         assertEquals("beet", PlantCareCatalog.find("свекла")?.id)
-        assertEquals("hydrangea-paniculata", PlantCareCatalog.find("Гортензия метельчатая")?.id)
-        assertEquals("tomato-indeterminate", PlantCareCatalog.find("Томат высокорослый")?.id)
         assertNull(PlantCareCatalog.find("Неизвестное растение"))
-    }
-
-    @Test
-    fun suggestionsMatchCanonicalNamesAndAliasesByPrefix() {
-        assertEquals(setOf("tomato-determinate", "tomato-indeterminate"), PlantCareCatalog.suggestions("пом").map { it.id }.toSet())
-        assertEquals(5, PlantCareCatalog.suggestions("горт").size)
-        assertEquals(setOf("pear-standard-rootstock", "pear-dwarf-rootstock"), PlantCareCatalog.suggestions("гру").map { it.id }.toSet())
-        assertTrue(PlantCareCatalog.suggestions("").isEmpty())
-    }
-
-    @Test
-    fun plantCatalogShowsCareGroupsOnlyForSupportedPlants() {
-        assertTrue(PlantNameCatalog.all().size >= 180)
-        assertEquals("Абутилон", PlantNameCatalog.suggestions("абу").single().canonicalName)
-        assertEquals(setOf("Томат детерминантный", "Томат индетерминантный"), PlantNameCatalog.suggestions("пом").map { it.canonicalName }.toSet())
-        assertTrue(PlantNameCatalog.suggestions("горт").none { it.canonicalName == "Гортензия" })
-        assertTrue(PlantNameCatalog.all().none { "F1" in it.canonicalName || "сорт" in it.canonicalName.lowercase() })
     }
 
     @Test
@@ -88,7 +68,7 @@ class CareProgramTest {
 
     @Test
     fun futureRecommendationUsesRecommendedDate() {
-        val tomato = requireNotNull(PlantCareCatalog.findById("tomato-indeterminate"))
+        val tomato = requireNotNull(PlantCareCatalog.find("томат"))
         val proposal = ProgramStartPlanner.propose(
             template = tomato,
             cultivationType = CultivationType.OPEN_GROUND,
@@ -98,16 +78,16 @@ class CareProgramTest {
         )
 
         assertEquals(false, proposal.recommendationHasPassed)
-        assertEquals(LocalDate.of(2026, 5, 6), proposal.recommendedDate)
+        assertEquals(LocalDate.of(2026, 4, 28), proposal.recommendedDate)
         assertEquals(
-            LocalDate.of(2026, 5, 6),
+            LocalDate.of(2026, 4, 28),
             proposal.resolve(ProgramStartChoice.RECOMMENDED_DATE)
         )
     }
 
     @Test
-    fun passedRecommendationCanMoveToNextYearOrUseSelectedDate() {
-        val tomato = requireNotNull(PlantCareCatalog.findById("tomato-indeterminate"))
+    fun passedRecommendationCanMoveToNextYearOrDayAfterUserDate() {
+        val tomato = requireNotNull(PlantCareCatalog.find("томат"))
         val proposal = ProgramStartPlanner.propose(
             template = tomato,
             cultivationType = CultivationType.OPEN_GROUND,
@@ -117,165 +97,51 @@ class CareProgramTest {
         )
 
         assertTrue(proposal.recommendationHasPassed)
-        assertEquals(LocalDate.of(2027, 5, 6), proposal.resolve(ProgramStartChoice.NEXT_YEAR))
-        assertEquals(LocalDate.of(2026, 8, 15), proposal.resolve(ProgramStartChoice.USER_DATE))
+        assertEquals(LocalDate.of(2027, 4, 28), proposal.resolve(ProgramStartChoice.NEXT_YEAR))
+        assertEquals(LocalDate.of(2026, 8, 16), proposal.resolve(ProgramStartChoice.USER_DATE))
     }
 
     @Test
-    fun customDateKeepsOnlyRemainingProceduresWithoutMovingSeason() {
-        val tomato = requireNotNull(PlantCareCatalog.findById("tomato-indeterminate"))
-        val normalStart = recommendedStartDate(tomato, CultivationType.OPEN_GROUND, climate, 2026)
-        val selectedDate = LocalDate.of(2026, 6, 20)
-        val program = CareProgramGenerator().generate(
-            template = tomato,
-            context = CareProgramContext(
-                startDate = normalStart,
-                cultivationType = CultivationType.OPEN_GROUND,
-                climate = climate,
-                includeOnlyOnOrAfter = selectedDate
-            ),
-            instanceId = "remaining"
-        )
-
-        assertEquals(selectedDate, program.remainingFromDate)
-        assertTrue(program.steps.all { !it.scheduledDate.isBefore(selectedDate) })
-        assertTrue(program.steps.none { it.templateStepId == "pruning" })
-        assertTrue(program.steps.none { it.templateStepId == "moisture_and_health_check" })
-        assertTrue(program.steps.all { "pruning" in it.templateStepId || it.productDescription != null })
-    }
-
-    @Test
-    fun customDateAfterSeasonProducesNoProcedures() {
-        val tomato = requireNotNull(PlantCareCatalog.findById("tomato-indeterminate"))
-        val normalStart = recommendedStartDate(tomato, CultivationType.OPEN_GROUND, climate, 2026)
-        val program = CareProgramGenerator().generate(
-            template = tomato,
-            context = CareProgramContext(
-                startDate = normalStart,
-                cultivationType = CultivationType.OPEN_GROUND,
-                climate = climate,
-                includeOnlyOnOrAfter = LocalDate.of(2026, 11, 1)
-            )
-        )
-
-        assertTrue(program.steps.isEmpty())
-    }
-
-    @Test
-    fun generatedProgramOnlyContainsPruningAndProductProcedures() {
-        val tomato = requireNotNull(PlantCareCatalog.findById("tomato-indeterminate"))
-        val program = CareProgramGenerator().generate(
-            template = tomato,
-            context = CareProgramContext(LocalDate.of(2026, 5, 6), CultivationType.OPEN_GROUND, climate)
-        )
-
-        assertTrue(program.steps.any { it.templateStepId == "pruning" })
-        assertTrue(program.steps.any { it.productDescription != null })
-        assertTrue(program.steps.all { "pruning" in it.templateStepId || it.productDescription != null })
-    }
-
-    @Test
-    fun everyCatalogProgramContainsBrandNeutralTreatmentCategories() {
+    fun approvedProgramsUseBashInkomAndOtherProgramsStayBrandNeutral() {
         PlantCareCatalog.all().forEach { template ->
-            assertTrue(template.version >= 2)
             val treatmentSteps = template.steps.filter { it.productDescription != null }
             assertTrue("${template.canonicalName} has no product steps", treatmentSteps.size >= 2)
-            assertTrue(treatmentSteps.all { step ->
-                val description = requireNotNull(step.productDescription)
-                "разрешённое" in description && "бренд" !in description.lowercase()
-            })
-        }
-    }
-
-    @Test
-    fun everyProgramProductStepHasAlternativesFromDifferentManufacturers() {
-        val availableDrugs = ReadyProgramDrugCatalog.defaultDrugs
-
-        PlantCareCatalog.all().forEach { template ->
-            template.steps.filter { it.productDescription != null }.forEach { step ->
-                val options = ReadyProgramDrugCatalog.recommendedFor(template.id, step.id, availableDrugs)
-                assertTrue("${template.canonicalName} / ${step.title}: нужно минимум два препарата", options.size >= 2)
-                assertTrue("${template.canonicalName} / ${step.title}: нужны разные производители", options.map { it.name.substringAfterLast("—").trim() }.distinct().size >= 2)
+            if (template.id in setOf("tomato", "cucumber")) {
+                assertEquals(3, template.version)
+                assertTrue(treatmentSteps.all { "БашИнком" in requireNotNull(it.productDescription) })
+                assertTrue(treatmentSteps.all { "https://www.bashinkom.ru/" in it.note })
+            } else {
+                assertEquals(2, template.version)
+                assertTrue(treatmentSteps.all { step ->
+                    val description = requireNotNull(step.productDescription)
+                    "разрешённое" in description && "бренд" !in description.lowercase()
+                })
             }
         }
     }
 
     @Test
-    fun popularProgramsCoverAnnualCareWithoutPlanting() {
-        val popularPrefixes = setOf("tomato-", "cucumber-", "hydrangea-", "peony-", "rose-", "apple-", "pear-")
-        val popular = PlantCareCatalog.all().filter { template -> popularPrefixes.any(template.id::startsWith) }
+    fun tomatoAndCucumberProgramsContainConfirmedRatesAndRainSensitiveSprays() {
+        val tomato = requireNotNull(PlantCareCatalog.find("томат"))
+        val cucumber = requireNotNull(PlantCareCatalog.find("огурец"))
 
-        assertEquals(21, popular.size)
-        popular.forEach { template ->
-            assertTrue("${template.canonicalName}: нужна корневая подкормка", template.steps.any { "root_feeding" in it.id })
-            assertTrue("${template.canonicalName}: нужна внекорневая подкормка", template.steps.any { "foliar_feeding" in it.id })
-            assertTrue("${template.canonicalName}: нужны обработки и опрыскивания", template.steps.count { "treatment" in it.id || "spraying" in it.id } >= 3)
-            assertTrue("${template.canonicalName}: нужна подготовка к зиме", template.steps.any { it.id == "winter_preparation" })
-            assertTrue("${template.canonicalName}: посадка не должна входить в план", template.steps.none { step ->
-                "посад" in step.title.lowercase() || "посад" in step.note.lowercase()
-            })
-            assertTrue(template.supportedNaturalZones.isNotEmpty())
+        assertTrue(tomato.steps.any { "5 г в 10 л воды" in it.note && it.recurrence?.count == 2 })
+        assertTrue(cucumber.steps.any { "10 г в 5 л воды" in it.note && it.recurrence?.count == 3 })
+        listOf(tomato, cucumber).forEach { template ->
+            template.steps.filter { "опрыск" in it.title.lowercase() || "по листьям" in it.title.lowercase() }.forEach { step ->
+                assertTrue(step.weatherLimits.maximumPrecipitationMm != null)
+                assertTrue(step.weatherLimits.maximumWindMetersPerSecond != null)
+            }
         }
     }
 
     @Test
-    fun pruningDependsOnSelectedCareGroup() {
-        val determinateTomato = requireNotNull(PlantCareCatalog.findById("tomato-determinate"))
-        val indeterminateTomato = requireNotNull(PlantCareCatalog.findById("tomato-indeterminate"))
-        val bigleafHydrangea = requireNotNull(PlantCareCatalog.findById("hydrangea-macrophylla"))
-        val panicleHydrangea = requireNotNull(PlantCareCatalog.findById("hydrangea-paniculata"))
-
-        assertTrue(determinateTomato.steps.none { "pruning" in it.id })
-        assertTrue(indeterminateTomato.steps.any { it.id == "pruning" })
-        assertTrue(bigleafHydrangea.steps.none { it.id == "pruning" })
-        assertTrue(panicleHydrangea.steps.any { it.id == "pruning" })
-    }
-
-    @Test
-    fun pruningTimingIsPlantSpecific() {
-        val tomato = requireNotNull(PlantCareCatalog.findById("tomato-indeterminate"))
-        val apple = requireNotNull(PlantCareCatalog.findById("apple-standard-rootstock"))
-        val peony = requireNotNull(PlantCareCatalog.findById("peony-herbaceous"))
-
-        assertTrue(tomato.steps.first().title.contains("пасынкование"))
-        assertTrue(apple.openGroundStartOffsetDays < tomato.openGroundStartOffsetDays)
-        assertTrue(peony.steps.any { it.id == "autumn_pruning" })
-    }
-
-    @Test
-    fun naturalZonesProduceDifferentCareWindows() {
-        val tomato = requireNotNull(PlantCareCatalog.findById("tomato-indeterminate"))
-        val coldClimate = climate.copy(
-            safeSpringDay = MonthDay.of(6, 5),
-            safeAutumnDay = MonthDay.of(8, 25),
-            frostFreeDays = 81,
-            growingDegreeDays5 = 900.0,
-            growingDegreeDays10 = 450.0,
-            winterMinimumP10 = -38.0
-        )
-        val subtropicalClimate = climate.copy(
-            safeSpringDay = MonthDay.of(3, 1),
-            safeAutumnDay = MonthDay.of(12, 1),
-            frostFreeDays = 275,
-            growingDegreeDays5 = 4_800.0,
-            growingDegreeDays10 = 3_200.0,
-            warmSeasonPrecipitationMm = 650.0,
-            winterMinimumP10 = -3.0
-        )
-
-        assertEquals(NaturalZone.TUNDRA_AND_FOREST_TUNDRA, coldClimate.naturalZone())
-        assertEquals(NaturalZone.HUMID_SUBTROPICS, subtropicalClimate.naturalZone())
-        assertTrue(recommendedStartDate(tomato, CultivationType.OPEN_GROUND, coldClimate, 2026) > recommendedStartDate(tomato, CultivationType.OPEN_GROUND, subtropicalClimate, 2026))
-        assertTrue(recommendedEndDate(tomato, CultivationType.OPEN_GROUND, coldClimate, 2026) < recommendedEndDate(tomato, CultivationType.OPEN_GROUND, subtropicalClimate, 2026))
-    }
-
-    @Test
     fun generatorMovesWeatherSensitiveStepInsideAllowedWindow() {
-        val tomato = requireNotNull(PlantCareCatalog.findById("tomato-indeterminate"))
+        val tomato = requireNotNull(PlantCareCatalog.find("томат"))
         val start = LocalDate.of(2026, 5, 10)
-        val initialFeedingDate = start.plusDays(8)
-        val forecast = (-2L..3L).map { offset ->
-            val date = initialFeedingDate.plusDays(offset)
+        val initialSprayingDate = start.plusDays(8)
+        val forecast = (-1L..2L).map { offset ->
+            val date = initialSprayingDate.plusDays(offset)
             ForecastWeatherDay(
                 date = date,
                 minimumTemperatureC = 10.0,
@@ -290,10 +156,51 @@ class CareProgramTest {
             context = CareProgramContext(start, CultivationType.OPEN_GROUND, climate, forecast),
             instanceId = "test-instance"
         )
-        val feeding = program.steps.first { it.templateStepId == "spring_root_feeding" }
+        val spraying = program.steps.first { it.templateStepId == "fitosporin_spraying" }
 
-        assertEquals(initialFeedingDate.plusDays(1), feeding.scheduledDate)
-        assertTrue(feeding.weatherAdjusted)
+        assertEquals(initialSprayingDate.plusDays(1), spraying.scheduledDate)
+        assertTrue(spraying.weatherAdjusted)
         assertNull(program.warning)
+    }
+
+    @Test
+    fun mergedPlantsUseOneCanonicalProgramAndDoNotExposeRemovedTasks() {
+        assertEquals("Яблоня", requireNotNull(PlantCareCatalog.find("Яблоня на сильнорослом подвое")).canonicalName)
+        assertEquals("Груша", requireNotNull(PlantCareCatalog.find("Груша на слаборослом подвое")).canonicalName)
+        assertEquals("Земляника", requireNotNull(PlantCareCatalog.find("Земляника садовая ремонтантная")).canonicalName)
+        assertEquals("Кабачок", requireNotNull(PlantCareCatalog.find("Кабачок кустовой")).canonicalName)
+        assertEquals("Чеснок", requireNotNull(PlantCareCatalog.find("Чеснок нестрелкующийся")).canonicalName)
+
+        val removedStepIds = setOf("post_harvest_pruning", "runner_pruning", "pruning_training", "scape_pruning")
+        val removedTitles = setOf(
+            "обновить землянику после окончания урожая",
+            "удалить усы",
+            "направить плети плетистого кабачка",
+            "удалить стрелки чеснока"
+        )
+        PlantCareCatalog.all().forEach { template ->
+            assertTrue(template.steps.none { it.id in removedStepIds })
+            assertTrue(template.steps.none { step ->
+                removedTitles.any { removed -> step.title.lowercase().contains(removed) }
+            })
+        }
+    }
+
+    @Test
+    fun workTitlesDoNotContainSeasonLabels() {
+        val forbidden = listOf("летняя", "осенняя", "весенняя", "предзимняя", "ранневесенняя", "позднезимняя")
+        PlantCareCatalog.all().forEach { template ->
+            template.steps.forEach { step ->
+                assertTrue(
+                    "${template.canonicalName}: ${step.title}",
+                    forbidden.none(step.title.lowercase()::contains)
+                )
+            }
+        }
+        assertEquals(
+            "Обрезка яблони",
+            careTitleWithoutSeasonLabel("Позднезимняя или ранневесенняя обрезка яблони")
+        )
+        assertEquals("Корневая подкормка", careTitleWithoutSeasonLabel("Летняя корневая подкормка"))
     }
 }

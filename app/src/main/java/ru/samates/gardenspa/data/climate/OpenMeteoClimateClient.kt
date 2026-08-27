@@ -22,6 +22,7 @@ class ClimateService(
 
     suspend fun loadForecast(location: GardenLocation): List<ForecastWeatherDay> =
         client.loadForecast(location)
+
 }
 
 class OpenMeteoClimateClient {
@@ -96,7 +97,9 @@ class OpenMeteoClimateClient {
             }
         }
 
-    private fun requestJson(url: String): JSONObject {
+    private fun requestJson(url: String): JSONObject = JSONObject(requestText(url))
+
+    private fun requestText(url: String): String {
         val connection = URL(url).openConnection() as HttpURLConnection
         return try {
             connection.requestMethod = "GET"
@@ -109,8 +112,7 @@ class OpenMeteoClimateClient {
                 val message = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
                 error("Погодный сервис вернул ошибку $code${message.takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty()}")
             }
-            val body = connection.inputStream.bufferedReader().use { it.readText() }
-            JSONObject(body)
+            connection.inputStream.bufferedReader().use { it.readText() }
         } finally {
             connection.disconnect()
         }
