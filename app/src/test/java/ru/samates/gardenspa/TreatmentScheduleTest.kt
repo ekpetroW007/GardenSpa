@@ -3,6 +3,7 @@ package ru.samates.gardenspa
 import ru.samates.gardenspa.data.database.entity.PlantEntity
 import ru.samates.gardenspa.data.database.entity.ProcedureEntity
 import ru.samates.gardenspa.domain.scheduledTreatmentsOn
+import ru.samates.gardenspa.domain.nearestIncompleteTreatment
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -82,5 +83,27 @@ class TreatmentScheduleTest {
 
         assertFalse(treatment.completed)
         assertEquals(LocalDate.parse("2026-07-30"), treatment.scheduledDate)
+    }
+
+    @Test
+    fun nearestIncompleteTreatmentSelectsTheFirstFutureWork() {
+        val fromDate = LocalDate.parse("2026-08-26")
+        val later = plant.copy(
+            id = 8,
+            creationDate = fromDate.plusDays(5).toString(),
+            repeatType = "NONE",
+            gardenId = 8
+        )
+        val sooner = plant.copy(
+            id = 9,
+            creationDate = fromDate.plusDays(1).toString(),
+            repeatType = "NONE",
+            gardenId = 9
+        )
+
+        val nearest = nearestIncompleteTreatment(listOf(later, sooner), emptyList(), fromDate)
+
+        assertEquals(9, nearest?.plant?.gardenId)
+        assertEquals(fromDate.plusDays(1), nearest?.scheduledDate)
     }
 }

@@ -6,7 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 
 class MainScreenViewmodel : ViewModel() {
-    var selectedScreen by mutableStateOf("Главная")
+    var selectedScreen by mutableStateOf("Сегодня")
     fun changeScreen(newText: String) {
         selectedScreen = newText
     }

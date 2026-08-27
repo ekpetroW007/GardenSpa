@@ -52,7 +52,7 @@ fun DrugAdd(navController: NavController, drugId: Int? = null) {
     BotanicalBackground {
         Column(Modifier.fillMaxSize()) {
             ScreenHeader(
-                if (editing) "Редактирование препарата" else "Новый препарат",
+                if (editing) "Изменить средство" else "Новое средство",
                 if (editing) "Измените нужные параметры" else "Обязательно только название",
                 onBack = { navController.popBackStack() }
             )
@@ -61,17 +61,17 @@ fun DrugAdd(navController: NavController, drugId: Int? = null) {
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 if (editing && drug == null) {
-                    EmptyGlassState("Препарат не найден", "Возможно, он был удалён")
+                    EmptyGlassState("Средство не найдено", "Возможно, оно было удалено")
                 } else {
                     GlassCard(Modifier.fillMaxWidth()) {
                         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                             Text("Основная информация", style = MaterialTheme.typography.titleLarge, color = Cream)
-                            Text("Данные будут доступны при создании процедуры", color = Mist)
+                            Text("Эти сведения будут доступны при создании работы по уходу", color = Mist)
                             OutlinedTextField(name, { name = it }, label = { Text("Название") }, keyboardOptions = SentenceKeyboardOptions, singleLine = true, colors = glassTextFieldColors(), shape = CompactGlassShape, modifier = Modifier.fillMaxWidth())
                             OutlinedTextField(purpose, { purpose = it }, label = { Text("Назначение (необязательно)") }, keyboardOptions = SentenceKeyboardOptions, minLines = 3, colors = glassTextFieldColors(), shape = CompactGlassShape, modifier = Modifier.fillMaxWidth())
                             OutlinedTextField(rate, { rate = it }, label = { Text("Норма расхода (необязательно)") }, keyboardOptions = SentenceKeyboardOptions, singleLine = true, colors = glassTextFieldColors(), shape = CompactGlassShape, modifier = Modifier.fillMaxWidth())
                             PrimaryAction(
-                                if (editing) "Сохранить изменения" else "Сохранить препарат",
+                                if (editing) "Сохранить изменения" else "Сохранить средство",
                                 onClick = {
                                     if (drugId == null) {
                                         viewModel.addDrug(name.trim(), purpose.trim(), rate.trim())

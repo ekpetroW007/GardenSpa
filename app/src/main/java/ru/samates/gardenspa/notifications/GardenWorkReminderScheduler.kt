@@ -22,8 +22,18 @@ object GardenWorkReminderScheduler {
     private const val OPEN_APP_REQUEST_CODE = 4301
     private const val PREFS_NAME = "garden_work_reminders"
     private const val LAST_SHOWN_DATE = "last_shown_date"
+    private const val ENABLED = "enabled"
+
+    fun isEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(ENABLED, false)
+
+    fun setEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(ENABLED, enabled).apply()
+        if (enabled) schedule(context) else cancel(context)
+    }
 
     fun schedule(context: Context) {
+        if (!isEnabled(context)) return
         createNotificationChannel(context)
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val pendingIntent = PendingIntent.getBroadcast(
@@ -47,8 +57,22 @@ object GardenWorkReminderScheduler {
         )
     }
 
+    fun cancel(context: Context) {
+        val alarmManager = context.getSystemService(AlarmManager::class.java)
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            DAILY_REQUEST_CODE,
+            Intent(context, GardenWorkReminderReceiver::class.java),
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+        )
+        pendingIntent?.let {
+            alarmManager.cancel(it)
+            it.cancel()
+        }
+    }
+
     fun showReminder(context: Context): Boolean {
-        if (!canPostNotifications(context) || wasShownToday(context)) return false
+        if (!isEnabled(context) || !canPostNotifications(context) || wasShownToday(context)) return false
         createNotificationChannel(context)
         val openApp = PendingIntent.getActivity(
             context,

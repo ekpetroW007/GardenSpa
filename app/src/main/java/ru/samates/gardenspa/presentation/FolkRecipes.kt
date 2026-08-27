@@ -49,14 +49,14 @@ fun FolkRecipes(innerPadding: PaddingValues) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    "Рецепты",
+                    "Народные рецепты",
                     color = Cream,
                     style = MaterialTheme.typography.headlineLarge,
                     maxLines = 1,
                     softWrap = false
                 )
                 Text(
-                    "Проверенные народные рецепты и баковые смеси",
+                    "Справочные варианты подкормок и ухода без рекламных названий",
                     color = Mist
                 )
             }
@@ -100,19 +100,33 @@ private fun FolkRecipeCard(
     alreadyAdded: Boolean,
     onAdd: () -> Unit
 ) {
+    var expanded by remember(recipe.id) { mutableStateOf(false) }
     GlassCard(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(recipe.name, color = Cream, style = MaterialTheme.typography.titleLarge)
             Text(recipe.purpose, color = Leaf300)
-            RecipeSection("Что понадобится", recipe.ingredients)
-            RecipeSection("Как приготовить", recipe.preparation)
-            RecipeSection("Норма расхода", recipe.consumptionRate)
-            PrimaryAction(
-                text = if (alreadyAdded) "Уже добавлено" else "Добавить в «Препараты»",
-                onClick = onAdd,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !alreadyAdded
+            Text("Народный рецепт: результат зависит от растения, почвы и концентрации.", color = Mist)
+            SecondaryAction(
+                text = if (expanded) "Скрыть рецепт" else "Показать рецепт",
+                onClick = { expanded = !expanded },
+                modifier = Modifier.fillMaxWidth()
             )
+            if (expanded) {
+                RecipeSection("Что понадобится", recipe.ingredients)
+                RecipeSection("Как приготовить", recipe.preparation)
+                RecipeSection("Как использовать", recipe.consumptionRate)
+                RecipeSection(
+                    "Меры осторожности",
+                    "Сначала проверьте состав на небольшом участке. Не смешивайте его с другими средствами без подтверждённой совместимости."
+                )
+                Text("Справочник GardenSpa · обновлено в августе 2026", color = Mist)
+                PrimaryAction(
+                    text = if (alreadyAdded) "Уже добавлено" else "Добавить в мои средства",
+                    onClick = onAdd,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !alreadyAdded
+                )
+            }
         }
     }
 }

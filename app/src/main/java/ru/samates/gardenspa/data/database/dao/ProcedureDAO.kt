@@ -18,6 +18,9 @@ interface ProcedureDAO {
     @Query("SELECT * FROM procedure_history ORDER BY scheduled_date DESC")
     suspend fun getAllProceduresOnce(): List<ProcedureEntity>
 
+    @Query("DELETE FROM procedure_history WHERE plant_id = :plantId AND scheduled_date = :scheduledDate")
+    suspend fun deleteForSchedule(plantId: Int, scheduledDate: String)
+
     @Query("SELECT * FROM procedure_history WHERE plant_id = :plantId ORDER BY scheduled_date DESC")
     fun getProceduresForPlant(plantId: Int): Flow<List<ProcedureEntity>>
 }

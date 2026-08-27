@@ -23,6 +23,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -58,7 +60,7 @@ fun Drugs(navController: NavController, innerPadding: PaddingValues) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(Modifier.weight(1f)) {
                     Text("Библиотека ухода", color = Mist)
-                    Text("Препараты", style = MaterialTheme.typography.headlineLarge, color = Cream)
+                    Text("Средства", style = MaterialTheme.typography.headlineLarge, color = Cream)
                 }
                 PrimaryAction("+ Добавить", { navController.navigate(AppDestinations.DRUG_ADD_ROUTE) })
             }
@@ -68,7 +70,7 @@ fun Drugs(navController: NavController, innerPadding: PaddingValues) {
                 value = query,
                 onValueChange = { query = it },
                 placeholder = { Text("Поиск по названию или назначению") },
-                leadingIcon = { Text("⌕", color = Leaf300) },
+                leadingIcon = { Text("⌕", color = Leaf300, modifier = Modifier.semantics { contentDescription = "Поиск" }) },
                 keyboardOptions = SentenceKeyboardOptions,
                 singleLine = true,
                 colors = glassTextFieldColors(),
@@ -123,16 +125,15 @@ fun Drugs(navController: NavController, innerPadding: PaddingValues) {
 fun DrugCard(drug: DrugEntity, onOpen: () -> Unit, onManage: () -> Unit) {
     GlassCard(Modifier.fillMaxWidth(), onClick = onOpen) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("◇", color = Leaf300, style = MaterialTheme.typography.headlineLarge)
             Column(Modifier.weight(1f)) {
                 Text(drug.name, style = MaterialTheme.typography.titleLarge, color = Cream)
                 Text(drug.purpose, color = Mist, maxLines = 2)
                 Text("Норма: ${drug.consumptionRate}", color = Leaf300, modifier = Modifier.padding(top = 6.dp))
             }
             Text(
-                "✎",
+                "Изменить",
                 color = Leaf300,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier.clickable(onClick = onManage)
             )
         }
@@ -152,7 +153,7 @@ private fun DrugActionsDialog(
         titleContentColor = Cream,
         textContentColor = Cream,
         title = { Text(drug.name) },
-        text = { Text("Что вы хотите сделать с препаратом?") },
+        text = { Text("Можно изменить сведения или удалить средство из вашего списка.") },
         confirmButton = {
             TextButton(onClick = onEdit) {
                 Text("Редактировать", color = Leaf300)

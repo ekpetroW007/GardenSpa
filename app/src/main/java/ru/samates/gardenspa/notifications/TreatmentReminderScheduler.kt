@@ -45,6 +45,9 @@ object TreatmentReminderScheduler {
     }
 
     fun refreshNow(context: Context) {
+        synchronized(treatmentNotificationLock) {
+            treatmentNotificationRevision += 1
+        }
         context.sendBroadcast(Intent(context, TreatmentReminderReceiver::class.java))
     }
 
@@ -56,7 +59,6 @@ object TreatmentReminderScheduler {
         val today = LocalDate.now().toString()
         val preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         if (preferences.getString(LAST_CHECK_DATE, null) == today) return
-        markCheckedToday(context)
         refreshNow(context)
     }
 
@@ -68,12 +70,21 @@ object TreatmentReminderScheduler {
     }
 
     fun cancelTreatmentNotification(context: Context, plantId: Int, originalDate: String) {
-        context.getSystemService(NotificationManager::class.java)
-            .cancel(notificationId(plantId, originalDate))
+        synchronized(treatmentNotificationLock) {
+            treatmentNotificationRevision += 1
+            runCatching { WeatherReminderJobService.reschedule(context) }
+            context.getSystemService(NotificationManager::class.java).apply {
+                cancel(notificationId(plantId, originalDate))
+                cancel(weatherNotificationId(plantId, originalDate))
+            }
+        }
     }
 
     fun notificationId(plantId: Int, originalDate: String): Int =
         "treatment:$plantId:$originalDate".hashCode()
+
+    fun weatherNotificationId(plantId: Int, originalDate: String): Int =
+        "treatment-weather:$plantId:$originalDate".hashCode()
 
     private fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return

@@ -63,6 +63,13 @@ class ProceduresViewmodel(private val repository: BookeeperRepository) : ViewMod
             onSaved()
         }
     }
+
+    fun undoChange(plantId: Int, originalDate: LocalDate, onSaved: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.undoProcedureChange(plantId, originalDate)
+            onSaved()
+        }
+    }
 }
 
 class ProceduresViewmodelFactory(

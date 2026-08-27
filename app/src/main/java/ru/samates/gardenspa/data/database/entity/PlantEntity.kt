@@ -4,10 +4,14 @@ package ru.samates.gardenspa.data.database.entity
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "plants",
+    indices = [
+        Index(value = ["program_import_key"], unique = true)
+    ],
     foreignKeys = [
         ForeignKey(
             entity = DrugEntity::class,
@@ -74,6 +78,27 @@ data class PlantEntity(
 
     @ColumnInfo(name = "plant_card_id", defaultValue = "''")
     val plantCardId: String = "",
+
+    @ColumnInfo(name = "program_id")
+    val programId: String? = null,
+
+    @ColumnInfo(name = "program_version")
+    val programVersion: Int? = null,
+
+    @ColumnInfo(name = "program_step_id")
+    val programStepId: String? = null,
+
+    @ColumnInfo(name = "program_import_key")
+    val programImportKey: String? = null,
+
+    @ColumnInfo(name = "program_note", defaultValue = "''")
+    val programNote: String = "",
+
+    @ColumnInfo(name = "user_locked_date", defaultValue = "0")
+    val userLockedDate: Boolean = false,
+
+    @ColumnInfo(name = "photo_uri")
+    val photoUri: String? = null,
 )
 
 val PlantEntity.resolvedCardId: String

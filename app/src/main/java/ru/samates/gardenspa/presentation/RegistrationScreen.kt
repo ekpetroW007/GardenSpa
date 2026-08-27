@@ -39,6 +39,10 @@ fun Registration(navController: NavController, userViewModel: UserViewModel) {
             GlassCard(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Text("Как к вам обращаться?", color = Cream, style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "GardenSpa поможет создать сад, добавить растения и покажет, что нужно сделать сегодня.",
+                        color = Mist
+                    )
                     OutlinedTextField(
                         value = login,
                         onValueChange = { login = it },
@@ -50,7 +54,7 @@ fun Registration(navController: NavController, userViewModel: UserViewModel) {
                         modifier = Modifier.fillMaxWidth()
                     )
                     PrimaryAction(
-                        "Начать  →",
+                        "Начать настройку",
                         onClick = {
                             userViewModel.registerUser(login.trim())
                             navController.navigate(AppDestinations.MAINSCREEN_ROUTE) {

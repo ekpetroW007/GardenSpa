@@ -59,9 +59,9 @@ class BookeeperRepository(
         taskDAO.deleteTask(id)
     }
 
-    suspend fun insertGarden(garden: GardenEntity) {
-        gardenDAO.insertGarden(garden)
-    }
+    suspend fun insertGarden(garden: GardenEntity): Long = gardenDAO.insertGarden(garden)
+
+    suspend fun updateGarden(garden: GardenEntity) = gardenDAO.updateGarden(garden)
 
     suspend fun deleteGarden(id: Int) {
         gardenDAO.deleteGarden(id)
@@ -86,6 +86,9 @@ class BookeeperRepository(
     suspend fun getAllPlantsOnce(): List<PlantEntity> = plantDAO.getAllPlantsOnce()
 
     suspend fun getAllProceduresOnce(): List<ProcedureEntity> = procedureDAO.getAllProceduresOnce()
+
+    suspend fun undoProcedureChange(plantId: Int, scheduledDate: LocalDate) =
+        procedureDAO.deleteForSchedule(plantId, scheduledDate.toString())
 
     suspend fun getGardenWorkForDate(date: LocalDate): List<GardenWorkEntity> =
         gardenWorkDAO.getEntriesForDate(date.toString())

@@ -53,3 +53,13 @@ fun scheduledTreatmentsOn(
         .distinctBy { it.plant.id to it.originalDate }
         .sortedWith(compareBy({ it.plant.gardenName }, { it.plant.plantName }, { it.originalDate }))
 }
+
+fun nearestIncompleteTreatment(
+    plants: List<PlantEntity>,
+    procedures: List<ProcedureEntity>,
+    fromDate: LocalDate,
+    searchDays: Long = 366
+): ScheduledTreatment? = (0L..searchDays).firstNotNullOfOrNull { offset ->
+    scheduledTreatmentsOn(plants, procedures, fromDate.plusDays(offset))
+        .firstOrNull { treatment -> !treatment.completed }
+}

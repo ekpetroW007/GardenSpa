@@ -1,12 +1,11 @@
 package ru.samates.gardenspa.presentation
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,7 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -28,6 +26,8 @@ import ru.samates.gardenspa.BookeeperApp
 import ru.samates.gardenspa.data.database.entity.resolvedCardId
 import ru.samates.gardenspa.domain.recurrenceDescription
 import ru.samates.gardenspa.domain.toPlantCards
+import ru.samates.gardenspa.domain.toDrugDisplayName
+import ru.samates.gardenspa.domain.toDrugDisplayText
 import ru.samates.gardenspa.notifications.TreatmentReminderScheduler
 import ru.samates.gardenspa.presentation.navigation.AppDestinations
 import ru.samates.gardenspa.ui.theme.Cream
@@ -38,7 +38,6 @@ import ru.samates.gardenspa.viewmodel.PlantsViewmodelFactory
 import ru.samates.gardenspa.viewmodel.ProceduresViewmodel
 import ru.samates.gardenspa.viewmodel.ProceduresViewmodelFactory
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PlantDetails(navController: NavController, plantId: Int) {
     val app = LocalContext.current.applicationContext as BookeeperApp
@@ -68,34 +67,26 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                     item {
                         GlassCard(Modifier.fillMaxWidth()) {
                             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                if (!plant.photoUri.isNullOrBlank()) {
+                                    PlantPhoto(plant.photoUri, plant.plantName, Modifier.fillMaxWidth().height(190.dp))
+                                }
                                 Text(plant.plantName, style = MaterialTheme.typography.headlineLarge, color = Cream)
-                                Text("Уход начат ${plant.creationDate}", color = Mist)
-                                Row(
-                                    Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Text(
-                                        text = "Сад: ${plant.gardenName}",
-                                        color = Leaf300,
-                                        maxLines = 1,
-                                        softWrap = false,
-                                        modifier = Modifier.weight(1f).basicMarquee()
-                                    )
-                                    Text(
-                                        text = "Препарат: ${plant.drugName}",
-                                        color = Leaf300,
-                                        maxLines = 1,
-                                        softWrap = false,
-                                        textAlign = TextAlign.End,
-                                        modifier = Modifier.weight(1f).basicMarquee()
-                                    )
+                                if (plant.programId != null) {
+                                    Text("Готовая программа · версия ${plant.programVersion ?: 1}", color = Leaf300)
+                                }
+                                Text("Уход начат ${cardRows.minOfOrNull { it.creationDate }?.toRussianDateOrSelf() ?: plant.creationDate.toRussianDateOrSelf()}", color = Mist)
+                                Text("Сад: ${plant.gardenName}", color = Leaf300)
+                                if (plant.programId == null) {
+                                    Text(plant.drugName.toDrugDisplayText(), color = Leaf300)
                                 }
                                 Text(
-                                    text = "Процедур: ${cardRows.size}   Частота обработки: ${plant.recurrenceDescription()}",
+                                    text = if (plant.programId != null) {
+                                        "Работ по уходу: ${cardRows.size} · индивидуальное расписание"
+                                    } else {
+                                        "Работ по уходу: ${cardRows.size}\nПовтор: ${plant.recurrenceDescription()}"
+                                    },
                                     color = Cream,
-                                    maxLines = 1,
-                                    softWrap = false,
-                                    modifier = Modifier.fillMaxWidth().basicMarquee()
+                                    modifier = Modifier.fillMaxWidth()
                                 )
                                 SecondaryAction(
                                     text = "Редактировать карточку",
@@ -110,13 +101,17 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                             }
                         }
                     }
-                    item { SectionTitle("Процедуры") }
+                    item { SectionTitle("План ухода") }
                     items(cardRows, key = { "card-procedure:${it.id}" }) { procedure ->
                         GlassCard(Modifier.fillMaxWidth()) {
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(procedure.taskName, color = Cream, style = MaterialTheme.typography.titleMedium)
-                                Text(procedure.drugName, color = Leaf300)
+                                Text(procedure.drugName.toDrugDisplayName(), color = Leaf300)
+                                Text("Дата: ${procedure.creationDate.toRussianDateOrSelf()}", color = Mist)
                                 Text(procedure.recurrenceDescription(), color = Mist)
+                                if (procedure.programNote.isNotBlank()) {
+                                    Text(procedure.programNote, color = Cream, modifier = Modifier.padding(top = 4.dp))
+                                }
                             }
                         }
                     }
@@ -131,8 +126,8 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                                     Text(procedure.procedureName, color = Cream, style = MaterialTheme.typography.titleMedium)
                                     Text("Готово", color = Leaf300)
                                 }
-                                Text("Запланировано: ${procedure.scheduledDate}", color = Mist)
-                                Text("Выполнено: ${procedure.completedDate ?: "—"}", color = Mist)
+                                Text("Запланировано: ${procedure.scheduledDate.toRussianDateOrSelf()}", color = Mist)
+                                Text("Выполнено: ${procedure.completedDate?.toRussianDateOrSelf() ?: "—"}", color = Mist)
                                 if (procedure.note.isNotBlank()) Text(procedure.note, color = Cream, modifier = Modifier.padding(top = 6.dp))
                             }
                         }
@@ -178,9 +173,9 @@ fun AllPlants(navController: NavController) {
                             Column(Modifier.weight(1f)) {
                                 Text(plant.plantName, style = MaterialTheme.typography.titleLarge, color = Cream)
                                 Text(plant.gardenName, color = Leaf300)
-                                Text(card.procedures.joinToString(" · ") { it.taskName }, color = Mist, maxLines = 2)
+                            Text("${card.procedures.size} работ по уходу", color = Mist)
                             }
-                            Text("›", color = Leaf300, style = MaterialTheme.typography.headlineMedium)
+                            Text("Открыть", color = Leaf300)
                         }
                     }
                 }

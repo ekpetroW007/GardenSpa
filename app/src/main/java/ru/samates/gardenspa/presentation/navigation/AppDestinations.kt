@@ -8,16 +8,22 @@ object AppDestinations {
     const val DRUG_EDIT_ROUTE = "drugEditScreen/{drugId}"
 
     const val GARDEN_ADD = "gardenAddScreen"
+    const val GARDEN_LOCATION = "gardenLocation/{gardenId}"
 
     const val DRUG_INFO = "drugInfoScreen"
 
-    const val PLANT_ADD = "plantAddScreen/{selectedDate}"
+    const val PLANT_ADD = "plantAddScreen/{selectedDate}?gardenId={gardenId}"
     const val PLANT_EDIT = "plantEditScreen/{plantId}"
     const val PLANT_DETAILS = "plantDetails/{plantId}"
     const val ALL_PLANTS = "allPlants"
+    const val SETTINGS = "settings"
 
-    fun plantAdd(selectedDate: String) = "plantAddScreen/$selectedDate"
+    fun plantAdd(selectedDate: String, gardenId: Int? = null): String = buildString {
+        append("plantAddScreen/$selectedDate")
+        gardenId?.let { append("?gardenId=$it") }
+    }
     fun plantEdit(plantId: Int) = "plantEditScreen/$plantId"
     fun plantDetails(plantId: Int) = "plantDetails/$plantId"
     fun drugEdit(drugId: Int) = "drugEditScreen/$drugId"
+    fun gardenLocation(gardenId: Int) = "gardenLocation/$gardenId"
 }

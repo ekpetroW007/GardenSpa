@@ -26,6 +26,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -49,6 +50,10 @@ import ru.samates.gardenspa.ui.theme.GlassStroke
 import ru.samates.gardenspa.ui.theme.Leaf200
 import ru.samates.gardenspa.ui.theme.Leaf300
 import ru.samates.gardenspa.ui.theme.Mist
+import ru.samates.gardenspa.ui.theme.LocalHighContrast
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 
 val GlassShape = RoundedCornerShape(24.dp)
 val CompactGlassShape = RoundedCornerShape(18.dp)
@@ -104,12 +109,13 @@ fun GlassCard(
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
+    val highContrast = LocalHighContrast.current
     val clickable = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
     Card(
         modifier = modifier.then(clickable),
         shape = GlassShape,
-        colors = CardDefaults.cardColors(containerColor = Glass),
-        border = BorderStroke(1.dp, GlassStroke),
+        colors = CardDefaults.cardColors(containerColor = if (highContrast) Forest800 else Glass),
+        border = BorderStroke(if (highContrast) 2.dp else 1.dp, if (highContrast) Mist else GlassStroke),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Box(Modifier.padding(contentPadding)) { content() }
@@ -132,9 +138,10 @@ fun ScreenHeader(
         if (onBack != null) {
             Box(
                 modifier = Modifier
-                    .size(42.dp)
+                    .size(48.dp)
                     .background(Glass, CircleShape)
-                    .clickable(onClick = onBack),
+                    .semantics { contentDescription = "Назад" }
+                    .clickable(role = Role.Button, onClick = onBack),
                 contentAlignment = Alignment.Center
             ) { Text("‹", color = Cream, fontSize = 32.sp, lineHeight = 32.sp) }
         }
@@ -264,7 +271,7 @@ fun DeleteConfirmationDialog(
         title = { Text("Подтверждение удаления") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Точно ли вы хотите это удалить?")
+                Text("Удалить без возможности восстановления?")
                 if (!itemName.isNullOrBlank()) {
                     Text(itemName, color = Mist)
                 }
@@ -272,12 +279,12 @@ fun DeleteConfirmationDialog(
         },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text("Да", color = ru.samates.gardenspa.ui.theme.Danger)
+                Text("Удалить", color = ru.samates.gardenspa.ui.theme.Danger)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Нет", color = Leaf300)
+                Text("Отмена", color = Leaf300)
             }
         }
     )
