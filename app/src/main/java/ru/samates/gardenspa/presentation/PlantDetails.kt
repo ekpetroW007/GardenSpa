@@ -110,7 +110,7 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                                 Text("Дата: ${procedure.creationDate.toRussianDateOrSelf()}", color = Mist)
                                 Text(procedure.recurrenceDescription(), color = Mist)
                                 if (procedure.programNote.isNotBlank()) {
-                                    Text(procedure.programNote, color = Cream, modifier = Modifier.padding(top = 4.dp))
+                                    LinkifiedText(procedure.programNote, color = Cream, modifier = Modifier.padding(top = 4.dp))
                                 }
                             }
                         }
@@ -128,7 +128,9 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                                 }
                                 Text("Запланировано: ${procedure.scheduledDate.toRussianDateOrSelf()}", color = Mist)
                                 Text("Выполнено: ${procedure.completedDate?.toRussianDateOrSelf() ?: "—"}", color = Mist)
-                                if (procedure.note.isNotBlank()) Text(procedure.note, color = Cream, modifier = Modifier.padding(top = 6.dp))
+                                if (procedure.note.isNotBlank()) {
+                                    LinkifiedText(procedure.note, color = Cream, modifier = Modifier.padding(top = 6.dp))
+                                }
                             }
                         }
                     }

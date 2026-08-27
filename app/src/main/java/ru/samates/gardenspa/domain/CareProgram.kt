@@ -2,6 +2,7 @@ package ru.samates.gardenspa.domain
 
 import java.text.Normalizer
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.absoluteValue
@@ -92,6 +93,9 @@ enum class ProgramStartChoice {
     USER_DATE
 }
 
+const val NO_REMAINING_CARE_MESSAGE =
+    "Эту программу нельзя продолжить с выбранной даты: при старте в рекомендуемую дату все предусмотренные процедуры уже должны были быть выполнены. Начните программу в следующем году или добавьте обработки вручную."
+
 data class ProgramStartProposal(
     val recommendedDate: LocalDate,
     val selectedDate: LocalDate,
@@ -100,7 +104,7 @@ data class ProgramStartProposal(
     fun resolve(choice: ProgramStartChoice): LocalDate = when (choice) {
         ProgramStartChoice.RECOMMENDED_DATE -> recommendedDate
         ProgramStartChoice.NEXT_YEAR -> recommendedDate.plusYears(1)
-        ProgramStartChoice.USER_DATE -> selectedDate.plusDays(1)
+        ProgramStartChoice.USER_DATE -> selectedDate
     }
 }
 
@@ -343,6 +347,61 @@ object PlantCareCatalog {
                 CareStepTemplate("leaf_inspection", "Осмотреть листья и побеги", offsetDays = 7, recurrence = CareRecurrence(RepeatType.WEEKLY, 1, 12), note = "Отмечайте увядание, пятна и повреждения, прежде чем выбирать обработку.")
             ) + standardTreatmentSteps("гортензии")
         ),
+        PlantCareTemplate(
+            id = "peony",
+            canonicalName = "Пион",
+            aliases = setOf("пион", "пионы", "пион травянистый", "пион ито", "ито-пион"),
+            version = 3,
+            supportedCultivationTypes = setOf(CultivationType.OPEN_GROUND),
+            openGroundStartOffsetDays = -21,
+            steps = listOf(
+                CareStepTemplate(
+                    id = "abiga_peak_sprouts",
+                    title = "Обработать молодые побеги от ботритиса",
+                    offsetDays = 0,
+                    windowAfterDays = 14,
+                    weatherLimits = WeatherLimits(maximumPrecipitationMm = 2.0, maximumWindMetersPerSecond = 6.0),
+                    productDescription = "Абига-Пик — рекомендован Пионовым Раем",
+                    note = "Проведите первую профилактическую обработку, когда побеги достигнут 10–15 см. Дозировку берите только из актуальной инструкции на упаковке; используйте СИЗ. Источник: https://pionray.ru/catalog/botritis2"
+                ),
+                CareStepTemplate(
+                    id = "start_leaf_feeding",
+                    title = "Подкормить пион в начале вегетации",
+                    offsetDays = 7,
+                    windowAfterDays = 14,
+                    weatherLimits = WeatherLimits(maximumPrecipitationMm = 2.0, maximumWindMetersPerSecond = 6.0),
+                    productDescription = "СТАРТ 7-20-25 + Ca + MgO + МЭ — Пионовый Рай",
+                    note = "Растворите 30 г в 10 л воды и опрыскайте листья в начале вегетации. 10 л рассчитаны на 30–40 взрослых кустов. Не обрабатывайте во время цветения; соблюдайте инструкцию и используйте СИЗ. Источник: https://pionray.ru/market3/tproduct/1150216401-504059333372-sistema-pitaniya-dlya-pionov"
+                ),
+                CareStepTemplate(
+                    id = "bud_leaf_feeding",
+                    title = "Подкормить пион перед цветением",
+                    offsetDays = 42,
+                    windowBeforeDays = 7,
+                    windowAfterDays = 14,
+                    weatherLimits = WeatherLimits(maximumPrecipitationMm = 2.0, maximumWindMetersPerSecond = 6.0),
+                    productDescription = "БУТОН 6-20-37 + MgO + МЭ — Пионовый Рай",
+                    note = "Растворите 30 г в 10 л воды и опрыскайте листья до раскрытия цветков. 10 л рассчитаны на 30–40 взрослых кустов. Если цветение уже началось, пропустите работу: во время цветения допустим только полив. Источник: https://pionray.ru/market3/tproduct/1150216401-504059333372-sistema-pitaniya-dlya-pionov"
+                ),
+                CareStepTemplate(
+                    id = "koren_leaf_feeding",
+                    title = "Подкормить пион после цветения",
+                    offsetDays = 95,
+                    windowBeforeDays = 14,
+                    windowAfterDays = 21,
+                    weatherLimits = WeatherLimits(maximumPrecipitationMm = 2.0, maximumWindMetersPerSecond = 6.0),
+                    productDescription = "КОРЕНЬ 0-40-26 + 2MgO + МЭ — Пионовый Рай",
+                    note = "Растворите 30 г в 10 л воды и опрыскайте листья только после окончания цветения. 10 л рассчитаны на 30–40 взрослых кустов. Соблюдайте инструкцию и используйте СИЗ. Источник: https://pionray.ru/market3/tproduct/1150216401-504059333372-sistema-pitaniya-dlya-pionov"
+                ),
+                CareStepTemplate(
+                    id = "botrytis_inspection",
+                    title = "Осмотреть пион на признаки ботритиса",
+                    offsetDays = 7,
+                    recurrence = CareRecurrence(RepeatType.WEEKLY, 1, 16),
+                    note = "Проверьте основания стеблей, листья и бутоны. После первой профилактики Пионовый Рай советует повторные обработки каждые 20 дней с чередованием препаратов и полным исключением периода цветения. GardenSpa не назначает их автоматически: сначала проверьте действующий допуск препарата для ЛПХ и актуальную инструкцию. При признаках болезни удалите поражённые части и подберите лечение. Источники: https://pionray.ru/catalog/botritis2 и https://pionray.ru/botritis1"
+                )
+            )
+        ),
         seasonalVegetable(
             id = "potato",
             name = "Картофель",
@@ -548,16 +607,19 @@ class CareProgramGenerator {
             climate = context.climate,
             year = context.startDate.year
         )
-        val warning = if (context.startDate.isBefore(recommendedStart)) {
-            "Выбранная дата раньше рекомендуемого начала работ ${recommendedStart}. Проверьте местные условия."
-        } else {
-            null
+        val continuesStartedSeason = context.startDate.isAfter(recommendedStart)
+        val warning = when {
+            context.startDate.isBefore(recommendedStart) ->
+                "Выбранная дата раньше рекомендуемого начала работ ${recommendedStart}. Проверьте местные условия."
+            continuesStartedSeason ->
+                "Программа продолжена с ${context.startDate}: работы и повторы, срок которых уже прошёл, исключены."
+            else -> null
         }
         val forecastByDate = context.forecast.associateBy { it.date }
 
         val generatedSteps = template.steps.map { step ->
             val anchorDate = when (step.anchor) {
-                CareAnchor.START_DATE -> context.startDate
+                CareAnchor.START_DATE -> if (continuesStartedSeason) recommendedStart else context.startDate
                 CareAnchor.SAFE_SPRING_DATE -> recommendedStart
             }
             val initialDate = anchorDate.plusDays(step.offsetDays.toLong())
@@ -604,6 +666,16 @@ class CareProgramGenerator {
                 productDescription = step.productDescription,
                 note = step.note
             )
+        }.let { steps ->
+            if (continuesStartedSeason) {
+                steps.flatMap { it.remainingFrom(context.startDate) }
+            } else {
+                steps
+            }
+        }
+
+        require(generatedSteps.isNotEmpty()) {
+            NO_REMAINING_CARE_MESSAGE
         }
 
         return GeneratedCareProgram(
@@ -622,6 +694,67 @@ class CareProgramGenerator {
 
     private fun candidateOffsets(beforeDays: Int, afterDays: Int): List<Int> =
         (-beforeDays..afterDays).sortedWith(compareBy<Int> { it.absoluteValue }.thenBy { it })
+
+    private fun GeneratedCareStep.remainingFrom(date: LocalDate): List<GeneratedCareStep> {
+        if (!scheduledDate.isBefore(date)) return listOf(this)
+
+        val repeat = recurrence
+        if (repeat == null || repeat.type == RepeatType.NONE) {
+            if (windowEnd.isBefore(date)) return emptyList()
+            return listOf(
+                copy(
+                    scheduledDate = date,
+                    windowStart = maxOf(windowStart, date),
+                    recurrence = null,
+                    explanation = "Срок работы ещё не завершился; при продолжении программы она назначена на $date."
+                )
+            )
+        }
+
+        val occurrences = (0 until repeat.count).map { index ->
+            occurrenceDate(scheduledDate, repeat, index)
+        }
+        val remaining = occurrences.dropWhile { it.isBefore(date) }
+        if (remaining.isEmpty()) return emptyList()
+
+        val nextDate = remaining.first()
+        val skipped = occurrences.size - remaining.size
+        if (repeat.type == RepeatType.MONTHLY || repeat.type == RepeatType.YEARLY) {
+            return remaining.mapIndexed { index, occurrence ->
+                val shiftDays = ChronoUnit.DAYS.between(scheduledDate, occurrence)
+                copy(
+                    templateStepId = "$templateStepId:remaining:${skipped + index + 1}",
+                    scheduledDate = occurrence,
+                    windowStart = windowStart.plusDays(shiftDays),
+                    windowEnd = windowEnd.plusDays(shiftDays),
+                    recurrence = null,
+                    explanation = "Программа продолжена с $date: сохранена оставшаяся работа ${index + 1} из ${remaining.size}."
+                )
+            }
+        }
+
+        val shiftDays = ChronoUnit.DAYS.between(scheduledDate, nextDate)
+        return listOf(
+            copy(
+                scheduledDate = nextDate,
+                windowStart = windowStart.plusDays(shiftDays),
+                windowEnd = windowEnd.plusDays(shiftDays),
+                recurrence = repeat.copy(count = remaining.size),
+                explanation = "Программа продолжена с $date: пропущено прошедших повторов — $skipped, осталось — ${remaining.size}."
+            )
+        )
+    }
+
+    private fun occurrenceDate(start: LocalDate, recurrence: CareRecurrence, index: Int): LocalDate {
+        val amount = recurrence.interval.coerceAtLeast(1).toLong() * index
+        return when (recurrence.type) {
+            RepeatType.NONE -> start
+            RepeatType.DAILY, RepeatType.CUSTOM -> start.plusDays(amount)
+            RepeatType.WEEKLY -> start.plusWeeks(amount)
+            RepeatType.MONTHLY -> start.plusMonths(amount)
+            RepeatType.YEARLY -> start.plusYears(amount)
+        }
+    }
 
     private fun ForecastWeatherDay.satisfies(limits: WeatherLimits): Boolean =
         (limits.minimumNightTemperatureC == null || minimumTemperatureC >= limits.minimumNightTemperatureC) &&

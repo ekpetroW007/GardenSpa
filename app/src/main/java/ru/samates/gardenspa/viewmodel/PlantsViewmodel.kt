@@ -9,6 +9,7 @@ import ru.samates.gardenspa.data.repository.BookeeperRepository
 import ru.samates.gardenspa.domain.RepeatType
 import ru.samates.gardenspa.domain.GeneratedCareProgram
 import ru.samates.gardenspa.domain.NO_DRUG_REQUIRED_LABEL
+import ru.samates.gardenspa.domain.NO_REMAINING_CARE_MESSAGE
 import java.time.LocalDate
 import java.util.UUID
 import kotlinx.coroutines.flow.SharingStarted
@@ -202,6 +203,7 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
     ) {
         viewModelScope.launch {
             try {
+                require(program.steps.isNotEmpty()) { NO_REMAINING_CARE_MESSAGE }
                 val rows = program.steps.map { step ->
                     val recurrence = step.recurrence
                     PlantEntity(

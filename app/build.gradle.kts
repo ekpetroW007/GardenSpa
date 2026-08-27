@@ -29,8 +29,8 @@ android {
         applicationId = "ru.samates.gardenspa"
         minSdk = 26
         targetSdk = 34
-        versionCode = 33
-        versionName = "1.0.32"
+        versionCode = 34
+        versionName = "1.0.33"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField(
             "String",

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -27,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -34,9 +36,13 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.samates.gardenspa.ui.theme.Cream
@@ -58,6 +64,42 @@ import androidx.compose.ui.semantics.semantics
 val GlassShape = RoundedCornerShape(24.dp)
 val CompactGlassShape = RoundedCornerShape(18.dp)
 val SentenceKeyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
+internal const val UrlAnnotationTag = "URL"
+private val webUrl = Regex("""https?://[^\s]*[\p{L}\p{N}/]""")
+
+internal fun linkifiedString(text: String) = buildAnnotatedString {
+    var cursor = 0
+    webUrl.findAll(text).forEach { match ->
+        append(text.substring(cursor, match.range.first))
+        pushStringAnnotation(UrlAnnotationTag, match.value)
+        pushStyle(SpanStyle(color = Leaf300, textDecoration = TextDecoration.Underline))
+        append(match.value)
+        pop()
+        pop()
+        cursor = match.range.last + 1
+    }
+    append(text.substring(cursor))
+}
+
+@Composable
+fun LinkifiedText(
+    text: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    val uriHandler = LocalUriHandler.current
+    val annotatedText = remember(text) { linkifiedString(text) }
+    ClickableText(
+        text = annotatedText,
+        modifier = modifier,
+        style = MaterialTheme.typography.bodyMedium.copy(color = color),
+        onClick = { offset ->
+            annotatedText.getStringAnnotations(UrlAnnotationTag, offset, offset)
+                .firstOrNull()
+                ?.let { runCatching { uriHandler.openUri(it.item) } }
+        }
+    )
+}
 
 @Composable
 fun BotanicalBackground(
