@@ -1,6 +1,7 @@
 package ru.samates.gardenspa.domain
 
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.Month
 import java.time.MonthDay
 import kotlin.math.roundToInt
@@ -40,6 +41,30 @@ data class ForecastWeatherDay(
     val maximumTemperatureC: Double,
     val precipitationMm: Double,
     val maximumWindMetersPerSecond: Double
+)
+
+data class CurrentGardenWeather(
+    val observedAt: LocalDateTime,
+    val temperatureC: Double,
+    val precipitationMm: Double,
+    val windMetersPerSecond: Double,
+    val conditionText: String
+)
+
+data class HourlyGardenWeather(
+    val time: LocalDateTime,
+    val temperatureC: Double,
+    val precipitationMm: Double,
+    val chanceOfRainPercent: Int,
+    val windMetersPerSecond: Double,
+    val conditionText: String
+)
+
+data class GardenWeatherForecast(
+    val localTime: LocalDateTime,
+    val current: CurrentGardenWeather,
+    val hourly: List<HourlyGardenWeather>,
+    val daily: List<ForecastWeatherDay>
 )
 
 data class ClimateFingerprint(

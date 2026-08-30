@@ -64,6 +64,7 @@ import ru.samates.gardenspa.domain.CultivationType
 import ru.samates.gardenspa.domain.GeneratedCareProgram
 import ru.samates.gardenspa.domain.NO_REMAINING_CARE_MESSAGE
 import ru.samates.gardenspa.domain.PlantCareCatalog
+import ru.samates.gardenspa.domain.PlantNameCatalog
 import ru.samates.gardenspa.domain.ProgramStartChoice
 import ru.samates.gardenspa.domain.ProgramStartPlanner
 import ru.samates.gardenspa.domain.ProgramStartProposal
@@ -169,6 +170,8 @@ fun PlantAdd(
     var unavailableContinuationNextYear by remember { mutableStateOf<LocalDate?>(null) }
     var manualSetupOpen by remember(plantId) { mutableStateOf(editing) }
     var photoUri by remember(plantId) { mutableStateOf<String?>(null) }
+    var plantSuggestionsExpanded by remember { mutableStateOf(false) }
+    val plantNameSuggestions = remember(plantName) { PlantNameCatalog.namesStartingWith(plantName) }
     val matchedTemplate = remember(plantName) { PlantCareCatalog.find(plantName) }
     val selectedLocation = selectedGarden?.locationOrNull()
     val selectedClimate = selectedGarden?.climateOrNull()
@@ -302,16 +305,36 @@ fun PlantAdd(
                     GlassCard(Modifier.fillMaxWidth()) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text("1. Что вы выращиваете?", color = Cream, style = MaterialTheme.typography.titleLarge)
-                            OutlinedTextField(
-                                plantName,
-                                { plantName = it },
-                                label = { Text("Например, томат или яблоня") },
-                                keyboardOptions = SentenceKeyboardOptions,
-                                singleLine = true,
-                                colors = glassTextFieldColors(),
-                                shape = CompactGlassShape,
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                            Box(Modifier.fillMaxWidth()) {
+                                OutlinedTextField(
+                                    plantName,
+                                    {
+                                        plantName = it
+                                        plantSuggestionsExpanded = it.isNotBlank()
+                                    },
+                                    label = { Text("Например, томат или яблоня") },
+                                    keyboardOptions = SentenceKeyboardOptions,
+                                    singleLine = true,
+                                    colors = glassTextFieldColors(),
+                                    shape = CompactGlassShape,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                DropdownMenu(
+                                    expanded = plantSuggestionsExpanded && plantNameSuggestions.isNotEmpty(),
+                                    onDismissRequest = { plantSuggestionsExpanded = false },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    plantNameSuggestions.forEach { suggestion ->
+                                        DropdownMenuItem(
+                                            text = { Text(suggestion) },
+                                            onClick = {
+                                                plantName = suggestion
+                                                plantSuggestionsExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
                             if (photoUri != null) {
                                 PlantPhoto(photoUri, plantName.ifBlank { "растение" }, Modifier.fillMaxWidth().height(170.dp))
                             }
@@ -338,7 +361,14 @@ fun PlantAdd(
                                 PlantCareCatalog.all().take(8).map { it.canonicalName }.chunked(2).forEach { names ->
                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         names.forEach { name ->
-                                            SecondaryAction(name, { plantName = name }, Modifier.weight(1f))
+                                            SecondaryAction(
+                                                name,
+                                                {
+                                                    plantName = name
+                                                    plantSuggestionsExpanded = false
+                                                },
+                                                Modifier.weight(1f)
+                                            )
                                         }
                                         if (names.size == 1) Box(Modifier.weight(1f))
                                     }

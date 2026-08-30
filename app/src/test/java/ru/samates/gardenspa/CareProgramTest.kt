@@ -18,10 +18,12 @@ import ru.samates.gardenspa.domain.ForecastWeatherDay
 import ru.samates.gardenspa.domain.NO_REMAINING_CARE_MESSAGE
 import ru.samates.gardenspa.domain.PlantCareTemplate
 import ru.samates.gardenspa.domain.PlantCareCatalog
+import ru.samates.gardenspa.domain.PlantNameCatalog
 import ru.samates.gardenspa.domain.ProgramStartChoice
 import ru.samates.gardenspa.domain.ProgramStartPlanner
 import ru.samates.gardenspa.domain.RepeatType
 import ru.samates.gardenspa.domain.careTitleWithoutSeasonLabel
+import ru.samates.gardenspa.domain.normalizePlantName
 
 class CareProgramTest {
     private val climate = ClimateFingerprint(
@@ -49,6 +51,16 @@ class CareProgramTest {
         assertEquals("beet", PlantCareCatalog.find("свекла")?.id)
         assertEquals("peony", PlantCareCatalog.find("ИТО-пион")?.id)
         assertNull(PlantCareCatalog.find("Неизвестное растение"))
+    }
+
+    @Test
+    fun plantNameCatalogSuggestsManyCanonicalNamesByTypedPrefix() {
+        assertTrue(PlantNameCatalog.all().size >= 300)
+        assertEquals(listOf("Яблоня"), PlantNameCatalog.namesStartingWith("ЯБЛ"))
+        assertEquals(listOf("Свекла"), PlantNameCatalog.namesStartingWith("свё"))
+        assertTrue(PlantNameCatalog.namesStartingWith("  т").size >= 10)
+        assertTrue(PlantNameCatalog.namesStartingWith("  т").all { normalizePlantName(it).startsWith("т") })
+        assertTrue(PlantNameCatalog.namesStartingWith(" ").isEmpty())
     }
 
     @Test

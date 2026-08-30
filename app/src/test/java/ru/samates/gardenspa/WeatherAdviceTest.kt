@@ -1,15 +1,18 @@
 package ru.samates.gardenspa
 
 import java.time.LocalDate
+import java.time.LocalDateTime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import ru.samates.gardenspa.data.database.entity.PlantEntity
 import ru.samates.gardenspa.domain.ForecastWeatherDay
+import ru.samates.gardenspa.domain.HourlyGardenWeather
 import ru.samates.gardenspa.domain.ScheduledTreatment
 import ru.samates.gardenspa.domain.WeatherLimitKind
 import ru.samates.gardenspa.domain.WeatherLimits
 import ru.samates.gardenspa.domain.violationsFor
+import ru.samates.gardenspa.domain.findWeatherWindow
 import ru.samates.gardenspa.domain.weatherWorkAdvice
 import ru.samates.gardenspa.domain.suggestedWeatherSafeDate
 
@@ -92,6 +95,22 @@ class WeatherAdviceTest {
         assertEquals(today.plusDays(3), suggestedWeatherSafeDate(work, forecast))
     }
 
+    @Test
+    fun `weather window keeps the two dry hours required by fitosporin`() {
+        val work = treatment(id = 1, date = today)
+        val hourly = listOf(
+            hour(16, precipitation = 1.0, chanceOfRain = 90),
+            hour(17, precipitation = 0.0, chanceOfRain = 10),
+            hour(18, precipitation = 0.0, chanceOfRain = 15),
+            hour(19, precipitation = 1.0, chanceOfRain = 80)
+        )
+
+        val window = findWeatherWindow(work, hourly, today.atTime(16, 30))
+
+        assertEquals(today.atTime(17, 0), window?.start)
+        assertEquals(today.atTime(19, 0), window?.endExclusive)
+    }
+
     private fun treatment(
         id: Int,
         date: LocalDate,
@@ -127,4 +146,13 @@ class WeatherAdviceTest {
             precipitationMm = precipitation,
             maximumWindMetersPerSecond = wind
         )
+
+    private fun hour(hour: Int, precipitation: Double, chanceOfRain: Int) = HourlyGardenWeather(
+        time = LocalDateTime.of(today, java.time.LocalTime.of(hour, 0)),
+        temperatureC = 20.0,
+        precipitationMm = precipitation,
+        chanceOfRainPercent = chanceOfRain,
+        windMetersPerSecond = 3.0,
+        conditionText = if (precipitation > 0.0) "Дождь" else "Ясно"
+    )
 }

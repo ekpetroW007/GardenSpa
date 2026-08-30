@@ -101,7 +101,7 @@ private suspend fun updateWeatherNotifications(application: BookeeperApp): Boole
     treatmentsByGarden.forEach { (gardenId, treatments) ->
         val location = gardensById[gardenId]?.locationOrNull() ?: return@forEach
         val forecast = try {
-            application.climateService.loadForecast(location).takeIf { it.isNotEmpty() }
+            application.climateService.loadGardenWeather(location).daily.takeIf { it.isNotEmpty() }
                 ?: throw IllegalStateException("Пустой прогноз")
         } catch (error: CancellationException) {
             throw error
