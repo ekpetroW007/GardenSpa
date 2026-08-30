@@ -11,10 +11,12 @@ import ru.samates.gardenspa.domain.ClimateFingerprint
 import ru.samates.gardenspa.domain.ClimateFingerprintCalculator
 import ru.samates.gardenspa.domain.ForecastWeatherDay
 import ru.samates.gardenspa.domain.GardenLocation
+import ru.samates.gardenspa.domain.GardenWeatherForecast
 import ru.samates.gardenspa.domain.HistoricalWeatherDay
 
 class ClimateService(
     private val client: OpenMeteoClimateClient = OpenMeteoClimateClient(),
+    private val weatherApiClient: WeatherApiClient,
     private val calculator: ClimateFingerprintCalculator = ClimateFingerprintCalculator()
 ) {
     suspend fun calculateFingerprint(location: GardenLocation): ClimateFingerprint =
@@ -22,6 +24,9 @@ class ClimateService(
 
     suspend fun loadForecast(location: GardenLocation): List<ForecastWeatherDay> =
         client.loadForecast(location)
+
+    suspend fun loadGardenWeather(location: GardenLocation): GardenWeatherForecast =
+        weatherApiClient.loadForecast(location)
 
 }
 

@@ -82,7 +82,6 @@ fun Profile(
         today = LocalDate.now()
     }
     val todayTreatments = scheduledTreatmentsOn(plants, procedures, today)
-    val tomorrowTreatments = scheduledTreatmentsOn(plants, procedures, today.plusDays(1))
     val nextTreatments = (1L..7L).flatMap { offset ->
         val date = today.plusDays(offset)
         scheduledTreatmentsOn(plants, procedures, date).map { date to it }
@@ -90,7 +89,7 @@ fun Profile(
     val nearestTreatment = remember(plants, procedures, today) {
         nearestIncompleteTreatment(plants, procedures, today)
     }
-    val precipitationGarden = selectPrecipitationGarden(
+    val weatherGarden = selectWeatherGarden(
         gardens = gardens,
         preferredGardenIds = listOfNotNull(nearestTreatment?.plant?.gardenId)
     )
@@ -125,10 +124,20 @@ fun Profile(
         }
 
         item {
-            PrecipitationMapCard(
-                garden = precipitationGarden,
-                scheduledTreatments = todayTreatments + tomorrowTreatments,
-                onOpenGardens = { onScreenSelected("Сады") }
+            WeatherWindowCard(
+                garden = weatherGarden,
+                treatment = nearestTreatment,
+                onOpenGardens = { onScreenSelected("Сады") },
+                onReschedule = { treatment, newDate ->
+                    proceduresVm.reschedule(
+                        plantId = treatment.plant.id,
+                        procedureName = treatment.plant.taskName,
+                        originalDate = treatment.originalDate,
+                        newDate = newDate
+                    ) {
+                        TreatmentReminderScheduler.refreshNow(app)
+                    }
+                }
             )
         }
 

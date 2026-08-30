@@ -20,7 +20,8 @@ enum class CareAnchor {
 data class WeatherLimits(
     val minimumNightTemperatureC: Double? = null,
     val maximumPrecipitationMm: Double? = null,
-    val maximumWindMetersPerSecond: Double? = null
+    val maximumWindMetersPerSecond: Double? = null,
+    val requiredDryHoursAfter: Int = 0
 )
 
 data class CareRecurrence(
@@ -173,7 +174,11 @@ object PlantCareCatalog {
                     offsetDays = 8,
                     windowBeforeDays = 1,
                     windowAfterDays = 2,
-                    weatherLimits = WeatherLimits(maximumPrecipitationMm = 2.0, maximumWindMetersPerSecond = 6.0),
+                    weatherLimits = WeatherLimits(
+                        maximumPrecipitationMm = 2.0,
+                        maximumWindMetersPerSecond = 6.0,
+                        requiredDryHoursAfter = 2
+                    ),
                     recurrence = CareRecurrence(RepeatType.CUSTOM, 21, 2),
                     productDescription = "Фитоспорин-М Томат, 10 г — БашИнком",
                     note = "Разведите 5 г в 10 л воды; расход — 10 л на 100 м². Первая обработка — через 7–10 дней после высадки, повторная — через 2–3 недели. Работайте утром, вечером или в пасмурную погоду минимум за 2 часа до дождя. Источник: https://www.bashinkom.ru/products/ojz/FitosporinMTomat10g"
@@ -242,7 +247,11 @@ object PlantCareCatalog {
                     offsetDays = 7,
                     windowBeforeDays = 0,
                     windowAfterDays = 3,
-                    weatherLimits = WeatherLimits(maximumPrecipitationMm = 2.0, maximumWindMetersPerSecond = 6.0),
+                    weatherLimits = WeatherLimits(
+                        maximumPrecipitationMm = 2.0,
+                        maximumWindMetersPerSecond = 6.0,
+                        requiredDryHoursAfter = 2
+                    ),
                     recurrence = CareRecurrence(RepeatType.CUSTOM, 14, 3),
                     productDescription = "Фитоспорин-М Огурцы, 10 г — БашИнком",
                     note = "Разведите 10 г в 5 л воды; расход — 5 л на 50 м². Проведите 3 опрыскивания: первое профилактическое, следующие с интервалом 10–15 дней. Раствор готовьте за 1–2 часа до применения и используйте в течение суток; обрабатывайте минимум за 2 часа до дождя. Источник: https://www.bashinkom.ru/products/ojz/FitosporinMOGURTSY10g/1"

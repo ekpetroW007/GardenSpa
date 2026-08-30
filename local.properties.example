@@ -1,0 +1,7 @@
+sdk.dir=C:\\Users\\your-name\\AppData\\Local\\Android\\Sdk
+
+# Только для локальной debug-сборки. Не добавляйте ключ в release APK.
+WEATHERAPI_API_KEY=your_weatherapi_key
+
+# Необязательно: переопределите публичный прокси GardenSpa своим HTTPS-адресом.
+WEATHERAPI_PROXY_URL=https://gardenspa-weather-api.pukpukyc96.chatgpt.site/api/weather

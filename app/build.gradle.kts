@@ -13,9 +13,16 @@ val localProperties = Properties().apply {
         ?.inputStream()
         ?.use(::load)
 }
-val openWeatherApiKey = System.getenv("OPENWEATHER_API_KEY")
+val weatherApiKey = System.getenv("WEATHERAPI_API_KEY")
     ?.takeIf { it.isNotBlank() }
-    ?: localProperties.getProperty("OPENWEATHER_API_KEY").orEmpty()
+    ?: localProperties.getProperty("WEATHERAPI_API_KEY").orEmpty()
+val weatherApiProxyUrl = System.getenv("WEATHERAPI_PROXY_URL")
+    ?.takeIf { it.isNotBlank() }
+    ?: localProperties.getProperty("WEATHERAPI_PROXY_URL")
+        ?.takeIf { it.isNotBlank() }
+    ?: "https://gardenspa-weather-api.pukpukyc96.chatgpt.site/api/weather"
+fun String.asBuildConfigString(): String =
+    "\"${trim().replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
 System.getenv("BOOKEEPER_BUILD_DIR")
     ?.takeIf { it.isNotBlank() }
@@ -29,18 +36,30 @@ android {
         applicationId = "ru.samates.gardenspa"
         minSdk = 26
         targetSdk = 34
-        versionCode = 34
-        versionName = "1.0.33"
+        versionCode = 38
+        versionName = "1.0.37"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField(
             "String",
-            "OPENWEATHER_API_KEY",
-            "\"${openWeatherApiKey.trim().replace("\\", "\\\\").replace("\"", "\\\"")}\""
+            "WEATHERAPI_API_KEY",
+            "".asBuildConfigString()
+        )
+        buildConfigField(
+            "String",
+            "WEATHERAPI_PROXY_URL",
+            weatherApiProxyUrl.asBuildConfigString()
         )
 
     }
 
     buildTypes {
+        debug {
+            buildConfigField(
+                "String",
+                "WEATHERAPI_API_KEY",
+                weatherApiKey.asBuildConfigString()
+            )
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -81,8 +100,6 @@ dependencies {
     implementation("androidx.preference:preference-ktx:1.2.1")
     implementation("io.github.boguszpawlowski.composecalendar:composecalendar:1.4.0")
     implementation("io.github.boguszpawlowski.composecalendar:kotlinx-datetime:1.4.0")
-    implementation("org.maplibre.gl:android-sdk:11.8.0")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.runtime.livedata)

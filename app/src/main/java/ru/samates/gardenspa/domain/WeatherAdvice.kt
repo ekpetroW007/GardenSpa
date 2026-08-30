@@ -1,6 +1,8 @@
 package ru.samates.gardenspa.domain
 
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
 
 enum class WeatherLimitKind {
     NIGHT_TEMPERATURE,
@@ -19,6 +21,11 @@ data class WeatherWorkAdvice(
     val forecast: ForecastWeatherDay,
     val violations: List<WeatherLimitViolation>,
     val message: String
+)
+
+data class WeatherWindow(
+    val start: LocalDateTime,
+    val endExclusive: LocalDateTime
 )
 
 /**
@@ -81,6 +88,60 @@ private fun ScheduledTreatment.weatherLimits(
     ?.steps
     ?.firstOrNull { it.id == stepId }
     ?.weatherLimits
+
+fun ScheduledTreatment.weatherLimits(): WeatherLimits? {
+    val programId = plant.programId ?: return null
+    val stepId = plant.programStepId ?: return null
+    return weatherLimits(
+        PlantCareCatalog.all().associateBy(PlantCareTemplate::id),
+        programId,
+        stepId
+    )
+}
+
+fun findWeatherWindow(
+    treatment: ScheduledTreatment,
+    hourly: List<HourlyGardenWeather>,
+    localNow: LocalDateTime
+): WeatherWindow? {
+    val limits = treatment.weatherLimits() ?: return null
+    val requiredHours = limits.requiredDryHoursAfter.coerceAtLeast(1)
+    val earliest = maxOf(
+        treatment.scheduledDate.atTime(6, 0),
+        localNow.truncatedTo(ChronoUnit.HOURS)
+    )
+    var runStart: LocalDateTime? = null
+    var runHours = 0
+    var previousTime: LocalDateTime? = null
+
+    hourly.asSequence()
+        .filter { hour -> !hour.time.isBefore(earliest) }
+        .filter { hour -> hour.time.hour in 6..21 }
+        .forEach { hour ->
+            val continuous = previousTime?.plusHours(1) == hour.time
+            val suitable = hour.satisfies(limits)
+            if (!suitable || (!continuous && runHours > 0)) {
+                runStart = null
+                runHours = 0
+            }
+            if (suitable) {
+                if (runStart == null) runStart = hour.time
+                runHours++
+                if (runHours >= requiredHours) {
+                    return WeatherWindow(
+                        start = requireNotNull(runStart),
+                        endExclusive = hour.time.plusHours(1)
+                    )
+                }
+            }
+            previousTime = hour.time
+        }
+    return null
+}
+
+private fun HourlyGardenWeather.satisfies(limits: WeatherLimits): Boolean =
+    (limits.maximumPrecipitationMm == null || (precipitationMm <= 0.1 && chanceOfRainPercent < 50)) &&
+        (limits.maximumWindMetersPerSecond == null || windMetersPerSecond <= limits.maximumWindMetersPerSecond)
 
 fun WeatherLimits.violationsFor(forecast: ForecastWeatherDay): List<WeatherLimitViolation> = buildList {
     minimumNightTemperatureC?.let { limit ->
