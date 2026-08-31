@@ -4,7 +4,6 @@ import android.app.Application
 import kotlin.getValue
 import ru.samates.gardenspa.data.database.AppDatabase
 import ru.samates.gardenspa.data.climate.ClimateService
-import ru.samates.gardenspa.data.climate.WeatherApiClient
 import ru.samates.gardenspa.data.repository.BookeeperRepository
 import ru.samates.gardenspa.notifications.TreatmentReminderScheduler
 import ru.samates.gardenspa.notifications.GardenWorkReminderScheduler
@@ -33,12 +32,7 @@ class BookeeperApp : Application() {
     }
 
     val climateService by lazy {
-        ClimateService(
-            weatherApiClient = WeatherApiClient(
-                apiKey = buildConfigString("WEATHERAPI_API_KEY"),
-                proxyUrl = buildConfigString("WEATHERAPI_PROXY_URL")
-            )
-        )
+        ClimateService()
     }
 }
 

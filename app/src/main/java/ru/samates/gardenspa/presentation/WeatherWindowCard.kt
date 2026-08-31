@@ -190,11 +190,11 @@ fun WeatherWindowCard(
 
             weather?.let { loaded ->
                 Text(
-                    "Обновлено ${loaded.current.observedAt.format(HOUR_FORMAT)} · Данные о погоде: WeatherAPI.com",
+                    "Обновлено ${loaded.current.observedAt.format(HOUR_FORMAT)} · Данные о погоде: Open-Meteo.com",
                     color = Leaf300,
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.clickable {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.weatherapi.com/")))
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://open-meteo.com/")))
                     }
                 )
             }
@@ -254,23 +254,19 @@ private fun weatherMessage(
 internal fun weatherFailureMessage(error: Throwable): String {
     val causes = generateSequence(error) { it.cause }.toList()
     val statusCode = causes.asSequence()
-        .mapNotNull { cause -> Regex("WeatherAPI вернул ошибку (\\d+)").find(cause.message.orEmpty()) }
+        .mapNotNull { cause -> Regex("Погодный сервис вернул ошибку (\\d+)").find(cause.message.orEmpty()) }
         .map { match -> match.groupValues[1] }
         .firstOrNull()
     return when {
-        causes.any { "WeatherAPI не настроен" in it.message.orEmpty() } ->
-            "В этой сборке нет ключа WeatherAPI. Установите новый APK поверх текущего."
         causes.any { it is UnknownHostException } ->
-            "Телефон не может найти api.weatherapi.com. Проверьте Private DNS, VPN или другую сеть."
+            "Телефон не может подключиться к погодному сервису. Проверьте Private DNS, VPN или другую сеть."
         causes.any { it is SocketTimeoutException } ->
-            "WeatherAPI не ответил вовремя. Повторите в другой сети."
+            "Погодный сервис не ответил вовремя. Повторите в другой сети."
         causes.any { it is SSLException } ->
-            "Не удалось установить защищённое соединение с WeatherAPI. Проверьте дату и время телефона."
-        statusCode == "401" || statusCode == "403" ->
-            "WeatherAPI отклонил ключ (код $statusCode)."
-        statusCode != null -> "WeatherAPI вернул ошибку $statusCode."
+            "Не удалось установить защищённое соединение с погодным сервисом. Проверьте дату и время телефона."
+        statusCode != null -> "Погодный сервис вернул ошибку $statusCode."
         causes.any { it is DateTimeParseException || it.javaClass.simpleName == "JSONException" } ->
-            "WeatherAPI вернул данные в неожиданном формате."
+            "Погодный сервис вернул данные в неожиданном формате."
         else -> "Не удалось обновить прогноз (${error.javaClass.simpleName})."
     }
 }

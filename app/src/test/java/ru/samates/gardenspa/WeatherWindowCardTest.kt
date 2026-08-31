@@ -31,10 +31,10 @@ class WeatherWindowCardTest {
 
     @Test
     fun `weather error explains a dns failure`() {
-        val error = IllegalStateException("request failed", UnknownHostException("api.weatherapi.com"))
+        val error = IllegalStateException("request failed", UnknownHostException("api.open-meteo.com"))
 
         assertEquals(
-            "Телефон не может найти api.weatherapi.com. Проверьте Private DNS, VPN или другую сеть.",
+            "Телефон не может подключиться к погодному сервису. Проверьте Private DNS, VPN или другую сеть.",
             weatherFailureMessage(error)
         )
     }
