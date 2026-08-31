@@ -3,20 +3,20 @@ const RUSTORE_URL = "https://www.rustore.ru/catalog/app/ru.samates.gardenspa";
 const features = [
   {
     number: "01",
-    title: "Садовый дневник",
-    text: "Добавляйте домашние цветы, растения на даче и в теплице. У каждого сада и растения будет своя понятная карточка.",
+    title: "Погодное окно",
+    text: "GardenSpa сопоставляет прогноз с ближайшей работой и показывает, подходит ли погода для обработки, полива или другого ухода.",
     accent: "leaf",
   },
   {
     number: "02",
-    title: "Календарь ухода",
-    text: "Планируйте полив, подкормку, обработку и пересадку. GardenSpa вовремя напомнит о предстоящих садовых работах.",
+    title: "Несколько садов",
+    text: "Ведите дачу, теплицу и домашние растения отдельно. Ближайшая работа и прогноз выбираются для нужного сада.",
     accent: "sun",
   },
   {
     number: "03",
-    title: "Учёт препаратов",
-    text: "Сохраняйте назначение и норму расхода препаратов, связывайте их с растениями и запланированными обработками.",
+    title: "Календарь и программы",
+    text: "Используйте готовые программы ухода, планируйте процедуры и препараты, переносите работу и отмечайте выполненное.",
     accent: "drop",
   },
 ];
@@ -24,28 +24,55 @@ const features = [
 const steps = [
   {
     number: "1",
-    title: "Создайте садовый дневник",
-    text: "Добавьте дом, дачу, теплицу или отдельную коллекцию, а затем сохраните нужные растения.",
+    title: "Добавьте свои сады",
+    text: "Создайте дачу, теплицу или домашнюю коллекцию и укажите их местоположение для прогноза.",
   },
   {
     number: "2",
-    title: "Запланируйте уход",
-    text: "Выберите полив, подкормку, пересадку или обработку, препарат и удобный интервал повторения.",
+    title: "Выберите растения и уход",
+    text: "Найдите растение в подсказках, подключите готовую программу или назначьте собственную работу.",
   },
   {
     number: "3",
-    title: "Получайте напоминания",
-    text: "GardenSpa соберёт садовые работы в календаре и напомнит, когда растению потребуется уход.",
+    title: "Получайте рекомендации",
+    text: "GardenSpa соберёт работы в календаре и предупредит, если дождь, ветер или температура мешают процедуре.",
   },
 ];
 
 const videoChapters = [
-  { time: "00:00", label: "Открытие календаря" },
-  { time: "00:07", label: "Новое растение «Смородина»" },
-  { time: "00:18", label: "Действие и препарат «Сера»" },
-  { time: "00:25", label: "3 повтора через 5 дней" },
-  { time: "00:39", label: "Сохранение и уведомление" },
-  { time: "00:51", label: "Карточка и отметка «Выполнено»" },
+  { time: "00:00", label: "Погодное окно для ближайшей работы" },
+  { time: "00:13", label: "План садовых дел на сегодня" },
+  { time: "00:19", label: "Несколько садов и растения" },
+  { time: "00:29", label: "Календарь запланированных работ" },
+  { time: "00:35", label: "Справочник садовода" },
+];
+
+const screenshots = [
+  {
+    src: "/screenshots/app-today-weather-v1-0-39.png",
+    title: "Погодное окно",
+    text: "Рекомендация для ближайшей работы и безопасный интервал без дождя.",
+  },
+  {
+    src: "/screenshots/app-gardens-v1-0-39.png",
+    title: "Мои сады",
+    text: "Дача, теплица и растения — каждый со своим планом ухода.",
+  },
+  {
+    src: "/screenshots/app-calendar-v1-0-39.png",
+    title: "Календарь",
+    text: "Работы, препараты, повторы и быстрые действия в одном экране.",
+  },
+  {
+    src: "/screenshots/app-reference-v1-0-39.png",
+    title: "Справочник",
+    text: "Средства обработки и практические рецепты для садовых задач.",
+  },
+  {
+    src: "/screenshots/app-plant-search-v1-0-39.png",
+    title: "Поиск растений",
+    text: "Большой прокручиваемый список подсказок прямо под строкой ввода.",
+  },
 ];
 
 function BrandMark() {
@@ -63,10 +90,10 @@ function ArrowIcon() {
 
 function PhonePreview({
   compact = false,
-  screen = "home",
+  screen = "today",
 }: {
   compact?: boolean;
-  screen?: "home" | "calendar";
+  screen?: "today" | "calendar";
 }) {
   const isCalendar = screen === "calendar";
 
@@ -77,13 +104,13 @@ function PhonePreview({
           className="phone-screenshot"
           src={
             isCalendar
-              ? "/screenshots/app-calendar.png"
-              : "/screenshots/app-home-v1-0-24.png"
+              ? "/screenshots/app-calendar-v1-0-39.png"
+              : "/screenshots/app-today-weather-v1-0-39.png"
           }
           alt={
             isCalendar
               ? "Календарь ухода за растениями в приложении GardenSpa"
-              : "Садовый дневник и растения в приложении GardenSpa"
+              : "Погодное окно для ближайшей работы в приложении GardenSpa"
           }
           width={1080}
           height={2400}
@@ -107,8 +134,8 @@ export default function Home() {
           </a>
           <div className="nav-links">
             <a href="#possibilities">Возможности</a>
+            <a href="#screens">Экраны</a>
             <a href="#video">Видео</a>
-            <a href="#how">Как работает</a>
             <a href="#privacy">Приватность</a>
           </div>
           <a
@@ -140,8 +167,9 @@ export default function Home() {
             <div className="kicker"><span /> Android-приложение для садоводов и дачников</div>
             <h1>Приложение для ухода<br /><em>за садом и растениями.</em></h1>
             <p>
-              GardenSpa объединяет садовый дневник, календарь полива, подкормок
-              и обработок. Планируйте работы и получайте напоминания — без суеты.
+              GardenSpa объединяет несколько садов, готовые программы ухода,
+              календарь и прогноз погоды. Приложение подскажет, когда работу
+              лучше выполнить, а когда перенести из-за дождя, ветра или холода.
             </p>
             <div className="hero-actions">
               <a
@@ -157,23 +185,23 @@ export default function Home() {
           </div>
           <div className="hero-phone">
             <div className="phone-aura" />
-            <PhonePreview screen="home" />
+            <PhonePreview screen="today" />
             <div className="floating-note floating-note-top">
               <span className="note-icon note-icon-leaf" />
-              <span><small>Статус на сегодня</small><strong>Всё идёт по плану</strong></span>
+              <span><small>Погодное окно</small><strong>Условия подходят</strong></span>
             </div>
             <div className="floating-note floating-note-bottom">
               <span className="pulse-dot" />
-              <span><small>Данные</small><strong>Только на вашем телефоне</strong></span>
+              <span><small>Ближайшая работа</small><strong>Для нужного сада</strong></span>
             </div>
           </div>
         </div>
 
         <div className="hero-foot shell">
-          <span>Садовый дневник</span><i />
+          <span>Погодные рекомендации</span><i />
+          <span>Несколько садов</span><i />
           <span>Календарь ухода</span><i />
-          <span>Напоминания</span><i />
-          <span>Учёт препаратов</span>
+          <span>Готовые программы</span>
         </div>
       </section>
 
@@ -186,13 +214,13 @@ export default function Home() {
           <div className="intro-copy">
             <p>
               Когда растений становится больше, трудно помнить, что и когда
-              поливать, чем подкармливать и обрабатывать. GardenSpa превращает
-              разрозненные дела в понятный план садовых работ.
+              поливать, чем подкармливать и безопасно ли проводить обработку.
+              GardenSpa превращает разрозненные дела в понятный план с учётом погоды.
             </p>
             <div className="intro-facts">
-              <span><b>01</b> Работает без интернета</span>
+              <span><b>01</b> План сада доступен офлайн</span>
               <span><b>02</b> Без рекламы</span>
-              <span><b>03</b> Данные на телефоне</span>
+              <span><b>03</b> Прогноз для конкретной работы</span>
             </div>
           </div>
         </div>
@@ -220,15 +248,43 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="screens section-light" id="screens">
+        <div className="shell">
+          <div className="screens-head">
+            <span className="section-label">Актуальная версия GardenSpa</span>
+            <h2>Пять экранов — <em>от прогноза до выполненной работы.</em></h2>
+            <p>Настоящий интерфейс версии 1.0.39 с заполненным садом, календарём и погодной рекомендацией.</p>
+          </div>
+          <div className="screens-track">
+            {screenshots.map((screenshot) => (
+              <figure className="screen-card" key={screenshot.src}>
+                <div className="screen-device">
+                  <img
+                    src={screenshot.src}
+                    alt={`${screenshot.title} в приложении GardenSpa`}
+                    width={1080}
+                    height={2400}
+                    loading="lazy"
+                  />
+                </div>
+                <figcaption>
+                  <strong>{screenshot.title}</strong>
+                  <span>{screenshot.text}</span>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="video-guide" id="video">
         <div className="shell video-guide-grid">
           <div className="video-guide-copy">
             <span className="section-label section-label-dark">GardenSpa в действии</span>
-            <h2>Как работает <em>календарь садовых работ.</em></h2>
+            <h2>Как GardenSpa связывает <em>погоду и план ухода.</em></h2>
             <p>
-              Реальный сценарий ухода за растением: добавляем для смородины
-              обработку серой, настраиваем три повтора через пять дней, получаем
-              напоминание и отмечаем садовую работу выполненной.
+              Короткий обзор актуальной версии: погодное окно для обработки,
+              отдельные планы для дачи и теплицы, календарь работ и встроенный справочник.
             </p>
             <div className="video-chapters" aria-label="Содержание видео">
               {videoChapters.map((chapter) => (
@@ -238,7 +294,7 @@ export default function Home() {
                 </div>
               ))}
             </div>
-            <p className="video-note">Без звука · каждое касание выделено кругом · 74 секунды</p>
+            <p className="video-note">Без звука · запись реального интерфейса · 60 секунд</p>
           </div>
           <div className="video-stage">
             <span className="video-ring video-ring-one" aria-hidden="true" />
@@ -249,10 +305,10 @@ export default function Home() {
                 controls
                 playsInline
                 preload="metadata"
-                poster="/screenshots/app-home-v1-0-24.png"
-                aria-label="Видеоинструкция по приложению GardenSpa"
+                poster="/screenshots/app-today-weather-v1-0-39.png"
+                aria-label="Видеообзор актуальной версии приложения GardenSpa"
               >
-                <source src="/videos/gardenspa-guide.mp4" type="video/mp4" />
+                <source src="/videos/gardenspa-guide-v1-0-39.mp4" type="video/mp4" />
                 Ваш браузер не поддерживает воспроизведение видео.
               </video>
             </div>
@@ -294,16 +350,16 @@ export default function Home() {
             <span className="privacy-core"><BrandMark /></span>
           </div>
           <div className="privacy-copy">
-            <span className="section-label">Офлайн-приложение для садовода</span>
-            <h2>Данные о растениях остаются <em>на вашем телефоне.</em></h2>
+            <span className="section-label">Локальный садовый дневник</span>
+            <h2>Основные данные остаются <em>на вашем телефоне.</em></h2>
             <p>
-              GardenSpa работает без интернета, облака и сервера. Садовый
-              дневник, растения, запланированные процедуры и препараты
-              хранятся локально на устройстве.
+              Сады, растения, программы, запланированные процедуры и препараты
+              хранятся локально. Интернет нужен для актуального прогноза Open‑Meteo
+              и перехода по внешним ссылкам.
             </p>
             <div className="privacy-points">
               <span><i>✓</i> Локальное хранение</span>
-              <span><i>✓</i> Работа без интернета</span>
+              <span><i>✓</i> План доступен офлайн</span>
               <span><i>✓</i> Экспорт данных о саде</span>
             </div>
           </div>

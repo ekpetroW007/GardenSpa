@@ -990,6 +990,73 @@ h2 em {
   letter-spacing: 1px;
 }
 
+.screens {
+  padding: 42px 0 122px;
+}
+
+.screens-head {
+  max-width: 780px;
+}
+
+.screens-head h2 {
+  margin-top: 18px;
+}
+
+.screens-head p {
+  max-width: 650px;
+  margin: 24px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.screens-track {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 56px;
+}
+
+.screen-card {
+  min-width: 0;
+  margin: 0;
+}
+
+.screen-device {
+  overflow: hidden;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, .32);
+  border-radius: 34px;
+  background: linear-gradient(145deg, #31433c, #070e0b 42%, #263a31);
+  box-shadow: 0 25px 55px rgba(17, 47, 36, .18), inset 0 0 0 1px #020706;
+}
+
+.screen-device img {
+  width: 100%;
+  aspect-ratio: 9 / 20;
+  display: block;
+  border-radius: 28px;
+  object-fit: cover;
+}
+
+.screen-card figcaption {
+  display: grid;
+  gap: 8px;
+  padding: 18px 5px 0;
+}
+
+.screen-card strong {
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 400;
+}
+
+.screen-card figcaption span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
 .video-guide {
   position: relative;
   overflow: hidden;
@@ -1636,6 +1703,22 @@ footer {
     min-height: 365px;
   }
 
+  .screens-track {
+    grid-auto-flow: column;
+    grid-template-columns: none;
+    grid-auto-columns: 260px;
+    overflow-x: auto;
+    gap: 22px;
+    padding: 4px 4px 24px;
+    margin-inline: -4px;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: thin;
+  }
+
+  .screen-card {
+    scroll-snap-align: start;
+  }
+
   .video-guide {
     padding: 90px 0;
   }
@@ -1738,6 +1821,7 @@ footer {
   }
 
   .intro h2,
+  .screens h2,
   .video-guide-copy h2,
   .how h2,
   .privacy h2,
@@ -1763,6 +1847,15 @@ footer {
   .feature-card {
     min-height: 390px;
     padding: 24px;
+  }
+
+  .screens {
+    padding: 25px 0 80px;
+  }
+
+  .screens-track {
+    grid-auto-columns: min(245px, 78vw);
+    margin-top: 38px;
   }
 
   .video-guide {

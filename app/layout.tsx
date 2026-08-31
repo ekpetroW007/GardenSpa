@@ -4,7 +4,7 @@ import "./globals.css";
 
 const title = "GardenSpa — приложение для садовода и ухода за растениями";
 const description =
-  "GardenSpa — Android-приложение для садоводов: дневник растений, календарь полива, подкормок и обработок, напоминания и учёт препаратов. Работает офлайн.";
+  "GardenSpa — Android-приложение для садоводов: несколько садов, готовые программы ухода, календарь работ и погодные рекомендации для полива и обработок.";
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
@@ -22,7 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     openGraph: {
       title,
-      description: "Садовый дневник, календарь ухода за растениями и напоминания в одном Android-приложении.",
+      description: "Садовый дневник, календарь ухода и погодное окно для ближайшей работы в одном Android-приложении.",
       type: "website",
       locale: "ru_RU",
       images: [
@@ -37,7 +37,7 @@ export async function generateMetadata(): Promise<Metadata> {
     twitter: {
       card: "summary_large_image",
       title,
-      description: "Садовый дневник, календарь ухода за растениями и напоминания в одном Android-приложении.",
+      description: "Садовый дневник, календарь ухода и погодное окно для ближайшей работы в одном Android-приложении.",
       images: [`${origin}/og.png`],
     },
   };
