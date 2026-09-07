@@ -127,23 +127,38 @@ class CareProgramTest {
             assertTrue("${template.canonicalName} has no product steps", treatmentSteps.size >= 2)
             when (template.id) {
                 "tomato", "cucumber" -> {
-                    assertEquals(3, template.version)
+                    assertEquals(4, template.version)
                     assertTrue(treatmentSteps.all { "БашИнком" in requireNotNull(it.productDescription) })
                     assertTrue(treatmentSteps.all { "https://www.bashinkom.ru/" in it.note })
                 }
                 "peony" -> {
-                    assertEquals(3, template.version)
+                    assertEquals(4, template.version)
                     assertTrue(treatmentSteps.all { "Пион" in requireNotNull(it.productDescription) })
                     assertTrue(treatmentSteps.all { "https://pionray.ru/" in it.note })
                 }
                 else -> {
-                    assertEquals(2, template.version)
+                    assertEquals(3, template.version)
                     assertTrue(treatmentSteps.all { step ->
                         val description = requireNotNull(step.productDescription)
                         "разрешённое" in description && "бренд" !in description.lowercase()
                     })
                 }
             }
+        }
+    }
+
+    @Test
+    fun readyProgramsContainOnlyProductProcedures() {
+        PlantCareCatalog.all().forEach { template ->
+            assertTrue(template.steps.isNotEmpty())
+            assertTrue("${template.canonicalName} contains a general inspection",
+                template.steps.all { !it.productDescription.isNullOrBlank() })
+            val program = CareProgramGenerator().generate(
+                template,
+                CareProgramContext(LocalDate.of(2026, 3, 1), CultivationType.OPEN_GROUND, climate)
+            )
+            assertEquals(template.steps.map { it.id }, program.steps.map { it.templateStepId })
+            assertTrue(program.steps.all { !it.productDescription.isNullOrBlank() })
         }
     }
 
