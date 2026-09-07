@@ -43,10 +43,12 @@ test("server-renders the GardenSpa landing page", async () => {
   assert.match(html, /\/rustore-gardenspa-qr\.png/);
   assert.match(html, /\/screenshots\/app-today-weather-v1-0-39\.png/);
   assert.match(html, /\/screenshots\/app-gardens-v1-0-39\.png/);
-  assert.match(html, /\/screenshots\/app-calendar-v1-0-39\.png/);
+  assert.match(html, /\/screenshots\/app-calendar-v1-0-40\.png/);
   assert.match(html, /\/screenshots\/app-reference-v1-0-39\.png/);
   assert.match(html, /\/screenshots\/app-plant-search-v1-0-39\.png/);
-  assert.match(html, /\/videos\/gardenspa-guide-v1-0-39\.mp4/);
+  assert.match(html, /\/videos\/gardenspa-guide-v1-0-40\.mp4/);
+  assert.match(html, /нажатия подсвечены/);
+  assert.match(html, /новый экран каждые 4 секунды/);
   assert.match(html, /\/og\.png/);
   assert.doesNotMatch(html, /codex-preview|SkeletonPreview|Starter Project/);
 });

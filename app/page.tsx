@@ -41,10 +41,9 @@ const steps = [
 
 const videoChapters = [
   { time: "00:00", label: "Погодное окно для ближайшей работы" },
-  { time: "00:13", label: "План садовых дел на сегодня" },
-  { time: "00:19", label: "Несколько садов и растения" },
-  { time: "00:29", label: "Календарь запланированных работ" },
-  { time: "00:35", label: "Справочник садовода" },
+  { time: "00:04", label: "Несколько садов и растения" },
+  { time: "00:08", label: "Справочник садовода" },
+  { time: "00:12", label: "Месячный календарь работ" },
 ];
 
 const screenshots = [
@@ -59,7 +58,7 @@ const screenshots = [
     text: "Дача, теплица и растения — каждый со своим планом ухода.",
   },
   {
-    src: "/screenshots/app-calendar-v1-0-39.png",
+    src: "/screenshots/app-calendar-v1-0-40.png",
     title: "Календарь",
     text: "Работы, препараты, повторы и быстрые действия в одном экране.",
   },
@@ -104,7 +103,7 @@ function PhonePreview({
           className="phone-screenshot"
           src={
             isCalendar
-              ? "/screenshots/app-calendar-v1-0-39.png"
+              ? "/screenshots/app-calendar-v1-0-40.png"
               : "/screenshots/app-today-weather-v1-0-39.png"
           }
           alt={
@@ -253,7 +252,7 @@ export default function Home() {
           <div className="screens-head">
             <span className="section-label">Актуальная версия GardenSpa</span>
             <h2>Пять экранов — <em>от прогноза до выполненной работы.</em></h2>
-            <p>Настоящий интерфейс версии 1.0.39 с заполненным садом, календарём и погодной рекомендацией.</p>
+            <p>Реальный интерфейс GardenSpa с примером заполненного сада, календарём и погодной рекомендацией.</p>
           </div>
           <div className="screens-track">
             {screenshots.map((screenshot) => (
@@ -294,7 +293,7 @@ export default function Home() {
                 </div>
               ))}
             </div>
-            <p className="video-note">Без звука · запись реального интерфейса · 60 секунд</p>
+            <p className="video-note">Без звука · 16 секунд · нажатия подсвечены · новый экран каждые 4 секунды</p>
           </div>
           <div className="video-stage">
             <span className="video-ring video-ring-one" aria-hidden="true" />
@@ -308,7 +307,7 @@ export default function Home() {
                 poster="/screenshots/app-today-weather-v1-0-39.png"
                 aria-label="Видеообзор актуальной версии приложения GardenSpa"
               >
-                <source src="/videos/gardenspa-guide-v1-0-39.mp4" type="video/mp4" />
+                <source src="/videos/gardenspa-guide-v1-0-40.mp4" type="video/mp4" />
                 Ваш браузер не поддерживает воспроизведение видео.
               </video>
             </div>
