@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
@@ -36,10 +38,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -172,12 +176,28 @@ fun PlantAdd(
     var pendingStartProposal by remember { mutableStateOf<ProgramStartProposal?>(null) }
     var unavailableContinuationNextYear by remember { mutableStateOf<LocalDate?>(null) }
     var manualSetupOpen by remember(plantId) { mutableStateOf(editing) }
+    var manualScrollRequest by remember(plantId) { mutableIntStateOf(0) }
+    val manualSetupRequester = remember { BringIntoViewRequester() }
     var photoUri by remember(plantId) { mutableStateOf<String?>(null) }
     var plantSuggestionsExpanded by remember { mutableStateOf(false) }
     val plantNameSuggestions = remember(plantName) { PlantNameCatalog.namesStartingWith(plantName) }
     val matchedTemplate = remember(plantName) { PlantCareCatalog.find(plantName) }
     val selectedLocation = selectedGarden?.locationOrNull()
     val selectedClimate = selectedGarden?.climateOrNull()
+
+    fun openManualSetup() {
+        manualSetupOpen = true
+        manualScrollRequest++
+    }
+
+    LaunchedEffect(manualScrollRequest) {
+        if (manualScrollRequest > 0) {
+            // Wait until the newly revealed fields have been laid out.
+            withFrameNanos { }
+            manualSetupRequester.bringIntoView()
+        }
+    }
+
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let {
             runCatching {
@@ -489,7 +509,7 @@ fun PlantAdd(
                                     )
                                     SecondaryAction(
                                         "Настроить уход самостоятельно",
-                                        onClick = { manualSetupOpen = true },
+                                        onClick = ::openManualSetup,
                                         modifier = Modifier.fillMaxWidth()
                                     )
                                 }
@@ -501,11 +521,13 @@ fun PlantAdd(
                             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Text("Готовой программы пока нет", color = Cream, style = MaterialTheme.typography.titleLarge)
                                 Text("Вы можете самостоятельно добавить нужные работы по уходу.", color = Mist)
-                                PrimaryAction("Настроить уход самостоятельно", { manualSetupOpen = true }, Modifier.fillMaxWidth())
+                                PrimaryAction("Настроить уход самостоятельно", ::openManualSetup, Modifier.fillMaxWidth())
                             }
                         }
                     }
-                    if (editing || manualSetupOpen) GlassCard(Modifier.fillMaxWidth()) {
+                    if (editing || manualSetupOpen) GlassCard(
+                        Modifier.fillMaxWidth().bringIntoViewRequester(manualSetupRequester)
+                    ) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text("Работы по уходу", color = Cream, style = MaterialTheme.typography.titleLarge)
                             taskNames.forEachIndexed { index, taskName ->
@@ -774,7 +796,7 @@ fun PlantAdd(
             },
             onManual = {
                 unavailableContinuationNextYear = null
-                manualSetupOpen = true
+                openManualSetup()
             },
             onDismiss = { unavailableContinuationNextYear = null }
         )
