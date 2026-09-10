@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import ru.samates.gardenspa.data.database.entity.PlantEntity
 import ru.samates.gardenspa.data.database.entity.resolvedCardId
 import ru.samates.gardenspa.data.repository.BookeeperRepository
+import ru.samates.gardenspa.domain.PlantTaskDraft
 import ru.samates.gardenspa.domain.RepeatType
 import ru.samates.gardenspa.domain.GeneratedCareProgram
 import ru.samates.gardenspa.domain.NO_DRUG_REQUIRED_LABEL
@@ -127,9 +128,8 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
     fun savePlantCard(
         plantId: Int?,
         plantName: String,
-        taskNames: List<String>,
+        tasks: List<PlantTaskDraft>,
         wateringInterval: Int,
-        creationDate: String,
         drugId: Int?,
         gardenId: Int?,
         drugName: String,
@@ -151,17 +151,20 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                 val existing = plants.value
                     .filter { it.resolvedCardId == cardId }
                     .sortedBy(PlantEntity::id)
-                val normalizedTasks = taskNames.map { it.trim() }.filter { it.isNotBlank() }
+                val normalizedTasks = tasks.map { it.copy(name = it.name.trim()) }.filter { it.name.isNotBlank() }
                 if (normalizedTasks.isEmpty()) return@launch
+                if (repeatType != "NONE" && repeatEndType == "UNTIL_DATE" && repeatEndDate != null) {
+                    require(normalizedTasks.none { it.startDate.isAfter(LocalDate.parse(repeatEndDate)) })
+                }
 
-                val cardRows = normalizedTasks.mapIndexed { index, taskName ->
-                    val previous = existing.getOrNull(index)
+                val cardRows = normalizedTasks.map { task ->
+                    val previous = existing.firstOrNull { it.id == task.id }
                     PlantEntity(
                         id = previous?.id ?: 0,
                         plantName = plantName,
-                        taskName = taskName,
+                        taskName = task.name,
                         wateringInterval = wateringInterval,
-                        creationDate = creationDate,
+                        creationDate = task.startDate.toString(),
                         drugId = drugId,
                         gardenId = gardenId,
                         drugName = drugName,

@@ -199,13 +199,14 @@ private fun dateTitle(date: LocalDate, today: LocalDate): String = when (date) {
 }
 
 @Composable
-private fun MonthCalendar(
+internal fun MonthCalendar(
     month: YearMonth,
     selectedDate: LocalDate,
     datesWithTasks: Set<LocalDate>,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
-    onDateSelected: (LocalDate) -> Unit
+    onDateSelected: (LocalDate) -> Unit,
+    showTaskIndicators: Boolean = true
 ) {
     val locale = Locale.forLanguageTag("ru")
     val title = month.format(DateTimeFormatter.ofPattern("LLLL yyyy", locale))
@@ -233,7 +234,7 @@ private fun MonthCalendar(
                     repeat(7) { weekDay ->
                         val date = gridStart.plusDays((week * 7 + weekDay).toLong())
                         val isSelected = date == selectedDate
-                        val taskText = if (date in datesWithTasks) ", есть запланированные работы" else ", работ нет"
+                        val taskText = if (!showTaskIndicators) "" else if (date in datesWithTasks) ", есть запланированные работы" else ", работ нет"
                         Column(
                             modifier = Modifier
                                 .weight(1f)
@@ -260,7 +261,7 @@ private fun MonthCalendar(
                                     fontSize = 14.sp
                                 )
                             }
-                            Text(if (date in datesWithTasks) "•" else "", color = Leaf300, fontSize = 16.sp, lineHeight = 10.sp)
+                            if (showTaskIndicators) Text(if (date in datesWithTasks) "•" else "", color = Leaf300, fontSize = 16.sp, lineHeight = 10.sp)
                         }
                     }
                 }

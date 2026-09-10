@@ -64,6 +64,7 @@ import ru.samates.gardenspa.data.database.entity.resolvedCardId
 import ru.samates.gardenspa.data.database.entity.climateOrNull
 import ru.samates.gardenspa.data.database.entity.locationOrNull
 import ru.samates.gardenspa.domain.RepeatEndType
+import ru.samates.gardenspa.domain.PlantTaskDraft
 import ru.samates.gardenspa.domain.RepeatType
 import ru.samates.gardenspa.domain.CareProgramContext
 import ru.samates.gardenspa.domain.CareProgramGenerator
@@ -153,7 +154,8 @@ fun PlantAdd(
     val editingProgram = editingRows.isNotEmpty() && editingRows.any { it.programId != null }
 
     var plantName by remember { mutableStateOf("") }
-    var taskNames by remember { mutableStateOf(listOf("")) }
+    var taskDrafts by remember(plantId, requestedDate) { mutableStateOf(listOf(PlantTaskDraft("", startDate))) }
+    var taskDatePickerIndex by remember { mutableStateOf<Int?>(null) }
     var selectedDrug by remember { mutableStateOf<DrugEntity?>(null) }
     var selectedGarden by remember { mutableStateOf<GardenEntity?>(null) }
     var repeatType by remember { mutableStateOf(RepeatType.NONE) }
@@ -166,7 +168,6 @@ fun PlantAdd(
     var fieldsInitialized by remember(plantId) { mutableStateOf(false) }
     var addDrugDialogOpen by remember { mutableStateOf(false) }
     var pendingNewDrugName by remember { mutableStateOf<String?>(null) }
-    var importedTaskDates by remember { mutableStateOf<List<LocalDate>>(emptyList()) }
     var cultivationType by remember { mutableStateOf(CultivationType.OPEN_GROUND) }
     var programStartDate by remember(startDate) { mutableStateOf(startDate) }
     var generatedProgram by remember { mutableStateOf<GeneratedCareProgram?>(null) }
@@ -184,6 +185,8 @@ fun PlantAdd(
     val matchedTemplate = remember(plantName) { PlantCareCatalog.find(plantName) }
     val selectedLocation = selectedGarden?.locationOrNull()
     val selectedClimate = selectedGarden?.climateOrNull()
+    val invalidRepeatEnd = !editingProgram && repeatType != RepeatType.NONE &&
+        endType == RepeatEndType.UNTIL_DATE && taskDrafts.any { it.startDate.isAfter(endDate) }
 
     fun openManualSetup() {
         manualSetupOpen = true
@@ -215,7 +218,13 @@ fun PlantAdd(
     LaunchedEffect(editingPlant, editingRows, drugs, gardens, fieldsInitialized) {
         if (editingPlant != null && !fieldsInitialized) {
             plantName = editingPlant.plantName
-            taskNames = editingRows.map { it.taskName }.ifEmpty { listOf("") }
+            taskDrafts = editingRows.map { row ->
+                PlantTaskDraft(
+                    name = row.taskName,
+                    startDate = runCatching { LocalDate.parse(row.creationDate) }.getOrDefault(startDate),
+                    id = row.id
+                )
+            }
             selectedDrug = drugs.firstOrNull { it.id == editingPlant.drugId }
             selectedGarden = gardens.firstOrNull { it.id == editingPlant.gardenId }
             repeatType = runCatching { RepeatType.valueOf(editingPlant.repeatType) }.getOrDefault(RepeatType.NONE)
@@ -236,9 +245,6 @@ fun PlantAdd(
                 .takeIf(reminderLabels::containsKey)
                 ?: 1
             photoUri = editingPlant.photoUri
-            importedTaskDates = editingRows.map { row ->
-                runCatching { LocalDate.parse(row.creationDate) }.getOrDefault(startDate)
-            }
             fieldsInitialized = true
         }
     }
@@ -530,16 +536,16 @@ fun PlantAdd(
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text("Работы по уходу", color = Cream, style = MaterialTheme.typography.titleLarge)
-                            taskNames.forEachIndexed { index, taskName ->
+                            taskDrafts.forEachIndexed { index, task ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     OutlinedTextField(
-                                        value = taskName,
+                                        value = task.name,
                                         onValueChange = { value ->
-                                            taskNames = taskNames.toMutableList().also { it[index] = value }
+                                            taskDrafts = taskDrafts.toMutableList().also { it[index] = task.copy(name = value) }
                                         },
                                         label = { Text("Работа ${index + 1}") },
                                         keyboardOptions = SentenceKeyboardOptions,
@@ -548,35 +554,24 @@ fun PlantAdd(
                                         shape = CompactGlassShape,
                                         modifier = Modifier.weight(1f)
                                     )
-                                    if (taskNames.size > 1) {
+                                    if (taskDrafts.size > 1) {
                                         if (!editingProgram) {
                                         TextButton(
                                             onClick = {
-                                                taskNames = taskNames.filterIndexed { itemIndex, _ -> itemIndex != index }
+                                                taskDrafts = taskDrafts.filterIndexed { itemIndex, _ -> itemIndex != index }
                                             }
                                         ) { Text("Удалить", color = Danger) }
                                         }
                                     }
                                 }
+                                SecondaryAction(
+                                    "Начало: ${task.startDate.toRussianDate()}",
+                                    onClick = { taskDatePickerIndex = index },
+                                    modifier = Modifier.fillMaxWidth().semantics {
+                                        contentDescription = "Дата начала работы ${index + 1}"
+                                    }
+                                )
                                 if (editingProgram) {
-                                    val taskDate = importedTaskDates.getOrNull(index) ?: startDate
-                                    SecondaryAction(
-                                        "Дата: ${taskDate.toRussianDate()}",
-                                        onClick = {
-                                            DatePickerDialog(
-                                                context,
-                                                { _, year, month, day ->
-                                                    importedTaskDates = importedTaskDates.toMutableList().also {
-                                                        it[index] = LocalDate.of(year, month + 1, day)
-                                                    }
-                                                },
-                                                taskDate.year,
-                                                taskDate.monthValue - 1,
-                                                taskDate.dayOfMonth
-                                            ).show()
-                                        },
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
                                     editingRows.getOrNull(index)?.programNote
                                         ?.takeIf(String::isNotBlank)
                                         ?.let { LinkifiedText(it, color = Mist) }
@@ -585,7 +580,7 @@ fun PlantAdd(
                             if (!editingProgram) {
                             SecondaryAction(
                                 "+ Добавить ещё одну работу",
-                                onClick = { taskNames = taskNames + "" },
+                                onClick = { taskDrafts = taskDrafts + PlantTaskDraft("", startDate) },
                                 modifier = Modifier.fillMaxWidth()
                             )
                             }
@@ -674,17 +669,20 @@ fun PlantAdd(
                         }
                     }
                     }
+                    if ((editing || manualSetupOpen) && invalidRepeatEnd) {
+                        Text("Дата окончания повторов не может быть раньше даты начала любой из работ.", color = Danger)
+                    }
                     if (editing || manualSetupOpen) PrimaryAction(
                         if (editingProgram) "Сохранить программу" else if (editing) "Сохранить изменения" else "Сохранить растение",
                         onClick = {
                             val interval = intervalText.toIntOrNull()?.coerceAtLeast(1) ?: 1
-                            val normalizedTaskNames = taskNames.map { it.trim() }
+                            val normalizedTaskNames = taskDrafts.map { it.name.trim() }
                             if (editingProgram) {
                                 plantsVm.updateImportedProgramCard(
                                     plantName = plantName,
                                     existingRows = editingRows,
                                     taskNames = normalizedTaskNames,
-                                    taskDates = importedTaskDates,
+                                    taskDates = taskDrafts.map { it.startDate },
                                     gardenId = selectedGarden?.id,
                                     gardenName = selectedGarden?.name.orEmpty(),
                                     onSaved = {
@@ -697,9 +695,8 @@ fun PlantAdd(
                             plantsVm.savePlantCard(
                                 plantId = plantId,
                                 plantName = plantName.trim(),
-                                taskNames = normalizedTaskNames,
+                                tasks = taskDrafts,
                                 wateringInterval = interval,
-                                creationDate = startDate.toString(),
                                 drugId = selectedDrug?.id,
                                 gardenId = selectedGarden?.id,
                                 drugName = selectedDrug?.name ?: "Препарат не требуется",
@@ -720,8 +717,8 @@ fun PlantAdd(
                                 }
                             )
                         },
-                        enabled = plantName.isNotBlank() && selectedGarden != null && taskNames.isNotEmpty() && taskNames.all { it.isNotBlank() } &&
-                            (!editingProgram || importedTaskDates.size == taskNames.size),
+                        enabled = plantName.isNotBlank() && selectedGarden != null && taskDrafts.isNotEmpty() &&
+                            taskDrafts.all { it.name.isNotBlank() } && !invalidRepeatEnd,
                         modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
                     )
                 }
@@ -767,6 +764,20 @@ fun PlantAdd(
                 )
             }
         )
+    }
+
+    taskDatePickerIndex?.let { index ->
+        taskDrafts.getOrNull(index)?.let { task ->
+            GardenDatePickerDialog(
+                title = "Начало работы ${index + 1}",
+                initialDate = task.startDate,
+                onDateSelected = { date ->
+                    taskDrafts = taskDrafts.toMutableList().also { it[index] = task.copy(startDate = date) }
+                    taskDatePickerIndex = null
+                },
+                onDismiss = { taskDatePickerIndex = null }
+            )
+        }
     }
 
     pendingStartProposal?.let { proposal ->
