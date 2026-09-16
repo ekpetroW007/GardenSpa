@@ -11,6 +11,10 @@ import ru.samates.gardenspa.domain.RepeatType
 import ru.samates.gardenspa.domain.GeneratedCareProgram
 import ru.samates.gardenspa.domain.NO_DRUG_REQUIRED_LABEL
 import ru.samates.gardenspa.domain.NO_REMAINING_CARE_MESSAGE
+import ru.samates.gardenspa.domain.CultivationType
+import ru.samates.gardenspa.domain.withProgramProduct
+import ru.samates.gardenspa.domain.problemTreatment
+import kotlinx.coroutines.CancellationException
 import java.time.LocalDate
 import java.util.UUID
 import kotlinx.coroutines.flow.SharingStarted
@@ -227,7 +231,7 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                         },
                         repeatEndType = if (recurrence == null) "NEVER" else "COUNT",
                         repeatCount = recurrence?.count,
-                        reminderDaysBefore = reminderDaysBefore,
+                        reminderDaysBefore = step.reminderDaysBefore ?: reminderDaysBefore,
                         plantCardId = program.instanceId,
                         programId = program.templateId,
                         programVersion = program.templateVersion,
@@ -258,6 +262,8 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
         taskDates: List<LocalDate>,
         gardenId: Int?,
         gardenName: String,
+        reminderDaysBefore: Int? = null,
+        photoUri: String? = null,
         onSaved: () -> Unit = {}
     ) {
         viewModelScope.launch {
@@ -271,6 +277,8 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                         creationDate = taskDates[index].toString(),
                         gardenId = gardenId,
                         gardenName = gardenName,
+                        reminderDaysBefore = reminderDaysBefore ?: row.reminderDaysBefore,
+                        photoUri = photoUri ?: row.photoUri,
                         repeatDaysOfWeek = if (row.repeatType == RepeatType.WEEKLY.name) {
                             taskDates[index].dayOfWeek.value.toString()
                         } else {
@@ -283,6 +291,28 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                 onSaved()
             } catch (e: Exception) {
                 Log.d("updateImportedProgramCard", e.toString())
+            }
+        }
+    }
+
+    fun saveProgramProduct(
+        plant: PlantEntity, productId: String, date: LocalDate, reminder: Int,
+        afterInspection: Boolean, problemId: String?, cultivation: CultivationType,
+        onSaved: () -> Unit, onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                require(!date.isBefore(LocalDate.now())) { "Выберите сегодняшнюю или будущую дату" }
+                if (afterInspection) {
+                    repository.addProgramTreatment(plant, plant.problemTreatment(problemId, productId, cultivation, date, reminder))
+                } else {
+                    repository.replaceUnusedProgramProduct(plant, plant.withProgramProduct(productId, date, reminder))
+                }
+                onSaved()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (e: Exception) {
+                onError(e.message ?: "Не удалось сохранить обработку. Повторите попытку.")
             }
         }
     }

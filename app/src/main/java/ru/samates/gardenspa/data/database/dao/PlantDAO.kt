@@ -35,6 +35,29 @@ interface PlantDAO {
     @Query("SELECT * FROM plants WHERE plant_card_id = :cardId ORDER BY id")
     suspend fun getPlantsForCardOnce(cardId: String): List<PlantEntity>
 
+    @Query("SELECT COUNT(*) FROM procedure_history WHERE plant_id = :id")
+    suspend fun historyCount(id: Int): Int
+
+    @Transaction
+    suspend fun replaceUnusedProgramProduct(expected: PlantEntity, replacement: PlantEntity) {
+        val current = getPlantById(expected.id.toLong())
+        require(current == expected) { "Карточка изменилась. Откройте выбор препарата заново." }
+        require(historyCount(expected.id) == 0) {
+            "У работы уже есть выполнения или переносы. Чтобы сохранить историю, оставьте её без изменений и добавьте отдельную обработку после осмотра."
+        }
+        require(replacement.id == expected.id && replacement.plantCardId == expected.plantCardId)
+        updatePlant(replacement)
+    }
+
+    @Transaction
+    suspend fun addProgramTreatment(expected: PlantEntity, treatment: PlantEntity) {
+        require(getPlantById(expected.id.toLong()) == expected) {
+            "Карточка изменилась или удалена. Откройте её заново."
+        }
+        require(treatment.id == 0 && treatment.plantCardId == expected.plantCardId)
+        insertPlant(treatment)
+    }
+
     @Query("UPDATE plants SET drugNameInPlant = :name WHERE drug_id = :drugId")
     suspend fun updateDrugName(drugId: Int, name: String)
 

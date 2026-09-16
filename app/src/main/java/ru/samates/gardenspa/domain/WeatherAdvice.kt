@@ -84,10 +84,12 @@ private fun ScheduledTreatment.weatherLimits(
     templatesById: Map<String, PlantCareTemplate>,
     programId: String,
     stepId: String
-): WeatherLimits? = templatesById[programId]
-    ?.steps
-    ?.firstOrNull { it.id == stepId }
-    ?.weatherLimits
+): WeatherLimits? {
+    // A different product must not inherit the original product's rain-free period.
+    // Its label conditions remain visible in the work until a full weather rule is verified.
+    if ('~' in stepId) return null
+    return templatesById[programId]?.steps?.firstOrNull { it.id == stepId }?.weatherLimits
+}
 
 fun ScheduledTreatment.weatherLimits(): WeatherLimits? {
     val programId = plant.programId ?: return null

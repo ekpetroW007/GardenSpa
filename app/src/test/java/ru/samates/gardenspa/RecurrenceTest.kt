@@ -50,6 +50,18 @@ class RecurrenceTest {
     }
 
     @Test
+    fun weeklyDaysAreWorkDatesWithinStartAndEndBounds() {
+        val rule = plant(start = "2026-09-16", type = "WEEKLY", days = "2,4",
+            endType = "UNTIL_DATE", endDate = "2026-10-12")
+        val expected = setOf("2026-09-17", "2026-09-22", "2026-09-24", "2026-09-29",
+            "2026-10-01", "2026-10-06", "2026-10-08")
+        val start = LocalDate.parse("2026-09-14")
+        (0L..30L).map(start::plusDays).forEach { date ->
+            org.junit.Assert.assertEquals(date.toString(), date.toString() in expected, rule.occursOn(date))
+        }
+    }
+
+    @Test
     fun endDateIsInclusive() {
         val rule = plant(type = "DAILY", endType = "UNTIL_DATE", endDate = "2026-07-29")
         assertTrue(rule.occursOn(LocalDate.parse("2026-07-29")))

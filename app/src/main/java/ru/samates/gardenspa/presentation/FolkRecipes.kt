@@ -105,7 +105,6 @@ private fun FolkRecipeCard(
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(recipe.name, color = Cream, style = MaterialTheme.typography.titleLarge)
             Text(recipe.purpose, color = Leaf300)
-            Text("Народный рецепт: результат зависит от растения, почвы и концентрации.", color = Mist)
             SecondaryAction(
                 text = if (expanded) "Скрыть рецепт" else "Показать рецепт",
                 onClick = { expanded = !expanded },

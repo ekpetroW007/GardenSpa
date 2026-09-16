@@ -48,13 +48,5 @@ fun ReferenceHub(innerPadding: PaddingValues, onOpen: (String) -> Unit) {
                 }
             }
         }
-        item {
-            GlassCard(Modifier.fillMaxWidth()) {
-                Text(
-                    "Перед обработкой сверяйтесь с инструкцией выбранного средства. Не смешивайте составы, если совместимость не указана производителем.",
-                    color = Mist
-                )
-            }
-        }
     }
 }

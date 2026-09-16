@@ -121,13 +121,13 @@ class CareProgramTest {
     }
 
     @Test
-    fun approvedProgramsUseBashInkomAndOtherProgramsStayBrandNeutral() {
+    fun defaultProgramsUseBashInkomAndOtherProgramsStayBrandNeutral() {
         PlantCareCatalog.all().forEach { template ->
             val treatmentSteps = template.steps.filter { it.productDescription != null }
             assertTrue("${template.canonicalName} has no product steps", treatmentSteps.size >= 2)
             when (template.id) {
                 "tomato", "cucumber" -> {
-                    assertEquals(4, template.version)
+                    assertEquals(5, template.version)
                     assertTrue(treatmentSteps.all { "БашИнком" in requireNotNull(it.productDescription) })
                     assertTrue(treatmentSteps.all { "https://www.bashinkom.ru/" in it.note })
                 }

@@ -72,7 +72,8 @@ data class GeneratedCareStep(
     val needsWeatherConfirmation: Boolean,
     val explanation: String,
     val productDescription: String?,
-    val note: String
+    val note: String,
+    val reminderDaysBefore: Int? = null
 )
 
 data class GeneratedCareProgram(
@@ -151,7 +152,7 @@ object PlantCareCatalog {
             id = "tomato",
             canonicalName = "Томат",
             aliases = setOf("томат", "томаты", "помидор", "помидоры"),
-            version = 4,
+            version = 5,
             supportedCultivationTypes = CultivationType.entries.toSet(),
             steps = listOf(
                 CareStepTemplate(
@@ -222,7 +223,7 @@ object PlantCareCatalog {
             id = "cucumber",
             canonicalName = "Огурец",
             aliases = setOf("огурец", "огурцы"),
-            version = 4,
+            version = 5,
             supportedCultivationTypes = CultivationType.entries.toSet(),
             steps = listOf(
                 CareStepTemplate(
