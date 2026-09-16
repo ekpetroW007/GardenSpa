@@ -9,7 +9,8 @@ data class FolkFertilizerRecipe(
     val consumptionRate: String,
     val warning: String,
     val sourceName: String,
-    val sourceUrl: String
+    val sourceUrl: String,
+    val isTankMix: Boolean = false
 ) {
     fun purposeForDrug(): String = buildString {
         append(purpose)
@@ -30,7 +31,7 @@ object FolkFertilizers {
     private const val MUSTARD_SCAB = "https://lenta.ru/articles/2025/04/17/kak-izbavitsya-ot-parshi/"
     private const val RSC_ASH_FRUIT_SET = "https://rosselhoscenter.ru/ob-uchrezhdenii/filialy/privolzhskiy/chuvashskaya-respublika/zola-prostaya-i-dostupnaya-podkormka-s-otlichnym-rezultatom-/"
 
-    val recipes = listOf(
+    private val allRecipes = listOf(
         FolkFertilizerRecipe(
             id = "milk_iodine_late_blight",
             name = "Молоко с йодом от фитофторы",
@@ -106,7 +107,11 @@ object FolkFertilizers {
             consumptionRate = "Расходовать согласно норме для обрабатываемой культуры и инструкциям применяемых препаратов.",
             warning = "",
             sourceName = "Рецепт пользователя",
-            sourceUrl = ""
+            sourceUrl = "",
+            isTankMix = true
         )
     )
+
+    val recipes = allRecipes.filterNot { it.isTankMix }
+    val tankMixes = allRecipes.filter { it.isTankMix }
 }

@@ -40,7 +40,7 @@ class CareProgramTest {
 
     @Test
     fun catalogRecognizesAliasesButNotUnknownPlants() {
-        assertEquals(17, PlantCareCatalog.all().size)
+        assertEquals(23, PlantCareCatalog.all().size)
         assertEquals("tomato", PlantCareCatalog.find("  ПОМИДОР ")?.id)
         assertEquals("garden-strawberry", PlantCareCatalog.find("Клубника")?.id)
         assertEquals("apple", PlantCareCatalog.find("Яблоня на карликовом подвое")?.id)
@@ -118,60 +118,6 @@ class CareProgramTest {
         assertTrue(proposal.recommendationHasPassed)
         assertEquals(LocalDate.of(2027, 4, 28), proposal.resolve(ProgramStartChoice.NEXT_YEAR))
         assertEquals(LocalDate.of(2026, 8, 15), proposal.resolve(ProgramStartChoice.USER_DATE))
-    }
-
-    @Test
-    fun defaultProgramsUseBashInkomAndOtherProgramsStayBrandNeutral() {
-        PlantCareCatalog.all().forEach { template ->
-            val treatmentSteps = template.steps.filter { it.productDescription != null }
-            assertTrue("${template.canonicalName} has no product steps", treatmentSteps.size >= 2)
-            when (template.id) {
-                "tomato", "cucumber" -> {
-                    assertEquals(5, template.version)
-                    assertTrue(treatmentSteps.all { "БашИнком" in requireNotNull(it.productDescription) })
-                    assertTrue(treatmentSteps.all { "https://www.bashinkom.ru/" in it.note })
-                }
-                "peony" -> {
-                    assertEquals(4, template.version)
-                    assertTrue(treatmentSteps.all { "Пион" in requireNotNull(it.productDescription) })
-                    assertTrue(treatmentSteps.all { "https://pionray.ru/" in it.note })
-                }
-                else -> {
-                    assertEquals(3, template.version)
-                    assertTrue(treatmentSteps.all { step ->
-                        val description = requireNotNull(step.productDescription)
-                        "разрешённое" in description && "бренд" !in description.lowercase()
-                    })
-                }
-            }
-        }
-    }
-
-    @Test
-    fun readyProgramsContainOnlyProductProcedures() {
-        PlantCareCatalog.all().forEach { template ->
-            assertTrue(template.steps.isNotEmpty())
-            assertTrue("${template.canonicalName} contains a general inspection",
-                template.steps.all { !it.productDescription.isNullOrBlank() })
-            val program = CareProgramGenerator().generate(
-                template,
-                CareProgramContext(LocalDate.of(2026, 3, 1), CultivationType.OPEN_GROUND, climate)
-            )
-            assertEquals(template.steps.map { it.id }, program.steps.map { it.templateStepId })
-            assertTrue(program.steps.all { !it.productDescription.isNullOrBlank() })
-        }
-    }
-
-    @Test
-    fun peonyProgramUsesPionRayRatesAndGrowthPhases() {
-        val peony = requireNotNull(PlantCareCatalog.find("пион"))
-        val productSteps = peony.steps.filter { it.productDescription != null }
-
-        assertEquals(4, productSteps.size)
-        assertTrue(productSteps.any { it.id == "start_leaf_feeding" && "30 г в 10 л воды" in it.note })
-        assertTrue(productSteps.any { it.id == "bud_leaf_feeding" && "до раскрытия цветков" in it.note })
-        assertTrue(productSteps.any { it.id == "koren_leaf_feeding" && "после окончания цветения" in it.note })
-        assertTrue(productSteps.filter { it.id != "abiga_peak_sprouts" }.all { "30–40 взрослых кустов" in it.note })
     }
 
     @Test

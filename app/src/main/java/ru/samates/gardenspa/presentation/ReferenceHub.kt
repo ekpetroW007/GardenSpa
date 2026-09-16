@@ -40,6 +40,24 @@ fun ReferenceHub(innerPadding: PaddingValues, onOpen: (String) -> Unit) {
             }
         }
         item {
+            GlassCard(Modifier.fillMaxWidth(), onClick = { onOpen("Удобрения") }) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Удобрения", color = Cream, style = MaterialTheme.typography.titleLarge)
+                    Text("Подкормки из готовых программ и варианты других производителей", color = Mist)
+                    Text("Открыть удобрения  →", color = Leaf300)
+                }
+            }
+        }
+        item {
+            GlassCard(Modifier.fillMaxWidth(), onClick = { onOpen("Баковые смеси") }) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Баковые смеси", color = Cream, style = MaterialTheme.typography.titleLarge)
+                    Text("Составы смесей, приготовление и применение", color = Mist)
+                    Text("Открыть смеси  →", color = Leaf300)
+                }
+            }
+        }
+        item {
             GlassCard(Modifier.fillMaxWidth(), onClick = { onOpen("Рецепты") }) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Народные рецепты", color = Cream, style = MaterialTheme.typography.titleLarge)

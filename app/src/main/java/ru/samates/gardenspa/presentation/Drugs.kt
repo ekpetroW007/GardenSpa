@@ -31,6 +31,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import ru.samates.gardenspa.BookeeperApp
 import ru.samates.gardenspa.data.database.entity.DrugEntity
+import ru.samates.gardenspa.domain.ProductSection
+import ru.samates.gardenspa.domain.ProgramReferenceCatalog
+import ru.samates.gardenspa.domain.PlantCareCatalog
 import ru.samates.gardenspa.presentation.navigation.AppDestinations
 import ru.samates.gardenspa.ui.theme.Cream
 import ru.samates.gardenspa.ui.theme.Danger
@@ -40,11 +43,12 @@ import ru.samates.gardenspa.viewmodel.DrugsViewmodel
 import ru.samates.gardenspa.viewmodel.DrugsViewmodelFactory
 
 @Composable
-fun Drugs(navController: NavController, innerPadding: PaddingValues) {
+fun Drugs(navController: NavController, innerPadding: PaddingValues, section: ProductSection = ProductSection.TREATMENT) {
     val application = LocalContext.current.applicationContext as BookeeperApp
     val drugsVm: DrugsViewmodel = viewModel(factory = DrugsViewmodelFactory(application.repository))
     val drugs by drugsVm.drugs.collectAsState()
-    var query by remember { mutableStateOf("") }
+    var query by remember(section) { mutableStateOf("") }
+    val catalog = remember(section, query) { ProgramReferenceCatalog.entries(section, query) }
     var drugForActions by remember { mutableStateOf<DrugEntity?>(null) }
     var drugPendingDelete by remember { mutableStateOf<DrugEntity?>(null) }
     val filtered = drugs.filter {
@@ -60,9 +64,11 @@ fun Drugs(navController: NavController, innerPadding: PaddingValues) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(Modifier.weight(1f)) {
                     Text("Библиотека ухода", color = Mist)
-                    Text("Средства", style = MaterialTheme.typography.headlineLarge, color = Cream)
+                    Text(section.title, style = MaterialTheme.typography.headlineLarge, color = Cream)
                 }
-                PrimaryAction("+ Добавить", { navController.navigate(AppDestinations.DRUG_ADD_ROUTE) })
+                if (section == ProductSection.TREATMENT) {
+                    PrimaryAction("+ Добавить", { navController.navigate(AppDestinations.DRUG_ADD_ROUTE) })
+                }
             }
         }
         item {
@@ -78,10 +84,33 @@ fun Drugs(navController: NavController, innerPadding: PaddingValues) {
                 modifier = Modifier.fillMaxWidth()
             )
         }
-        if (filtered.isEmpty()) {
+        items(catalog, key = { "catalog:${it.id}" }) { product ->
+            var expanded by remember(product.id) { mutableStateOf(false) }
+            GlassCard(Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(product.name, style = MaterialTheme.typography.titleLarge, color = Cream)
+                    Text(product.manufacturer, color = Leaf300)
+                    Text(product.crops.joinToString { crop ->
+                        PlantCareCatalog.all().firstOrNull { it.id == crop }?.canonicalName ?: crop
+                    }, color = Mist)
+                    SecondaryAction(if (expanded) "Скрыть инструкцию" else "Показать инструкцию", { expanded = !expanded }, Modifier.fillMaxWidth())
+                    if (expanded) {
+                        Text(product.purpose, color = Cream)
+                        LinkifiedText(product.instruction, color = Cream)
+                        product.unavailableReason?.let { Text(it, color = Danger) }
+                        Text("Сверяйте культуру, форму средства и регламент с вашей упаковкой. Альтернативы не смешивают.", color = Mist)
+                        Text("Справочник программ · сентябрь 2026", color = Mist)
+                    }
+                }
+            }
+        }
+        if (catalog.isEmpty() && (section != ProductSection.TREATMENT || filtered.isEmpty())) {
             item { EmptyGlassState("Ничего не найдено", "Измените запрос или добавьте новый препарат") }
         }
-        items(filtered, key = { it.id }) { drug ->
+        if (section == ProductSection.TREATMENT) {
+            item { SectionTitle("Мои средства") }
+        }
+        items(if (section == ProductSection.TREATMENT) filtered else emptyList(), key = { "my:${it.id}" }) { drug ->
             DrugCard(
                 drug = drug,
                 onOpen = {

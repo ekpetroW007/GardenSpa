@@ -1015,7 +1015,7 @@ private fun CareProgramPreviewDialog(
                             if (ProgramProductCatalog.alternatives(program.templateId, step.templateStepId).isNotEmpty()) {
                                 SecondaryAction("Выбрать препарат-аналог", { productStepIndex = index },
                                     Modifier.fillMaxWidth(), enabled = !importing)
-                                if ('~' in step.templateStepId && index < originalSteps.size) {
+                                if (index < originalSteps.size && step != originalSteps[index]) {
                                     SecondaryAction("Вернуть исходное средство и повторы", {
                                         onProgramChange(program.copy(steps = program.steps.toMutableList().also { it[index] = originalSteps[index] }))
                                     }, Modifier.fillMaxWidth(), enabled = !importing)

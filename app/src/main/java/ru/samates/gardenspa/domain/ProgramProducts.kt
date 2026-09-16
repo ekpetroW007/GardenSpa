@@ -5,6 +5,10 @@ import java.util.UUID
 import ru.samates.gardenspa.data.database.entity.PlantEntity
 import ru.samates.gardenspa.data.database.entity.resolvedCardId
 
+enum class ProductSection(val title: String) {
+    TREATMENT("Средства для обработки"), FERTILIZER("Удобрения")
+}
+
 /** Product instructions are independent. Task-level alternatives are not dose equivalents. */
 data class ProgramProduct(
     val id: String,
@@ -17,7 +21,8 @@ data class ProgramProduct(
     val crops: Set<String> = setOf("tomato", "cucumber"),
     val problems: Set<String> = emptySet(),
     val cultivationTypes: Set<CultivationType> = CultivationType.entries.toSet(),
-    val unavailableReason: String? = null
+    val unavailableReason: String? = null,
+    val sections: Set<ProductSection> = setOf(ProductSection.TREATMENT)
 ) {
     val displayName: String get() = "$name — $manufacturer"
     val note: String get() = "$purpose\n$instruction\nИсточник: $sourceUrl\n$PRODUCT_LABEL_NOTICE\n$SINGLE_PRODUCT_WORK_NOTICE"
@@ -31,7 +36,14 @@ enum class PlantProblemKind(val label: String) { DISEASE("Болезнь"), PEST
 data class PlantProblem(val id: String, val label: String, val kind: PlantProblemKind, val crops: Set<String>)
 
 object ProgramProductCatalog {
-    fun supports(programId: String?): Boolean = programId == "tomato" || programId == "cucumber"
+    val supportedCrops = setOf("tomato", "cucumber", "peony", "hydrangea", "rose", "blackberry",
+        "raspberry", "currant", "garden-strawberry", "blueberry", "apple", "pear", "potato", "lawn")
+
+    val allowedManufacturers = setOf("Август", "ЩёлковоАгрохим", "ФМРус", "BonaForte", "Фаско", "Гера",
+        "Ортон", "Агрикола", "HB-101", "БашИнком", "Фармбиомед", "Syngenta", "Нэст-М", "Петрович",
+        "Green Belt", "Био-комплекс", "Аминосил", "Органик Микс", "5сезонов")
+
+    fun supports(programId: String?): Boolean = programId in supportedCrops
 
     val problems = listOf(
         PlantProblem("late_blight", "Фитофтороз", PlantProblemKind.DISEASE, setOf("tomato")),
@@ -44,6 +56,25 @@ object ProgramProductCatalog {
         PlantProblem("aphids", "Тля", PlantProblemKind.PEST, setOf("tomato", "cucumber")),
         PlantProblem("spider_mite", "Паутинный клещ", PlantProblemKind.PEST, setOf("tomato", "cucumber")),
         PlantProblem("thrips", "Трипсы", PlantProblemKind.PEST, setOf("tomato", "cucumber"))
+    ).map { problem ->
+        problem.copy(crops = problem.crops + when (problem.id) {
+            "late_blight", "alternaria" -> setOf("potato")
+            "powdery_mildew" -> supportedCrops - setOf("potato")
+            "gray_mold" -> setOf("peony", "rose", "hydrangea", "blackberry", "raspberry", "currant", "garden-strawberry", "blueberry")
+            "root_rot" -> supportedCrops
+            "aphids" -> supportedCrops - "lawn"
+            "spider_mite", "thrips" -> setOf("peony", "rose", "hydrangea", "blackberry", "raspberry", "currant", "garden-strawberry", "apple", "pear")
+            else -> emptySet()
+        })
+    } + listOf(
+        PlantProblem("scab", "Парша", PlantProblemKind.DISEASE, setOf("apple", "pear")),
+        PlantProblem("leaf_spot", "Пятнистости листьев", PlantProblemKind.DISEASE,
+            setOf("peony", "rose", "hydrangea", "blackberry", "raspberry", "currant", "garden-strawberry", "blueberry", "lawn")),
+        PlantProblem("rust", "Ржавчина", PlantProblemKind.DISEASE, setOf("rose", "pear", "raspberry", "currant", "lawn")),
+        PlantProblem("snow_mold", "Снежная плесень", PlantProblemKind.DISEASE, setOf("lawn")),
+        PlantProblem("colorado_beetle", "Колорадский жук", PlantProblemKind.PEST, setOf("potato")),
+        PlantProblem("weevil", "Долгоносик", PlantProblemKind.PEST, setOf("garden-strawberry", "raspberry", "blackberry", "apple")),
+        PlantProblem("codling_moth", "Плодожорка", PlantProblemKind.PEST, setOf("apple", "pear"))
     )
 
     private const val SILVER_URL = "https://bio-kompleks.ru/catalog/vsya_produktsiya/bio_kompleks_serebromedin_/"
@@ -117,19 +148,30 @@ object ProgramProductCatalog {
             "Не подтверждены вид клеща, способ обработки, штамм, титр, норма и срок ожидания. Органическое удобрение не считается зарегистрированным акарицидом по названию.",
             "https://5-sezonov.ru/", problems = setOf("spider_mite"),
             unavailableReason = "Назначение недоступно до подтверждения регламента производителем.")
-    )
+    ).map { product ->
+        when (product.id) {
+            "organic_tomato", "organic_cucumber", "amino_tomato", "amino_cucumber_planting",
+            "amino_cucumber", "rostobion_seedling", "maxi_nutrition" ->
+                product.copy(sections = setOf(ProductSection.FERTILIZER))
+            "biozashchitin" -> product.copy(crops = supportedCrops - "lawn")
+            "muchnistop" -> product.copy(crops = supportedCrops - setOf("potato", "lawn"))
+            else -> product
+        }
+    } + SeasonalProgramProducts.products
 
-    fun baseStepId(stepId: String): String = stepId.substringBefore("~")
+    fun baseStepId(stepId: String): String = stepId.substringBefore("~").substringBefore(":remaining:")
     fun productForStep(stepId: String?): ProgramProduct? = stepId?.substringAfter("~", "")
-        ?.takeIf(String::isNotBlank)?.let { id -> products.firstOrNull { it.id == id } }
+        ?.substringBefore(":remaining:")?.takeIf(String::isNotBlank)?.let { id -> products.firstOrNull { it.id == id } }
 
     fun alternatives(programId: String?, stepId: String?): List<ProgramProduct> {
         if (!supports(programId) || stepId == null) return emptyList()
         val ids = when (baseStepId(stepId)) {
+            "nutrition", "nutrition_review" -> SeasonalProgramProducts.feedingIds(programId!!)
+            "lawn_autumn_nutrition" -> setOf("organic_lawn_autumn", "bona_lawn_autumn")
             "gumi_omi_planting" -> if (programId == "tomato") setOf("organic_tomato", "maxi_nutrition") else setOf("maxi_nutrition")
             "fitosporin_spraying" -> setOf("silver_prevention")
-            "gumi_omi_feeding" -> setOf("amino_tomato", "organic_tomato", "maxi_nutrition")
-            "gumi_omi_7_8_leaves" -> setOf("amino_cucumber", "organic_cucumber", "maxi_nutrition")
+            "gumi_omi_feeding" -> setOf("amino_tomato", "organic_tomato", "maxi_nutrition", "bona_vegetables")
+            "gumi_omi_7_8_leaves" -> setOf("amino_cucumber", "organic_cucumber", "maxi_nutrition", "bona_vegetables")
             "kornesil_planting" -> setOf("amino_cucumber_planting", "rostobion_seedling")
             else -> emptySet()
         }
@@ -140,6 +182,7 @@ object ProgramProductCatalog {
 
     fun treatments(programId: String, problemId: String?, cultivationType: CultivationType): List<ProgramProduct> {
         if (!supports(programId)) return emptyList()
+        if (programId !in setOf("tomato", "cucumber") && cultivationType != CultivationType.OPEN_GROUND) return emptyList()
         if (problemId != null && problemsFor(programId).none { it.id == problemId }) return emptyList()
         return products.filter {
             programId in it.crops && cultivationType in it.cultivationTypes && it.problems.isNotEmpty() &&

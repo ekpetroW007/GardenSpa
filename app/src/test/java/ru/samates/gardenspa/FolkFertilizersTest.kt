@@ -12,7 +12,7 @@ class FolkFertilizersTest {
             setOf("milk_iodine_late_blight", "ash_spray_rust", "ash_soap_aphids",
                 "mustard_caterpillars", "mustard_apple_scab", "ash_feed_fruit_set",
                 "magic_plant_drink_tank_mix"),
-            FolkFertilizers.recipes.map { it.id }.toSet()
+            (FolkFertilizers.recipes + FolkFertilizers.tankMixes).map { it.id }.toSet()
         )
         val allowedHosts = setOf("old.rosselhoscenter.ru", "rosselhoscenter.ru", "lenta.ru")
         FolkFertilizers.recipes.filter { it.sourceUrl.isNotBlank() }.forEach {
@@ -22,7 +22,7 @@ class FolkFertilizersTest {
 
     @Test
     fun magicPlantDrinkContainsTheRequestedIngredients() {
-        val recipe = FolkFertilizers.recipes.single { it.id == "magic_plant_drink_tank_mix" }
+        val recipe = FolkFertilizers.tankMixes.single { it.id == "magic_plant_drink_tank_mix" }
 
         assertEquals("Баковая смесь «Волшебный напиток для растений»", recipe.name)
         listOf(

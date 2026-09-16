@@ -38,7 +38,9 @@ fun MainScreen(
                 )
                 "Справочник" -> ReferenceHub(innerPadding, viewModel::changeScreen)
                 "Препараты" -> Drugs(navController, innerPadding)
+                "Удобрения" -> Drugs(navController, innerPadding, ru.samates.gardenspa.domain.ProductSection.FERTILIZER)
                 "Рецепты" -> FolkRecipes(innerPadding)
+                "Баковые смеси" -> FolkRecipes(innerPadding, tankMixes = true)
                 "Сады", "Мои сады" -> MyGardens(navController, innerPadding)
                 "Календарь" -> Calendar(innerPadding, navController)
             }

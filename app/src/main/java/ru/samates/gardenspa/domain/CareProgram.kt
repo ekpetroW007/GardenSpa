@@ -147,7 +147,7 @@ fun recommendedStartDate(
 }
 
 object PlantCareCatalog {
-    private val templates = listOf(
+    private val templates = (listOf(
         PlantCareTemplate(
             id = "tomato",
             canonicalName = "Томат",
@@ -289,107 +289,6 @@ object PlantCareCatalog {
                 ),
             )
         ),
-        PlantCareTemplate(
-            id = "garden-strawberry",
-            canonicalName = "Земляника",
-            aliases = setOf(
-                "земляника", "земляника садовая", "клубника",
-                "земляника садовая короткого дня", "земляника садовая ремонтантная",
-                "земляника садовая нейтрального дня", "клубника одноразовая",
-                "клубника июньская", "клубника ремонтантная", "клубника нейтрального дня"
-            ),
-            version = 3,
-            supportedCultivationTypes = setOf(CultivationType.OPEN_GROUND),
-            steps = standardTreatmentSteps("садовой земляники")
-        ),
-        PlantCareTemplate(
-            id = "apple",
-            canonicalName = "Яблоня",
-            aliases = setOf(
-                "яблоня", "яблони", "яблоко",
-                "яблоня на сильнорослом подвое", "яблоня на карликовом подвое",
-                "яблоня стандартная", "яблоня семенной подвой",
-                "яблоня карликовая", "яблоня полукарликовая"
-            ),
-            version = 3,
-            supportedCultivationTypes = setOf(CultivationType.OPEN_GROUND),
-            steps = standardTreatmentSteps("яблони")
-        ),
-        PlantCareTemplate(
-            id = "pear",
-            canonicalName = "Груша",
-            aliases = setOf(
-                "груша", "груши", "грушевое дерево",
-                "груша на сильнорослом подвое", "груша на слаборослом подвое",
-                "груша на карликовом подвое", "груша стандартная",
-                "груша карликовая", "груша полукарликовая"
-            ),
-            version = 3,
-            supportedCultivationTypes = setOf(CultivationType.OPEN_GROUND),
-            steps = standardTreatmentSteps("груши")
-        ),
-        PlantCareTemplate(
-            id = "hydrangea",
-            canonicalName = "Гортензия",
-            aliases = setOf("гортензия", "гортензии"),
-            version = 3,
-            supportedCultivationTypes = setOf(CultivationType.OPEN_GROUND),
-            steps = standardTreatmentSteps("гортензии")
-        ),
-        PlantCareTemplate(
-            id = "peony",
-            canonicalName = "Пион",
-            aliases = setOf("пион", "пионы", "пион травянистый", "пион ито", "ито-пион"),
-            version = 4,
-            supportedCultivationTypes = setOf(CultivationType.OPEN_GROUND),
-            openGroundStartOffsetDays = -21,
-            steps = listOf(
-                CareStepTemplate(
-                    id = "abiga_peak_sprouts",
-                    title = "Обработать молодые побеги от ботритиса",
-                    offsetDays = 0,
-                    windowAfterDays = 14,
-                    weatherLimits = WeatherLimits(maximumPrecipitationMm = 2.0, maximumWindMetersPerSecond = 6.0),
-                    productDescription = "Абига-Пик — рекомендован Пионовым Раем",
-                    note = "Проведите первую профилактическую обработку, когда побеги достигнут 10–15 см. Дозировку берите только из актуальной инструкции на упаковке; используйте СИЗ. Источник: https://pionray.ru/catalog/botritis2"
-                ),
-                CareStepTemplate(
-                    id = "start_leaf_feeding",
-                    title = "Подкормить пион в начале вегетации",
-                    offsetDays = 7,
-                    windowAfterDays = 14,
-                    weatherLimits = WeatherLimits(maximumPrecipitationMm = 2.0, maximumWindMetersPerSecond = 6.0),
-                    productDescription = "СТАРТ 7-20-25 + Ca + MgO + МЭ — Пионовый Рай",
-                    note = "Растворите 30 г в 10 л воды и опрыскайте листья в начале вегетации. 10 л рассчитаны на 30–40 взрослых кустов. Не обрабатывайте во время цветения; соблюдайте инструкцию и используйте СИЗ. Источник: https://pionray.ru/market3/tproduct/1150216401-504059333372-sistema-pitaniya-dlya-pionov"
-                ),
-                CareStepTemplate(
-                    id = "bud_leaf_feeding",
-                    title = "Подкормить пион перед цветением",
-                    offsetDays = 42,
-                    windowBeforeDays = 7,
-                    windowAfterDays = 14,
-                    weatherLimits = WeatherLimits(maximumPrecipitationMm = 2.0, maximumWindMetersPerSecond = 6.0),
-                    productDescription = "БУТОН 6-20-37 + MgO + МЭ — Пионовый Рай",
-                    note = "Растворите 30 г в 10 л воды и опрыскайте листья до раскрытия цветков. 10 л рассчитаны на 30–40 взрослых кустов. Если цветение уже началось, пропустите работу: во время цветения допустим только полив. Источник: https://pionray.ru/market3/tproduct/1150216401-504059333372-sistema-pitaniya-dlya-pionov"
-                ),
-                CareStepTemplate(
-                    id = "koren_leaf_feeding",
-                    title = "Подкормить пион после цветения",
-                    offsetDays = 95,
-                    windowBeforeDays = 14,
-                    windowAfterDays = 21,
-                    weatherLimits = WeatherLimits(maximumPrecipitationMm = 2.0, maximumWindMetersPerSecond = 6.0),
-                    productDescription = "КОРЕНЬ 0-40-26 + 2MgO + МЭ — Пионовый Рай",
-                    note = "Растворите 30 г в 10 л воды и опрыскайте листья только после окончания цветения. 10 л рассчитаны на 30–40 взрослых кустов. Соблюдайте инструкцию и используйте СИЗ. Источник: https://pionray.ru/market3/tproduct/1150216401-504059333372-sistema-pitaniya-dlya-pionov"
-                ),
-            )
-        ),
-        seasonalVegetable(
-            id = "potato",
-            name = "Картофель",
-            aliases = setOf("картофель", "картошка"),
-            openGroundStartOffsetDays = -7
-        ),
         seasonalVegetable(
             id = "sweet-pepper",
             name = "Перец сладкий",
@@ -453,7 +352,7 @@ object PlantCareCatalog {
             ),
             openGroundStartOffsetDays = -21
         )
-    ).map(PlantCareTemplate::withoutSeasonLabels)
+    ) + SeasonalCarePrograms.templates).map(PlantCareTemplate::withoutSeasonLabels)
 
     private fun standardTreatmentSteps(cropLabel: String): List<CareStepTemplate> = listOf(
         CareStepTemplate(

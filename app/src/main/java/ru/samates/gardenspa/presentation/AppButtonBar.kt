@@ -43,7 +43,7 @@ fun AppButtonBar(selectedScreen: String = "Сегодня", onClick: (String) ->
         NavigationEntry("Справочник", "Справочник", "☷", "Средства и народные рецепты")
     )
     val normalizedSelection = when (selectedScreen) {
-        "Препараты", "Рецепты" -> "Справочник"
+        "Препараты", "Рецепты", "Удобрения", "Баковые смеси" -> "Справочник"
         "Мои сады" -> "Сады"
         "Главная", "Профиль" -> "Сегодня"
         else -> selectedScreen

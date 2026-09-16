@@ -30,12 +30,12 @@ import ru.samates.gardenspa.viewmodel.DrugsViewmodel
 import ru.samates.gardenspa.viewmodel.DrugsViewmodelFactory
 
 @Composable
-fun FolkRecipes(innerPadding: PaddingValues) {
+fun FolkRecipes(innerPadding: PaddingValues, tankMixes: Boolean = false) {
     val application = androidx.compose.ui.platform.LocalContext.current.applicationContext as BookeeperApp
     val drugsVm: DrugsViewmodel = viewModel(factory = DrugsViewmodelFactory(application.repository))
     val drugs by drugsVm.drugs.collectAsState()
-    var query by remember { mutableStateOf("") }
-    val filteredRecipes = FolkFertilizers.recipes.filter { recipe ->
+    var query by remember(tankMixes) { mutableStateOf("") }
+    val filteredRecipes = (if (tankMixes) FolkFertilizers.tankMixes else FolkFertilizers.recipes).filter { recipe ->
         query.isBlank() ||
             recipe.name.contains(query, ignoreCase = true) ||
             recipe.purpose.contains(query, ignoreCase = true)
@@ -49,14 +49,12 @@ fun FolkRecipes(innerPadding: PaddingValues) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    "Народные рецепты",
+                    if (tankMixes) "Баковые смеси" else "Народные рецепты",
                     color = Cream,
-                    style = MaterialTheme.typography.headlineLarge,
-                    maxLines = 1,
-                    softWrap = false
+                    style = MaterialTheme.typography.headlineLarge
                 )
                 Text(
-                    "Справочные варианты подкормок и ухода без рекламных названий",
+                    if (tankMixes) "Составы для совместного применения средств" else "Справочные варианты подкормок и ухода без рекламных названий",
                     color = Mist
                 )
             }
@@ -124,7 +122,7 @@ private fun FolkRecipeCard(
                         color = Mist
                     )
                 }
-                Text("Справочник GardenSpa · обновлено в августе 2026", color = Mist)
+                Text("Справочник GardenSpa · сентябрь 2026", color = Mist)
                 PrimaryAction(
                     text = if (alreadyAdded) "Уже добавлено" else "Добавить в мои средства",
                     onClick = onAdd,

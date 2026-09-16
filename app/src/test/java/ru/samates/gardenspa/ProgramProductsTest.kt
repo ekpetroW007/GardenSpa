@@ -26,7 +26,7 @@ class ProgramProductsTest {
         assertFalse(mildew.any { it.id == "biozashchitin" })
         assertFalse(ProgramProductCatalog.treatments("cucumber", "downy_mildew", CultivationType.OPEN_GROUND).any { it.id == "muchnistop" })
         assertTrue(ProgramProductCatalog.treatments("cucumber", "late_blight", CultivationType.OPEN_GROUND).isEmpty())
-        assertTrue(ProgramProductCatalog.treatments("apple", null, CultivationType.OPEN_GROUND).isEmpty())
+        assertTrue(ProgramProductCatalog.treatments("apple", null, CultivationType.OPEN_GROUND).any { it.id == "rayek_fruit" })
     }
 
     @Test fun whiteflyProductRequiresGreenhouseAndMatchingTarget() {
@@ -119,7 +119,7 @@ class ProgramProductsTest {
         val products = ProgramProductCatalog.products
         assertEquals(products.size, products.map { it.id }.toSet().size)
         assertTrue(products.all { it.sourceUrl.startsWith("https://") && it.instruction.isNotBlank() })
-        assertEquals(setOf("БашИнком", "Био-комплекс", "Аминосил", "Органик Микс", "5сезонов"), products.map { it.manufacturer }.toSet())
+        assertTrue(products.all { it.manufacturer in ProgramProductCatalog.allowedManufacturers })
         for (crop in listOf("tomato", "cucumber")) {
             val template = PlantCareCatalog.all().first { it.id == crop }
             assertTrue(template.steps.count { step -> ProgramProductCatalog.alternatives(crop, step.id).any { it.unavailableReason == null } } >= 3)

@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -31,6 +32,7 @@ import java.time.LocalDate
 import ru.samates.gardenspa.domain.CultivationType
 import ru.samates.gardenspa.domain.PRODUCT_LABEL_NOTICE
 import ru.samates.gardenspa.domain.ProgramProductCatalog
+import ru.samates.gardenspa.domain.PlantCareCatalog
 import ru.samates.gardenspa.domain.SINGLE_PRODUCT_WORK_NOTICE
 import ru.samates.gardenspa.ui.theme.Cream
 import ru.samates.gardenspa.ui.theme.Danger
@@ -55,13 +57,16 @@ internal fun ProgramProductDialog(
     val afterInspection = stepId == null
     var choosingProduct by rememberSaveable { mutableStateOf(!afterInspection) }
     var problemId by rememberSaveable { mutableStateOf<String?>(null) }
-    var cultivationName by rememberSaveable { mutableStateOf(initialCultivation?.name) }
+    val cultivations = PlantCareCatalog.all().firstOrNull { it.id == programId }?.supportedCultivationTypes
+        ?: CultivationType.entries.toSet()
+    var cultivationName by rememberSaveable { mutableStateOf((initialCultivation ?: cultivations.singleOrNull())?.name) }
     val cultivation = cultivationName?.let(CultivationType::valueOf)
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var dateText by rememberSaveable { mutableStateOf(maxOf(initialDate, minimumDate).toString()) }
     var reminder by rememberSaveable { mutableStateOf(initialReminder) }
     var confirmed by rememberSaveable { mutableStateOf(false) }
     var datePickerOpen by remember { mutableStateOf(false) }
+    var productQuery by rememberSaveable { mutableStateOf("") }
     val scroll = rememberScrollState()
     val options = if (afterInspection) {
         cultivation?.let { ProgramProductCatalog.treatments(programId, problemId, it) }.orEmpty()
@@ -81,7 +86,7 @@ internal fun ProgramProductDialog(
                     if (!choosingProduct) {
                         Text("Если вы уже подтвердили болезнь или вредителя, можно добавить отдельную обработку.", color = Mist)
                         Text("Где растёт растение?", color = Leaf300)
-                        CultivationType.entries.forEach { type ->
+                        cultivations.forEach { type ->
                             ProductChoice(type.displayName, cultivation == type, !saving && initialCultivation == null) {
                                 cultivationName = type.name
                                 selectedId = null
@@ -104,10 +109,17 @@ internal fun ProgramProductDialog(
                         } else {
                             Text("Выберите один вариант по задаче", color = Mist)
                         }
+                        OutlinedTextField(value = productQuery, onValueChange = { productQuery = it },
+                            placeholder = { Text("Название или производитель") }, singleLine = true,
+                            colors = glassTextFieldColors(), modifier = Modifier.fillMaxWidth())
                         if (options.isEmpty()) {
                             Text("Для этого случая пока нет проверенных вариантов. Уточните диагноз и регламент у агронома или производителя.", color = Cream)
                         }
-                        options.forEach { product ->
+                        val filteredOptions = options.filter { productQuery.isBlank() || it.displayName.contains(productQuery.trim(), ignoreCase = true) }
+                        if (options.isNotEmpty() && filteredOptions.isEmpty()) {
+                            Text("Ничего не найдено. Измените название или производителя.", color = Mist)
+                        }
+                        filteredOptions.forEach { product ->
                             GlassCard(Modifier.fillMaxWidth()) {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Text(product.name, color = Cream, style = MaterialTheme.typography.titleMedium)
