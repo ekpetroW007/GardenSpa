@@ -78,7 +78,6 @@ import ru.samates.gardenspa.viewmodel.PlantsViewmodelFactory
 import ru.samates.gardenspa.viewmodel.ProceduresViewmodel
 import ru.samates.gardenspa.viewmodel.ProceduresViewmodelFactory
 
-private enum class CalendarMode { TODAY, WEEK, MONTH }
 private data class UndoAction(val message: String, val plantId: Int, val originalDate: LocalDate)
 
 @Composable
@@ -91,7 +90,6 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController) {
     val procedures by proceduresVm.procedures.collectAsState()
     val gardenWorkEntries by gardenWorkVm.entries.collectAsState()
     val today = LocalDate.now()
-    var mode by remember { mutableStateOf(CalendarMode.TODAY) }
     var selectedDate by remember { mutableStateOf(today) }
     var visibleMonth by remember { mutableStateOf(YearMonth.from(today)) }
     var undoAction by remember { mutableStateOf<UndoAction?>(null) }
@@ -100,11 +98,7 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController) {
     val markedDates = (1..visibleMonth.lengthOfMonth()).mapNotNull { day ->
         visibleMonth.atDay(day).takeIf { scheduledTreatmentsOn(plants, procedures, it).isNotEmpty() }
     }.toSet() + datesWithGardenWork
-    val agendaDays = when (mode) {
-        CalendarMode.TODAY -> listOf(today)
-        CalendarMode.WEEK -> (0L..6L).map(today::plusDays)
-        CalendarMode.MONTH -> listOf(selectedDate)
-    }
+    val agendaDays = listOf(selectedDate)
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(innerPadding),
@@ -116,16 +110,6 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController) {
                 Text("Понятный план ухода", color = Mist)
                 Text("Календарь", style = MaterialTheme.typography.headlineLarge, color = Cream)
                 PrimaryAction("Добавить работу", { navController.navigate(AppDestinations.plantAdd(selectedDate.toString())) }, Modifier.fillMaxWidth())
-            }
-        }
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CalendarModeButton("Сегодня", mode == CalendarMode.TODAY, Modifier.weight(1f)) {
-                    mode = CalendarMode.TODAY
-                    selectedDate = today
-                }
-                CalendarModeButton("Неделя", mode == CalendarMode.WEEK, Modifier.weight(1f)) { mode = CalendarMode.WEEK }
-                CalendarModeButton("Месяц", mode == CalendarMode.MONTH, Modifier.weight(1f)) { mode = CalendarMode.MONTH }
             }
         }
         undoAction?.let { action ->
@@ -148,17 +132,15 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController) {
                 }
             }
         }
-        if (mode == CalendarMode.MONTH) {
-            item {
-                MonthCalendar(
-                    month = visibleMonth,
-                    selectedDate = selectedDate,
-                    datesWithTasks = markedDates,
-                    onPreviousMonth = { visibleMonth = visibleMonth.minusMonths(1) },
-                    onNextMonth = { visibleMonth = visibleMonth.plusMonths(1) },
-                    onDateSelected = { selectedDate = it; visibleMonth = YearMonth.from(it) }
-                )
-            }
+        item {
+            MonthCalendar(
+                month = visibleMonth,
+                selectedDate = selectedDate,
+                datesWithTasks = markedDates,
+                onPreviousMonth = { visibleMonth = visibleMonth.minusMonths(1) },
+                onNextMonth = { visibleMonth = visibleMonth.plusMonths(1) },
+                onDateSelected = { selectedDate = it; visibleMonth = YearMonth.from(it) }
+            )
         }
 
         agendaDays.forEach { date ->
@@ -210,19 +192,6 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController) {
     }
 }
 
-@Composable
-private fun CalendarModeButton(text: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        modifier = modifier.heightIn(min = 52.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (selected) Leaf300 else Forest700,
-            contentColor = if (selected) Forest950 else Cream
-        ),
-        shape = RoundedCornerShape(16.dp)
-    ) { Text(text, fontWeight = FontWeight.SemiBold) }
-}
-
 private fun dateTitle(date: LocalDate, today: LocalDate): String = when (date) {
     today -> "Сегодня, ${date.toRussianDate(false)}"
     today.plusDays(1) -> "Завтра, ${date.toRussianDate(false)}"
@@ -230,13 +199,14 @@ private fun dateTitle(date: LocalDate, today: LocalDate): String = when (date) {
 }
 
 @Composable
-private fun MonthCalendar(
+internal fun MonthCalendar(
     month: YearMonth,
     selectedDate: LocalDate,
     datesWithTasks: Set<LocalDate>,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
-    onDateSelected: (LocalDate) -> Unit
+    onDateSelected: (LocalDate) -> Unit,
+    showTaskIndicators: Boolean = true
 ) {
     val locale = Locale.forLanguageTag("ru")
     val title = month.format(DateTimeFormatter.ofPattern("LLLL yyyy", locale))
@@ -264,7 +234,7 @@ private fun MonthCalendar(
                     repeat(7) { weekDay ->
                         val date = gridStart.plusDays((week * 7 + weekDay).toLong())
                         val isSelected = date == selectedDate
-                        val taskText = if (date in datesWithTasks) ", есть запланированные работы" else ", работ нет"
+                        val taskText = if (!showTaskIndicators) "" else if (date in datesWithTasks) ", есть запланированные работы" else ", работ нет"
                         Column(
                             modifier = Modifier
                                 .weight(1f)
@@ -291,7 +261,7 @@ private fun MonthCalendar(
                                     fontSize = 14.sp
                                 )
                             }
-                            Text(if (date in datesWithTasks) "•" else "", color = Leaf300, fontSize = 16.sp, lineHeight = 10.sp)
+                            if (showTaskIndicators) Text(if (date in datesWithTasks) "•" else "", color = Leaf300, fontSize = 16.sp, lineHeight = 10.sp)
                         }
                     }
                 }

@@ -7,19 +7,34 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStore
 import java.time.MonthDay
+import java.io.IOException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.catch
 import ru.samates.gardenspa.domain.ClimateConfidence
 import ru.samates.gardenspa.domain.ClimateFingerprint
 import ru.samates.gardenspa.domain.GardenLocation
 import ru.samates.gardenspa.domain.LocationSource
+import ru.samates.gardenspa.R
+import ru.samates.gardenspa.domain.CURRENT_OFFER_VERSION
+import ru.samates.gardenspa.domain.OfferAcceptance
+import ru.samates.gardenspa.domain.OfferDocument
+import ru.samates.gardenspa.domain.RegistrationState
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
 
-class PreferencesManager(context: Context) {
-    private val dataStore = context.dataStore
+class PreferencesManager(context: Context, private val dataStore: DataStore<Preferences> = context.applicationContext.dataStore) {
+    private val installedVersion = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
+    val offer = OfferDocument(CURRENT_OFFER_VERSION,
+        context.resources.openRawResource(R.raw.gardenspa_offer).bufferedReader(Charsets.UTF_8).use { it.readText() })
+    // Display preferences may fall back; the admission gate below intentionally reads the raw, fallible stream.
+    private val displayPreferences = dataStore.data.catch { error ->
+        if (error is IOException) emit(emptyPreferences()) else throw error
+    }
 
     companion object {
         val IS_REGISTERED = booleanPreferencesKey("is_registered")
@@ -42,17 +57,24 @@ class PreferencesManager(context: Context) {
         val CLIMATE_SOURCE_YEARS = stringPreferencesKey("climate_source_years")
         val LARGE_INTERFACE = booleanPreferencesKey("large_interface")
         val HIGH_CONTRAST = booleanPreferencesKey("high_contrast")
+        val OFFER_VERSION = stringPreferencesKey("offer_version")
+        val OFFER_SHA256 = stringPreferencesKey("offer_sha256")
+        val OFFER_ACCEPTED_AT = longPreferencesKey("offer_accepted_at")
+        val OFFER_APP_VERSION = stringPreferencesKey("offer_app_version")
+        val OFFER_TEXT = stringPreferencesKey("offer_text")
     }
 
-    suspend fun setRegistered(isRegistered: Boolean) {
+    suspend fun completeRegistration(login: String, accepted: Boolean) {
+        require(login.isNotBlank()) { "Укажите имя или псевдоним" }
+        require(accepted) { "Необходимо принять Договор оферты" }
         dataStore.edit { preferences ->
-            preferences[IS_REGISTERED] = isRegistered
-        }
-    }
-
-    suspend fun setUserLogin(login: String) {
-        dataStore.edit { preferences ->
-            preferences[USER_LOGIN] = login
+            preferences[USER_LOGIN] = login.trim()
+            preferences[IS_REGISTERED] = true
+            preferences[OFFER_VERSION] = offer.version
+            preferences[OFFER_SHA256] = offer.sha256
+            preferences[OFFER_ACCEPTED_AT] = System.currentTimeMillis()
+            preferences[OFFER_APP_VERSION] = installedVersion
+            preferences[OFFER_TEXT] = offer.text
         }
     }
 
@@ -91,26 +113,28 @@ class PreferencesManager(context: Context) {
         dataStore.edit { it[HIGH_CONTRAST] = enabled }
     }
 
-    val isRegistered: Flow<Boolean> = dataStore.data
-        .map { preferences ->
-            preferences[IS_REGISTERED] ?: false
-        }
+    val registrationState: Flow<RegistrationState> = dataStore.data.map { preferences ->
+        val name = preferences[USER_LOGIN].orEmpty()
+        val accepted = OfferAcceptance(preferences[OFFER_VERSION].orEmpty(),
+            preferences[OFFER_SHA256].orEmpty(), preferences[OFFER_ACCEPTED_AT] ?: 0)
+        RegistrationState(name, preferences[IS_REGISTERED] == true && name.isNotBlank() && accepted.matches(offer))
+    }
 
-    val userLogin: Flow<String> = dataStore.data
+    val userLogin: Flow<String> = displayPreferences
         .map { preferences ->
             preferences[USER_LOGIN] ?: "Гость"
         }
 
-    val userWeightKg: Flow<Double> = dataStore.data
+    val userWeightKg: Flow<Double> = displayPreferences
         .map { preferences ->
             preferences[USER_WEIGHT_KG]?.toDoubleOrNull() ?: 70.0
         }
 
-    val largeInterface: Flow<Boolean> = dataStore.data.map { it[LARGE_INTERFACE] ?: false }
+    val largeInterface: Flow<Boolean> = displayPreferences.map { it[LARGE_INTERFACE] ?: false }
 
-    val highContrast: Flow<Boolean> = dataStore.data.map { it[HIGH_CONTRAST] ?: false }
+    val highContrast: Flow<Boolean> = displayPreferences.map { it[HIGH_CONTRAST] ?: false }
 
-    val gardenLocation: Flow<GardenLocation?> = dataStore.data.map { preferences ->
+    val gardenLocation: Flow<GardenLocation?> = displayPreferences.map { preferences ->
         val latitude = preferences[GARDEN_LATITUDE]?.toDoubleOrNull() ?: return@map null
         val longitude = preferences[GARDEN_LONGITUDE]?.toDoubleOrNull() ?: return@map null
         GardenLocation(
@@ -125,7 +149,7 @@ class PreferencesManager(context: Context) {
         )
     }
 
-    val climateFingerprint: Flow<ClimateFingerprint?> = dataStore.data.map { preferences ->
+    val climateFingerprint: Flow<ClimateFingerprint?> = displayPreferences.map { preferences ->
         val spring = preferences[CLIMATE_SAFE_SPRING_DAY]
             ?.let { runCatching { MonthDay.parse(it) }.getOrNull() }
             ?: return@map null

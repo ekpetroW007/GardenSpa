@@ -24,6 +24,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import ru.samates.gardenspa.BookeeperApp
 import ru.samates.gardenspa.data.database.entity.resolvedCardId
+import ru.samates.gardenspa.data.database.entity.PlantEntity
+import ru.samates.gardenspa.domain.ProgramProductCatalog
+import java.time.LocalDate
 import ru.samates.gardenspa.domain.recurrenceDescription
 import ru.samates.gardenspa.domain.toPlantCards
 import ru.samates.gardenspa.domain.toDrugDisplayName
@@ -53,6 +56,10 @@ fun PlantDetails(navController: NavController, plantId: Int) {
     val cardPlantIds = cardRows.map { it.id }.toSet()
     val history = procedures.filter { it.plantId in cardPlantIds && it.status == "COMPLETED" }
     var deleteConfirmationOpen by remember { mutableStateOf(false) }
+    var productWork by remember { mutableStateOf<PlantEntity?>(null) }
+    var afterInspection by remember { mutableStateOf(false) }
+    var productSaving by remember { mutableStateOf(false) }
+    var productError by remember { mutableStateOf<String?>(null) }
 
     BotanicalBackground {
         Column(Modifier.fillMaxSize()) {
@@ -101,6 +108,21 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                             }
                         }
                     }
+                    if (ProgramProductCatalog.supports(plant.programId)) {
+                        item {
+                            GlassCard(Modifier.fillMaxWidth()) {
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Text("После осмотра обнаружена проблема", color = Cream, style = MaterialTheme.typography.titleLarge)
+                                    Text("Если болезнь или вредитель подтвердились, добавьте отдельную обработку. Название проблемы можно не указывать.", color = Mist)
+                                    SecondaryAction("Выбрать болезнь / вредителя и препарат", {
+                                        afterInspection = true
+                                        productError = null
+                                        productWork = plant
+                                    }, Modifier.fillMaxWidth())
+                                }
+                            }
+                        }
+                    }
                     item { SectionTitle("План ухода") }
                     items(cardRows, key = { "card-procedure:${it.id}" }) { procedure ->
                         GlassCard(Modifier.fillMaxWidth()) {
@@ -110,7 +132,19 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                                 Text("Дата: ${procedure.creationDate.toRussianDateOrSelf()}", color = Mist)
                                 Text(procedure.recurrenceDescription(), color = Mist)
                                 if (procedure.programNote.isNotBlank()) {
-                                    LinkifiedText(procedure.programNote, color = Cream, modifier = Modifier.padding(top = 4.dp))
+                                    ExpandableInfo("Инструкция и ограничения", procedure.programNote)
+                                }
+                                if (ProgramProductCatalog.alternatives(procedure.programId, procedure.programStepId).isNotEmpty()) {
+                                    val hasHistory = procedures.any { it.plantId == procedure.id }
+                                    if (hasHistory) {
+                                        Text("У работы есть история. Для другого средства добавьте отдельную обработку после осмотра.", color = Mist)
+                                    } else {
+                                        SecondaryAction("Выбрать препарат-аналог", {
+                                            afterInspection = false
+                                            productError = null
+                                            productWork = procedure
+                                        }, Modifier.fillMaxWidth())
+                                    }
                                 }
                             }
                         }
@@ -137,6 +171,29 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                 }
             }
         }
+    }
+
+    productWork?.let { work ->
+        ProgramProductDialog(
+            programId = requireNotNull(work.programId),
+            stepId = if (afterInspection) null else work.programStepId,
+            initialDate = if (afterInspection) LocalDate.now() else runCatching { LocalDate.parse(work.creationDate) }.getOrDefault(LocalDate.now()),
+            initialReminder = work.reminderDaysBefore,
+            saving = productSaving, error = productError,
+            onDismiss = { if (!productSaving) productWork = null },
+            onConfirm = { product, problem, cultivation, date, reminder ->
+                productSaving = true
+                productError = null
+                plantsVm.saveProgramProduct(work, product, date, reminder, afterInspection, problem, cultivation,
+                    onSaved = {
+                        TreatmentReminderScheduler.refreshNow(app)
+                        productSaving = false
+                        productWork = null
+                    },
+                    onError = { productError = it; productSaving = false }
+                )
+            }
+        )
     }
 
     if (deleteConfirmationOpen && plant != null) {

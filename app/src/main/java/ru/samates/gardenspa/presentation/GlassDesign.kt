@@ -29,6 +29,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -60,6 +63,7 @@ import ru.samates.gardenspa.ui.theme.LocalHighContrast
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 
 val GlassShape = RoundedCornerShape(24.dp)
 val CompactGlassShape = RoundedCornerShape(18.dp)
@@ -99,6 +103,19 @@ fun LinkifiedText(
                 ?.let { runCatching { uriHandler.openUri(it.item) } }
         }
     )
+}
+
+@Composable
+internal fun ExpandableInfo(title: String, text: String, modifier: Modifier = Modifier) {
+    var expanded by rememberSaveable(text) { mutableStateOf(false) }
+    Column(modifier) {
+        TextButton(onClick = { expanded = !expanded }, modifier = Modifier.semantics {
+            stateDescription = if (expanded) "Развёрнуто" else "Свёрнуто"
+        }) {
+            Text("$title ${if (expanded) "▴" else "▾"}", color = Leaf300)
+        }
+        if (expanded) LinkifiedText(text, color = Mist)
+    }
 }
 
 @Composable

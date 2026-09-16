@@ -75,6 +75,12 @@ class BookeeperRepository(
         plantDAO.updatePlant(plant)
     }
 
+    suspend fun replaceUnusedProgramProduct(expected: PlantEntity, replacement: PlantEntity) =
+        plantDAO.replaceUnusedProgramProduct(expected, replacement)
+
+    suspend fun addProgramTreatment(expected: PlantEntity, treatment: PlantEntity) =
+        plantDAO.addProgramTreatment(expected, treatment)
+
     suspend fun replacePlantCard(cardId: String, plants: List<PlantEntity>) {
         plantDAO.replacePlantCard(cardId, plants)
     }

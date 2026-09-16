@@ -79,7 +79,6 @@ fun GardenWorkCaloriesCard(
                         weightText = value.filter { it.isDigit() || it == ',' || it == '.' }.take(6)
                     },
                     label = { Text("Ваш вес, кг") },
-                    supportingText = { Text("Нужен для приблизительного расчёта", color = Mist) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     colors = glassTextFieldColors(),
@@ -132,11 +131,7 @@ fun GardenWorkCaloriesCard(
                         color = Cream
                     )
                 }
-                Text(
-                    "Это ориентировочная оценка по MET: фактический расход зависит от темпа и особенностей организма.",
-                    color = Mist,
-                    style = MaterialTheme.typography.bodySmall
-                )
+                ExpandableInfo("Как считается расход", "Оценка по MET: фактический расход зависит от темпа и особенностей организма. Это не медицинское измерение.")
                 SecondaryAction(
                     text = "Изменить работы",
                     onClick = { editingOverride = true },

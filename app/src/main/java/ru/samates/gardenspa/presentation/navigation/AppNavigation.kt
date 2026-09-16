@@ -1,15 +1,23 @@
 package ru.samates.gardenspa.presentation.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import ru.samates.gardenspa.presentation.BotanicalBackground
 import ru.samates.gardenspa.ui.theme.Leaf300
+import ru.samates.gardenspa.ui.theme.Cream
+import ru.samates.gardenspa.presentation.PrimaryAction
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -29,34 +37,40 @@ import ru.samates.gardenspa.viewmodel.UserViewModel
 
 @Composable
 fun AppNavigation(userViewModel: UserViewModel) {
-    val navController = rememberNavController()
-
-    val isRegistered by userViewModel.isRegistered.collectAsState()
-
-    if (isRegistered == null) {
+    val registration by userViewModel.registrationState.collectAsState()
+    val error by userViewModel.registrationError.collectAsState()
+    if (registration == null) {
         BotanicalBackground {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Leaf300)
+                if (error == null) CircularProgressIndicator(color = Leaf300)
+                else Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(error.orEmpty(), color = Cream)
+                    PrimaryAction("Повторить", userViewModel::reloadRegistration)
+                }
             }
         }
         return
     }
 
-    val startDestination = if (isRegistered == true) {
-        AppDestinations.MAINSCREEN_ROUTE
-    } else {
-        AppDestinations.REGISTRATION_ROUTE
+    // Keep the entire navigation graph inaccessible, including a restored back stack, until acceptance is saved.
+    if (registration?.canEnter != true) {
+        Registration(userViewModel)
+        return
     }
+    val navController = rememberNavController()
 
     NavHost(
         navController = navController,
-        startDestination = startDestination
+        startDestination = AppDestinations.MAINSCREEN_ROUTE
     ) {
         composable(route = AppDestinations.REGISTRATION_ROUTE) {
-            Registration(
-                navController = navController,
-                userViewModel = userViewModel
-            )
+            // An old saved navigation stack may still point at the former onboarding route.
+            LaunchedEffect(Unit) {
+                navController.navigate(AppDestinations.MAINSCREEN_ROUTE) {
+                    popUpTo(AppDestinations.REGISTRATION_ROUTE) { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
         }
         composable(route = AppDestinations.MAINSCREEN_ROUTE) {
             MainScreen(navController = navController, userViewModel = userViewModel)

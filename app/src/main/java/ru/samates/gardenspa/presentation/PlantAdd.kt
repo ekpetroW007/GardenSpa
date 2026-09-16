@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,6 +21,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
@@ -36,10 +40,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -60,6 +67,7 @@ import ru.samates.gardenspa.data.database.entity.resolvedCardId
 import ru.samates.gardenspa.data.database.entity.climateOrNull
 import ru.samates.gardenspa.data.database.entity.locationOrNull
 import ru.samates.gardenspa.domain.RepeatEndType
+import ru.samates.gardenspa.domain.PlantTaskDraft
 import ru.samates.gardenspa.domain.RepeatType
 import ru.samates.gardenspa.domain.CareProgramContext
 import ru.samates.gardenspa.domain.CareProgramGenerator
@@ -71,6 +79,9 @@ import ru.samates.gardenspa.domain.PlantNameCatalog
 import ru.samates.gardenspa.domain.ProgramStartChoice
 import ru.samates.gardenspa.domain.ProgramStartPlanner
 import ru.samates.gardenspa.domain.ProgramStartProposal
+import ru.samates.gardenspa.domain.ProgramProductCatalog
+import ru.samates.gardenspa.domain.withProduct
+import ru.samates.gardenspa.domain.withProblemTreatment
 import ru.samates.gardenspa.notifications.TreatmentReminderScheduler
 import ru.samates.gardenspa.presentation.navigation.AppDestinations
 import ru.samates.gardenspa.ui.theme.Cream
@@ -94,6 +105,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 
 private val repeatLabels = linkedMapOf(
     RepeatType.NONE to "Не повторять",
@@ -116,6 +128,7 @@ private val reminderLabels = linkedMapOf(
     5 to "За 5 дней"
 )
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PlantAdd(
     navController: NavController,
@@ -149,7 +162,8 @@ fun PlantAdd(
     val editingProgram = editingRows.isNotEmpty() && editingRows.any { it.programId != null }
 
     var plantName by remember { mutableStateOf("") }
-    var taskNames by remember { mutableStateOf(listOf("")) }
+    var taskDrafts by remember(plantId, requestedDate) { mutableStateOf(listOf(PlantTaskDraft("", startDate))) }
+    var taskDatePickerIndex by remember { mutableStateOf<Int?>(null) }
     var selectedDrug by remember { mutableStateOf<DrugEntity?>(null) }
     var selectedGarden by remember { mutableStateOf<GardenEntity?>(null) }
     var repeatType by remember { mutableStateOf(RepeatType.NONE) }
@@ -162,7 +176,6 @@ fun PlantAdd(
     var fieldsInitialized by remember(plantId) { mutableStateOf(false) }
     var addDrugDialogOpen by remember { mutableStateOf(false) }
     var pendingNewDrugName by remember { mutableStateOf<String?>(null) }
-    var importedTaskDates by remember { mutableStateOf<List<LocalDate>>(emptyList()) }
     var cultivationType by remember { mutableStateOf(CultivationType.OPEN_GROUND) }
     var programStartDate by remember(startDate) { mutableStateOf(startDate) }
     var generatedProgram by remember { mutableStateOf<GeneratedCareProgram?>(null) }
@@ -172,18 +185,49 @@ fun PlantAdd(
     var pendingStartProposal by remember { mutableStateOf<ProgramStartProposal?>(null) }
     var unavailableContinuationNextYear by remember { mutableStateOf<LocalDate?>(null) }
     var manualSetupOpen by remember(plantId) { mutableStateOf(editing) }
-    var photoUri by remember(plantId) { mutableStateOf<String?>(null) }
+    var manualScrollRequest by remember(plantId) { mutableIntStateOf(0) }
+    val manualSetupRequester = remember { BringIntoViewRequester() }
+    var photoUri by rememberSaveable(plantId) { mutableStateOf<String?>(null) }
+    var photoLoading by remember { mutableStateOf(false) }
+    var photoError by remember { mutableStateOf<String?>(null) }
     var plantSuggestionsExpanded by remember { mutableStateOf(false) }
     val plantNameSuggestions = remember(plantName) { PlantNameCatalog.namesStartingWith(plantName) }
     val matchedTemplate = remember(plantName) { PlantCareCatalog.find(plantName) }
     val selectedLocation = selectedGarden?.locationOrNull()
     val selectedClimate = selectedGarden?.climateOrNull()
+    val invalidRepeatEnd = !editingProgram && repeatType != RepeatType.NONE &&
+        endType == RepeatEndType.UNTIL_DATE && taskDrafts.any { it.startDate.isAfter(endDate) }
+    val invalidRepeatCount = !editingProgram && repeatType != RepeatType.NONE &&
+        endType == RepeatEndType.COUNT && (countText.toIntOrNull() ?: 0) < 1
+
+    fun openManualSetup() {
+        manualSetupOpen = true
+        manualScrollRequest++
+    }
+
+    LaunchedEffect(manualScrollRequest) {
+        if (manualScrollRequest > 0) {
+            // Wait until the newly revealed fields have been laid out.
+            withFrameNanos { }
+            manualSetupRequester.bringIntoView()
+        }
+    }
+
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let {
-            runCatching {
-                context.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        if (uri != null) {
+            photoLoading = true
+            photoError = null
+            coroutineScope.launch {
+                try {
+                    photoUri = storePlantPhoto(context, uri)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (_: Exception) {
+                    photoError = "Не удалось сохранить фото. Выберите другое изображение или проверьте свободное место."
+                } finally {
+                    photoLoading = false
+                }
             }
-            photoUri = it.toString()
         }
     }
     val voiceInput = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -195,7 +239,13 @@ fun PlantAdd(
     LaunchedEffect(editingPlant, editingRows, drugs, gardens, fieldsInitialized) {
         if (editingPlant != null && !fieldsInitialized) {
             plantName = editingPlant.plantName
-            taskNames = editingRows.map { it.taskName }.ifEmpty { listOf("") }
+            taskDrafts = editingRows.map { row ->
+                PlantTaskDraft(
+                    name = row.taskName,
+                    startDate = runCatching { LocalDate.parse(row.creationDate) }.getOrDefault(startDate),
+                    id = row.id
+                )
+            }
             selectedDrug = drugs.firstOrNull { it.id == editingPlant.drugId }
             selectedGarden = gardens.firstOrNull { it.id == editingPlant.gardenId }
             repeatType = runCatching { RepeatType.valueOf(editingPlant.repeatType) }.getOrDefault(RepeatType.NONE)
@@ -215,10 +265,7 @@ fun PlantAdd(
             reminderDaysBefore = editingPlant.reminderDaysBefore
                 .takeIf(reminderLabels::containsKey)
                 ?: 1
-            photoUri = editingPlant.photoUri
-            importedTaskDates = editingRows.map { row ->
-                runCatching { LocalDate.parse(row.creationDate) }.getOrDefault(startDate)
-            }
+            if (photoUri == null) photoUri = editingPlant.photoUri
             fieldsInitialized = true
         }
     }
@@ -358,10 +405,12 @@ fun PlantAdd(
                             if (photoUri != null) {
                                 PlantPhoto(photoUri, plantName.ifBlank { "растение" }, Modifier.fillMaxWidth().height(170.dp))
                             }
+                            if (photoLoading) Text("Сохраняем фото…", color = Mist)
+                            photoError?.let { Text(it, color = Danger) }
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 SecondaryAction(
                                     if (photoUri == null) "Добавить фото" else "Сменить фото",
-                                    { photoPicker.launch(arrayOf("image/*")) },
+                                    { if (!photoLoading) photoPicker.launch(arrayOf("image/*")) },
                                     Modifier.weight(1f)
                                 )
                                 SecondaryAction(
@@ -489,7 +538,7 @@ fun PlantAdd(
                                     )
                                     SecondaryAction(
                                         "Настроить уход самостоятельно",
-                                        onClick = { manualSetupOpen = true },
+                                        onClick = ::openManualSetup,
                                         modifier = Modifier.fillMaxWidth()
                                     )
                                 }
@@ -501,23 +550,25 @@ fun PlantAdd(
                             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Text("Готовой программы пока нет", color = Cream, style = MaterialTheme.typography.titleLarge)
                                 Text("Вы можете самостоятельно добавить нужные работы по уходу.", color = Mist)
-                                PrimaryAction("Настроить уход самостоятельно", { manualSetupOpen = true }, Modifier.fillMaxWidth())
+                                PrimaryAction("Настроить уход самостоятельно", ::openManualSetup, Modifier.fillMaxWidth())
                             }
                         }
                     }
-                    if (editing || manualSetupOpen) GlassCard(Modifier.fillMaxWidth()) {
+                    if (editing || manualSetupOpen) GlassCard(
+                        Modifier.fillMaxWidth().bringIntoViewRequester(manualSetupRequester)
+                    ) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text("Работы по уходу", color = Cream, style = MaterialTheme.typography.titleLarge)
-                            taskNames.forEachIndexed { index, taskName ->
+                            taskDrafts.forEachIndexed { index, task ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     OutlinedTextField(
-                                        value = taskName,
+                                        value = task.name,
                                         onValueChange = { value ->
-                                            taskNames = taskNames.toMutableList().also { it[index] = value }
+                                            taskDrafts = taskDrafts.toMutableList().also { it[index] = task.copy(name = value) }
                                         },
                                         label = { Text("Работа ${index + 1}") },
                                         keyboardOptions = SentenceKeyboardOptions,
@@ -526,35 +577,24 @@ fun PlantAdd(
                                         shape = CompactGlassShape,
                                         modifier = Modifier.weight(1f)
                                     )
-                                    if (taskNames.size > 1) {
+                                    if (taskDrafts.size > 1) {
                                         if (!editingProgram) {
                                         TextButton(
                                             onClick = {
-                                                taskNames = taskNames.filterIndexed { itemIndex, _ -> itemIndex != index }
+                                                taskDrafts = taskDrafts.filterIndexed { itemIndex, _ -> itemIndex != index }
                                             }
                                         ) { Text("Удалить", color = Danger) }
                                         }
                                     }
                                 }
+                                SecondaryAction(
+                                    "Начало: ${task.startDate.toRussianDate()}",
+                                    onClick = { taskDatePickerIndex = index },
+                                    modifier = Modifier.fillMaxWidth().semantics {
+                                        contentDescription = "Дата начала работы ${index + 1}"
+                                    }
+                                )
                                 if (editingProgram) {
-                                    val taskDate = importedTaskDates.getOrNull(index) ?: startDate
-                                    SecondaryAction(
-                                        "Дата: ${taskDate.toRussianDate()}",
-                                        onClick = {
-                                            DatePickerDialog(
-                                                context,
-                                                { _, year, month, day ->
-                                                    importedTaskDates = importedTaskDates.toMutableList().also {
-                                                        it[index] = LocalDate.of(year, month + 1, day)
-                                                    }
-                                                },
-                                                taskDate.year,
-                                                taskDate.monthValue - 1,
-                                                taskDate.dayOfMonth
-                                            ).show()
-                                        },
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
                                     editingRows.getOrNull(index)?.programNote
                                         ?.takeIf(String::isNotBlank)
                                         ?.let { LinkifiedText(it, color = Mist) }
@@ -563,7 +603,7 @@ fun PlantAdd(
                             if (!editingProgram) {
                             SecondaryAction(
                                 "+ Добавить ещё одну работу",
-                                onClick = { taskNames = taskNames + "" },
+                                onClick = { taskDrafts = taskDrafts + PlantTaskDraft("", startDate) },
                                 modifier = Modifier.fillMaxWidth()
                             )
                             }
@@ -580,23 +620,20 @@ fun PlantAdd(
                             }
                         }
                     }
-                    if ((editing || manualSetupOpen) && !editingProgram) {
+                    if (editing || manualSetupOpen) {
                     GlassCard(Modifier.fillMaxWidth()) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("Когда напоминать?", color = Cream, style = MaterialTheme.typography.titleLarge)
+                            if (!editingProgram) {
                             SelectionMenu(
                                 label = "Повтор",
                                 value = repeatLabels.getValue(repeatType),
                                 options = repeatLabels.keys.toList(),
                                 optionLabel = { repeatLabels.getValue(it) },
-                                onSelected = { repeatType = it }
-                            )
-                            SelectionMenu(
-                                label = "Напоминание",
-                                value = reminderLabels.getValue(reminderDaysBefore),
-                                options = reminderLabels.keys.toList(),
-                                optionLabel = { reminderLabels.getValue(it) },
-                                onSelected = { reminderDaysBefore = it }
+                                onSelected = {
+                                    repeatType = it
+                                    // A custom interval in days must not silently become an interval in weeks/months.
+                                    if (it != RepeatType.CUSTOM) intervalText = "1"
+                                }
                             )
                             if (repeatType == RepeatType.CUSTOM) {
                                 OutlinedTextField(
@@ -611,8 +648,8 @@ fun PlantAdd(
                                 )
                             }
                             if (repeatType == RepeatType.WEEKLY) {
-                                Text("Дни недели", color = Mist)
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Дни повторения процедуры", color = Mist)
+                                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     DayOfWeek.entries.forEach { day ->
                                         val label = listOf("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс")[day.value - 1]
                                         FilterChip(
@@ -633,7 +670,7 @@ fun PlantAdd(
                             }
                             if (repeatType != RepeatType.NONE) {
                                 SelectionMenu(
-                                    label = "Окончание",
+                                    label = "Окончание работ",
                                     value = endLabels.getValue(endType),
                                     options = endLabels.keys.toList(),
                                     optionLabel = { endLabels.getValue(it) },
@@ -645,26 +682,64 @@ fun PlantAdd(
                                             datePicker.minDate = startDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
                                         }.show()
                                     }, Modifier.fillMaxWidth())
-                                    RepeatEndType.COUNT -> OutlinedTextField(countText, { countText = it.filter(Char::isDigit).take(4) }, label = { Text("Количество повторов") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, colors = glassTextFieldColors(), shape = CompactGlassShape, modifier = Modifier.fillMaxWidth())
+                                    RepeatEndType.COUNT -> {
+                                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                            TextButton(
+                                                onClick = { countText = ((countText.toIntOrNull() ?: 1) - 1).coerceAtLeast(1).toString() },
+                                                enabled = (countText.toIntOrNull() ?: 0) > 1,
+                                                modifier = Modifier.semantics { contentDescription = "Уменьшить количество повторов" }
+                                            ) { Text("−", color = Leaf300) }
+                                            OutlinedTextField(
+                                                countText, { countText = it.filter(Char::isDigit).take(4) },
+                                                label = { Text("Количество повторов") },
+                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                singleLine = true, isError = invalidRepeatCount,
+                                                colors = glassTextFieldColors(), shape = CompactGlassShape,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            TextButton(
+                                                onClick = { countText = ((countText.toIntOrNull() ?: 0) + 1).coerceIn(1, 9999).toString() },
+                                                enabled = (countText.toIntOrNull() ?: 0) < 9999,
+                                                modifier = Modifier.semantics { contentDescription = "Увеличить количество повторов" }
+                                            ) { Text("+", color = Leaf300) }
+                                        }
+                                        Text("Всего выполнений, включая первое", color = Mist)
+                                        SecondaryAction("Убрать ограничение повторов", { endType = RepeatEndType.NEVER }, Modifier.fillMaxWidth())
+                                    }
                                     RepeatEndType.NEVER -> Unit
                                 }
                             }
+                            }
+                            SelectionMenu(
+                                label = "Напоминание",
+                                value = reminderLabels.getValue(reminderDaysBefore),
+                                options = reminderLabels.keys.toList(),
+                                optionLabel = { reminderLabels.getValue(it) },
+                                onSelected = { reminderDaysBefore = it }
+                            )
                         }
                     }
+                    }
+                    if ((editing || manualSetupOpen) && invalidRepeatEnd) {
+                        Text("Дата окончания повторов не может быть раньше даты начала любой из работ.", color = Danger)
                     }
                     if (editing || manualSetupOpen) PrimaryAction(
                         if (editingProgram) "Сохранить программу" else if (editing) "Сохранить изменения" else "Сохранить растение",
                         onClick = {
-                            val interval = intervalText.toIntOrNull()?.coerceAtLeast(1) ?: 1
-                            val normalizedTaskNames = taskNames.map { it.trim() }
+                            val interval = if (repeatType == RepeatType.CUSTOM) {
+                                intervalText.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                            } else 1
+                            val normalizedTaskNames = taskDrafts.map { it.name.trim() }
                             if (editingProgram) {
                                 plantsVm.updateImportedProgramCard(
                                     plantName = plantName,
                                     existingRows = editingRows,
                                     taskNames = normalizedTaskNames,
-                                    taskDates = importedTaskDates,
+                                    taskDates = taskDrafts.map { it.startDate },
                                     gardenId = selectedGarden?.id,
                                     gardenName = selectedGarden?.name.orEmpty(),
+                                    reminderDaysBefore = reminderDaysBefore,
+                                    photoUri = photoUri,
                                     onSaved = {
                                         TreatmentReminderScheduler.refreshNow(app)
                                         navController.popBackStack()
@@ -675,9 +750,8 @@ fun PlantAdd(
                             plantsVm.savePlantCard(
                                 plantId = plantId,
                                 plantName = plantName.trim(),
-                                taskNames = normalizedTaskNames,
+                                tasks = taskDrafts,
                                 wateringInterval = interval,
-                                creationDate = startDate.toString(),
                                 drugId = selectedDrug?.id,
                                 gardenId = selectedGarden?.id,
                                 drugName = selectedDrug?.name ?: "Препарат не требуется",
@@ -698,8 +772,8 @@ fun PlantAdd(
                                 }
                             )
                         },
-                        enabled = plantName.isNotBlank() && selectedGarden != null && taskNames.isNotEmpty() && taskNames.all { it.isNotBlank() } &&
-                            (!editingProgram || importedTaskDates.size == taskNames.size),
+                        enabled = plantName.isNotBlank() && selectedGarden != null && taskDrafts.isNotEmpty() &&
+                            taskDrafts.all { it.name.isNotBlank() } && !invalidRepeatEnd && !invalidRepeatCount && !photoLoading,
                         modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
                     )
                 }
@@ -721,7 +795,9 @@ fun PlantAdd(
     generatedProgram?.let { program ->
         CareProgramPreviewDialog(
             program = program,
-            importing = programImporting,
+            onProgramChange = { generatedProgram = it },
+            error = programError,
+            importing = programImporting || photoLoading,
             onDismiss = { if (!programImporting) generatedProgram = null },
             onImport = {
                 programImporting = true
@@ -745,6 +821,20 @@ fun PlantAdd(
                 )
             }
         )
+    }
+
+    taskDatePickerIndex?.let { index ->
+        taskDrafts.getOrNull(index)?.let { task ->
+            GardenDatePickerDialog(
+                title = "Начало работы ${index + 1}",
+                initialDate = task.startDate,
+                onDateSelected = { date ->
+                    taskDrafts = taskDrafts.toMutableList().also { it[index] = task.copy(startDate = date) }
+                    taskDatePickerIndex = null
+                },
+                onDismiss = { taskDatePickerIndex = null }
+            )
+        }
     }
 
     pendingStartProposal?.let { proposal ->
@@ -774,7 +864,7 @@ fun PlantAdd(
             },
             onManual = {
                 unavailableContinuationNextYear = null
-                manualSetupOpen = true
+                openManualSetup()
             },
             onDismiss = { unavailableContinuationNextYear = null }
         )
@@ -873,10 +963,15 @@ private fun ProgramContinuationUnavailableDialog(
 @Composable
 private fun CareProgramPreviewDialog(
     program: GeneratedCareProgram,
+    onProgramChange: (GeneratedCareProgram) -> Unit,
+    error: String?,
     importing: Boolean,
     onDismiss: () -> Unit,
     onImport: () -> Unit
 ) {
+    var productStepIndex by remember { mutableStateOf<Int?>(null) }
+    var problemTreatmentOpen by remember { mutableStateOf(false) }
+    val originalSteps = remember(program.instanceId) { program.steps }
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -898,7 +993,7 @@ private fun CareProgramPreviewDialog(
                     color = Mist
                 )
                 program.warning?.let { Text(it, color = Danger) }
-                program.steps.forEach { step ->
+                program.steps.forEachIndexed { index, step ->
                     GlassCard(Modifier.fillMaxWidth()) {
                         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                             Text(step.title, color = Cream, style = MaterialTheme.typography.titleMedium)
@@ -912,20 +1007,41 @@ private fun CareProgramPreviewDialog(
                             }
                             Text(step.explanation, color = Mist)
                             if (step.note.isNotBlank()) {
-                                LinkifiedText(step.note, color = Cream)
+                                ExpandableInfo("Инструкция и ограничения", step.note)
                             }
                             if (step.needsWeatherConfirmation) {
                                 Text("Проверьте погоду перед выполнением", color = Danger)
                             }
+                            if (ProgramProductCatalog.alternatives(program.templateId, step.templateStepId).isNotEmpty()) {
+                                SecondaryAction("Выбрать препарат-аналог", { productStepIndex = index },
+                                    Modifier.fillMaxWidth(), enabled = !importing)
+                                if ('~' in step.templateStepId && index < originalSteps.size) {
+                                    SecondaryAction("Вернуть исходное средство и повторы", {
+                                        onProgramChange(program.copy(steps = program.steps.toMutableList().also { it[index] = originalSteps[index] }))
+                                    }, Modifier.fillMaxWidth(), enabled = !importing)
+                                }
+                            }
+                            if (step.templateStepId.startsWith("problem:")) {
+                                SecondaryAction("Убрать дополнительную обработку", {
+                                    onProgramChange(program.copy(steps = program.steps.filterIndexed { i, _ -> i != index }))
+                                }, Modifier.fillMaxWidth(), enabled = !importing)
+                            }
                         }
                     }
                 }
+                if (ProgramProductCatalog.supports(program.templateId)) {
+                    GlassCard(Modifier.fillMaxWidth()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("После осмотра обнаружена проблема", color = Cream, style = MaterialTheme.typography.titleMedium)
+                            Text("Если болезнь или вредитель подтверждены, добавьте отдельную обработку. Указывать название проблемы необязательно.", color = Mist)
+                            SecondaryAction("Выбрать болезнь / вредителя и препарат", { problemTreatmentOpen = true },
+                                Modifier.fillMaxWidth(), enabled = !importing)
+                        }
+                    }
+                }
+                error?.let { Text(it, color = Danger) }
                 Text(
                     "После добавления каждую работу можно переименовать или перенести вручную.",
-                    color = Mist
-                )
-                Text(
-                    "Перед применением препарата сверяйте дозировку, допуск для культуры и меры защиты с актуальной инструкцией на упаковке.",
                     color = Mist
                 )
                 if (importing) {
@@ -939,6 +1055,31 @@ private fun CareProgramPreviewDialog(
                 SecondaryAction("Вернуться", onDismiss, Modifier.fillMaxWidth(), enabled = !importing)
             }
         }
+    }
+    productStepIndex?.let { index ->
+        ProgramProductDialog(
+            programId = program.templateId, stepId = program.steps[index].templateStepId,
+            initialDate = program.steps[index].scheduledDate, minimumDate = program.chosenStartDate,
+            initialCultivation = program.cultivationType,
+            initialReminder = program.steps[index].reminderDaysBefore ?: 1,
+            onDismiss = { productStepIndex = null },
+            onConfirm = { product, _, _, date, reminder ->
+                onProgramChange(program.withProduct(index, product, date, reminder))
+                productStepIndex = null
+            }
+        )
+    }
+    if (problemTreatmentOpen) {
+        ProgramProductDialog(
+            programId = program.templateId, initialCultivation = program.cultivationType,
+            initialDate = maxOf(LocalDate.now(), program.chosenStartDate),
+            minimumDate = maxOf(LocalDate.now(), program.chosenStartDate),
+            onDismiss = { problemTreatmentOpen = false },
+            onConfirm = { product, problem, _, date, reminder ->
+                onProgramChange(program.withProblemTreatment(problem, product, date, reminder))
+                problemTreatmentOpen = false
+            }
+        )
     }
 }
 
@@ -959,7 +1100,11 @@ private fun <T> SelectionMenu(
             onValueChange = {},
             readOnly = true,
             label = { Text(label) },
-            trailingIcon = { Text("Выбрать", color = Leaf300, style = MaterialTheme.typography.labelMedium) },
+            trailingIcon = {
+                Text("Выбрать", color = Leaf300, style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = 12.dp), maxLines = 1)
+            },
+            singleLine = true,
             colors = glassTextFieldColors(),
             shape = CompactGlassShape,
             modifier = Modifier.fillMaxWidth()

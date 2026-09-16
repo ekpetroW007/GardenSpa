@@ -6,10 +6,15 @@ import androidx.lifecycle.viewModelScope
 import ru.samates.gardenspa.data.database.entity.PlantEntity
 import ru.samates.gardenspa.data.database.entity.resolvedCardId
 import ru.samates.gardenspa.data.repository.BookeeperRepository
+import ru.samates.gardenspa.domain.PlantTaskDraft
 import ru.samates.gardenspa.domain.RepeatType
 import ru.samates.gardenspa.domain.GeneratedCareProgram
 import ru.samates.gardenspa.domain.NO_DRUG_REQUIRED_LABEL
 import ru.samates.gardenspa.domain.NO_REMAINING_CARE_MESSAGE
+import ru.samates.gardenspa.domain.CultivationType
+import ru.samates.gardenspa.domain.withProgramProduct
+import ru.samates.gardenspa.domain.problemTreatment
+import kotlinx.coroutines.CancellationException
 import java.time.LocalDate
 import java.util.UUID
 import kotlinx.coroutines.flow.SharingStarted
@@ -127,9 +132,8 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
     fun savePlantCard(
         plantId: Int?,
         plantName: String,
-        taskNames: List<String>,
+        tasks: List<PlantTaskDraft>,
         wateringInterval: Int,
-        creationDate: String,
         drugId: Int?,
         gardenId: Int?,
         drugName: String,
@@ -151,17 +155,20 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                 val existing = plants.value
                     .filter { it.resolvedCardId == cardId }
                     .sortedBy(PlantEntity::id)
-                val normalizedTasks = taskNames.map { it.trim() }.filter { it.isNotBlank() }
+                val normalizedTasks = tasks.map { it.copy(name = it.name.trim()) }.filter { it.name.isNotBlank() }
                 if (normalizedTasks.isEmpty()) return@launch
+                if (repeatType != "NONE" && repeatEndType == "UNTIL_DATE" && repeatEndDate != null) {
+                    require(normalizedTasks.none { it.startDate.isAfter(LocalDate.parse(repeatEndDate)) })
+                }
 
-                val cardRows = normalizedTasks.mapIndexed { index, taskName ->
-                    val previous = existing.getOrNull(index)
+                val cardRows = normalizedTasks.map { task ->
+                    val previous = existing.firstOrNull { it.id == task.id }
                     PlantEntity(
                         id = previous?.id ?: 0,
                         plantName = plantName,
-                        taskName = taskName,
+                        taskName = task.name,
                         wateringInterval = wateringInterval,
-                        creationDate = creationDate,
+                        creationDate = task.startDate.toString(),
                         drugId = drugId,
                         gardenId = gardenId,
                         drugName = drugName,
@@ -224,7 +231,7 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                         },
                         repeatEndType = if (recurrence == null) "NEVER" else "COUNT",
                         repeatCount = recurrence?.count,
-                        reminderDaysBefore = reminderDaysBefore,
+                        reminderDaysBefore = step.reminderDaysBefore ?: reminderDaysBefore,
                         plantCardId = program.instanceId,
                         programId = program.templateId,
                         programVersion = program.templateVersion,
@@ -255,6 +262,8 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
         taskDates: List<LocalDate>,
         gardenId: Int?,
         gardenName: String,
+        reminderDaysBefore: Int? = null,
+        photoUri: String? = null,
         onSaved: () -> Unit = {}
     ) {
         viewModelScope.launch {
@@ -268,6 +277,8 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                         creationDate = taskDates[index].toString(),
                         gardenId = gardenId,
                         gardenName = gardenName,
+                        reminderDaysBefore = reminderDaysBefore ?: row.reminderDaysBefore,
+                        photoUri = photoUri ?: row.photoUri,
                         repeatDaysOfWeek = if (row.repeatType == RepeatType.WEEKLY.name) {
                             taskDates[index].dayOfWeek.value.toString()
                         } else {
@@ -280,6 +291,28 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                 onSaved()
             } catch (e: Exception) {
                 Log.d("updateImportedProgramCard", e.toString())
+            }
+        }
+    }
+
+    fun saveProgramProduct(
+        plant: PlantEntity, productId: String, date: LocalDate, reminder: Int,
+        afterInspection: Boolean, problemId: String?, cultivation: CultivationType,
+        onSaved: () -> Unit, onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                require(!date.isBefore(LocalDate.now())) { "Выберите сегодняшнюю или будущую дату" }
+                if (afterInspection) {
+                    repository.addProgramTreatment(plant, plant.problemTreatment(problemId, productId, cultivation, date, reminder))
+                } else {
+                    repository.replaceUnusedProgramProduct(plant, plant.withProgramProduct(productId, date, reminder))
+                }
+                onSaved()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (e: Exception) {
+                onError(e.message ?: "Не удалось сохранить обработку. Повторите попытку.")
             }
         }
     }

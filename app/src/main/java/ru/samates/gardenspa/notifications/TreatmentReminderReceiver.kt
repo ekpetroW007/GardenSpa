@@ -14,6 +14,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
+import java.io.IOException
+import ru.samates.gardenspa.presentation.PreferencesManager
 import ru.samates.gardenspa.BookeeperApp
 import ru.samates.gardenspa.R
 import ru.samates.gardenspa.data.database.entity.ProcedureEntity
@@ -77,6 +80,11 @@ class WeatherRescheduleReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val application = context.applicationContext as BookeeperApp
+                // A notification from an older installation must not bypass the new entry gate.
+                val accepted = try {
+                    PreferencesManager(application).registrationState.first().canEnter
+                } catch (_: IOException) { false }
+                if (!accepted) return@launch
                 val plants = application.repository.getAllPlantsOnce()
                 val procedures = application.repository.getAllProceduresOnce()
                 val isStillPending = scheduledTreatmentsOn(plants, procedures, currentDate).any { treatment ->

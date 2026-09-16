@@ -41,6 +41,7 @@ fun SettingsScreen(navController: NavController, userViewModel: UserViewModel) {
     val context = LocalContext.current
     val largeInterface by userViewModel.largeInterface.collectAsState()
     val highContrast by userViewModel.highContrast.collectAsState()
+    var offerOpen by remember { mutableStateOf(false) }
     var calorieReminder by remember { mutableStateOf(GardenWorkReminderScheduler.isEnabled(context)) }
     var notificationAllowed by remember {
         mutableStateOf(
@@ -103,7 +104,7 @@ fun SettingsScreen(navController: NavController, userViewModel: UserViewModel) {
                 item {
                     SettingsToggleCard(
                         title = "Вечерний подсчёт садовой активности",
-                        description = "Необязательное напоминание в 20:00. По умолчанию выключено.",
+                        description = "В 20:00 будет приходить напоминание посчитать потраченные в саду калории.",
                         checked = calorieReminder,
                         onCheckedChange = { enabled ->
                             calorieReminder = enabled
@@ -116,19 +117,17 @@ fun SettingsScreen(navController: NavController, userViewModel: UserViewModel) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text("Данные и приватность", color = Cream, style = MaterialTheme.typography.titleLarge)
                             Text("Сады и календарь хранятся на устройстве и доступны без интернета. Интернет нужен для обновления погоды.", color = Mist)
-                            Text("Местоположение используется только для расчёта сроков ухода.", color = Leaf300)
+                            Text("Местоположение используется для погоды и расчёта сроков ухода.", color = Leaf300)
                         }
                     }
                 }
                 item {
-                    EmptyGlassState(
-                        "Нужна помощь?",
-                        "На каждом сложном экране есть пояснения. Все опасные действия требуют подтверждения."
-                    )
+                    SecondaryAction("Договор оферты", { offerOpen = true }, Modifier.fillMaxWidth())
                 }
             }
         }
     }
+    if (offerOpen) OfferDialog(userViewModel.offer) { offerOpen = false }
 }
 
 @Composable

@@ -72,7 +72,8 @@ data class GeneratedCareStep(
     val needsWeatherConfirmation: Boolean,
     val explanation: String,
     val productDescription: String?,
-    val note: String
+    val note: String,
+    val reminderDaysBefore: Int? = null
 )
 
 data class GeneratedCareProgram(
@@ -151,7 +152,7 @@ object PlantCareCatalog {
             id = "tomato",
             canonicalName = "Томат",
             aliases = setOf("томат", "томаты", "помидор", "помидоры"),
-            version = 3,
+            version = 5,
             supportedCultivationTypes = CultivationType.entries.toSet(),
             steps = listOf(
                 CareStepTemplate(
@@ -216,15 +217,13 @@ object PlantCareCatalog {
                     productDescription = "Богатый Овощи — БашИнком",
                     note = "Выполните только во время цветения, чередуя с Борогумом-М: 1 ст. ложка на 5 л воды, расход раствора — на 50 м². Интервал между подкормками — 2 недели. Источник: https://www.bashinkom.ru/ojz/vyrashchivanie-kultur/tekhnologiya-vyrashchivaniya-tomata/"
                 ),
-                CareStepTemplate("support", "Проверить подвязку и опору", offsetDays = 7, note = "Подвязка не должна пережимать стебель."),
-                CareStepTemplate("leaf_inspection", "Осмотреть листья на признаки стресса", offsetDays = 7, recurrence = CareRecurrence(RepeatType.WEEKLY, 1, 12), note = "Отметьте пятна, повреждения и вредителей; лечение выбирайте после определения причины.")
             )
         ),
         PlantCareTemplate(
             id = "cucumber",
             canonicalName = "Огурец",
             aliases = setOf("огурец", "огурцы"),
-            version = 3,
+            version = 5,
             supportedCultivationTypes = CultivationType.entries.toSet(),
             steps = listOf(
                 CareStepTemplate(
@@ -288,9 +287,6 @@ object PlantCareCatalog {
                     productDescription = "Богатый Овощи — БашИнком",
                     note = "Выполните только во время цветения, чередуя с Борогумом-М: 1 ст. ложка на 5 л воды, расход раствора — на 50 м². Интервал между подкормками — 2 недели. Источник: https://www.bashinkom.ru/ojz/vyrashchivanie-kultur/tekhnologiya-vyrashchivaniya-ogurtsa/"
                 ),
-                CareStepTemplate("guide_shoots", "Проверить опору для побегов", offsetDays = 10, note = "Направляйте побеги без резких перегибов."),
-                CareStepTemplate("moisture_check", "Проверить влажность почвы", offsetDays = 2, recurrence = CareRecurrence(RepeatType.CUSTOM, 3, 20), note = "Поливайте только при необходимости с учётом осадков и состояния почвы."),
-                CareStepTemplate("leaf_inspection", "Осмотреть листья", offsetDays = 7, recurrence = CareRecurrence(RepeatType.WEEKLY, 1, 12), note = "Ищите изменение окраски, пятна и следы вредителей.")
             )
         ),
         PlantCareTemplate(
@@ -302,13 +298,9 @@ object PlantCareCatalog {
                 "земляника садовая нейтрального дня", "клубника одноразовая",
                 "клубника июньская", "клубника ремонтантная", "клубника нейтрального дня"
             ),
-            version = 2,
+            version = 3,
             supportedCultivationTypes = setOf(CultivationType.OPEN_GROUND),
-            steps = listOf(
-                CareStepTemplate("moisture_check", "Проверить влажность почвы", offsetDays = 1, recurrence = CareRecurrence(RepeatType.WEEKLY, 1, 12), note = "Оценивайте почву под мульчей, если она используется."),
-                CareStepTemplate("mulch_check", "Проверить мульчу", offsetDays = 5, recurrence = CareRecurrence(RepeatType.MONTHLY, 1, 4), note = "Мульча не должна закрывать центр розетки."),
-                CareStepTemplate("leaf_inspection", "Осмотреть листья и ягоды", offsetDays = 7, recurrence = CareRecurrence(RepeatType.WEEKLY, 1, 10), note = "Удаляйте только явно повреждённые части чистым инструментом.")
-            ) + standardTreatmentSteps("садовой земляники")
+            steps = standardTreatmentSteps("садовой земляники")
         ),
         PlantCareTemplate(
             id = "apple",
@@ -319,13 +311,9 @@ object PlantCareCatalog {
                 "яблоня стандартная", "яблоня семенной подвой",
                 "яблоня карликовая", "яблоня полукарликовая"
             ),
-            version = 2,
+            version = 3,
             supportedCultivationTypes = setOf(CultivationType.OPEN_GROUND),
-            steps = listOf(
-                CareStepTemplate("crown_inspection", "Осмотреть крону и ствол", offsetDays = 0, note = "Зафиксируйте повреждения коры, сухие ветви и необычные пятна."),
-                CareStepTemplate("trunk_circle", "Проверить приствольный круг", offsetDays = 7, recurrence = CareRecurrence(RepeatType.MONTHLY, 1, 6), note = "Не повреждайте поверхностные корни при рыхлении."),
-                CareStepTemplate("moisture_check", "Проверить необходимость полива", offsetDays = 10, recurrence = CareRecurrence(RepeatType.CUSTOM, 14, 12), note = "Учитывайте возраст дерева, осадки и влажность почвы.")
-            ) + standardTreatmentSteps("яблони")
+            steps = standardTreatmentSteps("яблони")
         ),
         PlantCareTemplate(
             id = "pear",
@@ -336,31 +324,23 @@ object PlantCareCatalog {
                 "груша на карликовом подвое", "груша стандартная",
                 "груша карликовая", "груша полукарликовая"
             ),
-            version = 2,
+            version = 3,
             supportedCultivationTypes = setOf(CultivationType.OPEN_GROUND),
-            steps = listOf(
-                CareStepTemplate("crown_inspection", "Осмотреть крону и ствол", offsetDays = 0, note = "Зафиксируйте повреждения коры, сухие ветви и необычные пятна."),
-                CareStepTemplate("trunk_circle", "Проверить приствольный круг", offsetDays = 7, recurrence = CareRecurrence(RepeatType.MONTHLY, 1, 6), note = "Не повреждайте поверхностные корни при рыхлении."),
-                CareStepTemplate("moisture_check", "Проверить необходимость полива", offsetDays = 10, recurrence = CareRecurrence(RepeatType.CUSTOM, 14, 12), note = "Учитывайте возраст дерева, осадки и влажность почвы.")
-            ) + standardTreatmentSteps("груши")
+            steps = standardTreatmentSteps("груши")
         ),
         PlantCareTemplate(
             id = "hydrangea",
             canonicalName = "Гортензия",
             aliases = setOf("гортензия", "гортензии"),
-            version = 2,
+            version = 3,
             supportedCultivationTypes = setOf(CultivationType.OPEN_GROUND),
-            steps = listOf(
-                CareStepTemplate("moisture_check", "Проверить влажность почвы", offsetDays = 0, recurrence = CareRecurrence(RepeatType.CUSTOM, 3, 24), note = "Ориентируйтесь на фактическую влажность, а не только на календарь."),
-                CareStepTemplate("mulch_check", "Проверить слой мульчи", offsetDays = 5, recurrence = CareRecurrence(RepeatType.MONTHLY, 1, 5), note = "Не укладывайте мульчу вплотную к основанию побегов."),
-                CareStepTemplate("leaf_inspection", "Осмотреть листья и побеги", offsetDays = 7, recurrence = CareRecurrence(RepeatType.WEEKLY, 1, 12), note = "Отмечайте увядание, пятна и повреждения, прежде чем выбирать обработку.")
-            ) + standardTreatmentSteps("гортензии")
+            steps = standardTreatmentSteps("гортензии")
         ),
         PlantCareTemplate(
             id = "peony",
             canonicalName = "Пион",
             aliases = setOf("пион", "пионы", "пион травянистый", "пион ито", "ито-пион"),
-            version = 3,
+            version = 4,
             supportedCultivationTypes = setOf(CultivationType.OPEN_GROUND),
             openGroundStartOffsetDays = -21,
             steps = listOf(
@@ -402,43 +382,27 @@ object PlantCareCatalog {
                     productDescription = "КОРЕНЬ 0-40-26 + 2MgO + МЭ — Пионовый Рай",
                     note = "Растворите 30 г в 10 л воды и опрыскайте листья только после окончания цветения. 10 л рассчитаны на 30–40 взрослых кустов. Соблюдайте инструкцию и используйте СИЗ. Источник: https://pionray.ru/market3/tproduct/1150216401-504059333372-sistema-pitaniya-dlya-pionov"
                 ),
-                CareStepTemplate(
-                    id = "botrytis_inspection",
-                    title = "Осмотреть пион на признаки ботритиса",
-                    offsetDays = 7,
-                    recurrence = CareRecurrence(RepeatType.WEEKLY, 1, 16),
-                    note = "Проверьте основания стеблей, листья и бутоны. После первой профилактики Пионовый Рай советует повторные обработки каждые 20 дней с чередованием препаратов и полным исключением периода цветения. GardenSpa не назначает их автоматически: сначала проверьте действующий допуск препарата для ЛПХ и актуальную инструкцию. При признаках болезни удалите поражённые части и подберите лечение. Источники: https://pionray.ru/catalog/botritis2 и https://pionray.ru/botritis1"
-                )
             )
         ),
         seasonalVegetable(
             id = "potato",
             name = "Картофель",
             aliases = setOf("картофель", "картошка"),
-            openGroundStartOffsetDays = -7,
-            moistureIntervalDays = 7,
-            cropSpecificTask = "Проверить окучивание",
-            cropSpecificNote = "Подсыпайте почву только при необходимости, не засыпая листья."
+            openGroundStartOffsetDays = -7
         ),
         seasonalVegetable(
             id = "sweet-pepper",
             name = "Перец сладкий",
             aliases = setOf("перец", "перец сладкий", "болгарский перец"),
             openGroundStartOffsetDays = 14,
-            greenhouseStartOffsetDays = -10,
-            moistureIntervalDays = 4,
-            cropSpecificTask = "Проверить опоры и завязи",
-            cropSpecificNote = "Подвязывайте побеги свободно и не удаляйте здоровые завязи без причины."
+            greenhouseStartOffsetDays = -10
         ),
         seasonalVegetable(
             id = "eggplant",
             name = "Баклажан",
             aliases = setOf("баклажан", "баклажаны"),
             openGroundStartOffsetDays = 16,
-            greenhouseStartOffsetDays = -8,
-            moistureIntervalDays = 4,
-            cropSpecificTask = "Проверить опору побегов",
-            cropSpecificNote = "Не допускайте пережимания стеблей подвязкой."
+            greenhouseStartOffsetDays = -8
         ),
         seasonalVegetable(
             id = "zucchini",
@@ -448,55 +412,37 @@ object PlantCareCatalog {
                 "кабачок кустовой", "кабачок плетистый",
                 "цуккини кустовой", "цуккини плетистый"
             ),
-            openGroundStartOffsetDays = 12,
-            moistureIntervalDays = 5,
-            cropSpecificTask = "Осмотреть центр куста",
-            cropSpecificNote = "Удаляйте только явно повреждённые части чистым инструментом."
+            openGroundStartOffsetDays = 12
         ),
         seasonalVegetable(
             id = "pumpkin",
             name = "Тыква",
             aliases = setOf("тыква", "тыквы"),
-            openGroundStartOffsetDays = 14,
-            moistureIntervalDays = 6,
-            cropSpecificTask = "Проверить плети и свободное место",
-            cropSpecificNote = "Направляйте плети без резких перегибов и повреждения узлов."
+            openGroundStartOffsetDays = 14
         ),
         seasonalVegetable(
             id = "cabbage",
             name = "Капуста белокочанная",
             aliases = setOf("капуста", "капуста белокочанная", "белокочанная капуста"),
-            openGroundStartOffsetDays = -10,
-            moistureIntervalDays = 5,
-            cropSpecificTask = "Осмотреть кочан и нижнюю сторону листьев",
-            cropSpecificNote = "Отмечайте кладки и повреждения, не применяя средство до определения причины."
+            openGroundStartOffsetDays = -10
         ),
         seasonalVegetable(
             id = "carrot",
             name = "Морковь",
             aliases = setOf("морковь", "морковка"),
-            openGroundStartOffsetDays = -14,
-            moistureIntervalDays = 6,
-            cropSpecificTask = "Проверить густоту всходов",
-            cropSpecificNote = "Прореживайте только после появления устойчивых всходов и увлажнения почвы."
+            openGroundStartOffsetDays = -14
         ),
         seasonalVegetable(
             id = "beet",
             name = "Свёкла",
             aliases = setOf("свекла", "свёкла", "свекла столовая", "свёкла столовая"),
-            openGroundStartOffsetDays = -7,
-            moistureIntervalDays = 7,
-            cropSpecificTask = "Проверить густоту всходов",
-            cropSpecificNote = "Оставляйте более сильные растения, не повреждая корни соседних."
+            openGroundStartOffsetDays = -7
         ),
         seasonalVegetable(
             id = "onion",
             name = "Лук репчатый",
             aliases = setOf("лук", "лук репчатый", "репчатый лук"),
-            openGroundStartOffsetDays = -18,
-            moistureIntervalDays = 7,
-            cropSpecificTask = "Осмотреть перо и шейку",
-            cropSpecificNote = "Отмечайте пожелтение и размягчение; не увлажняйте посадки автоматически."
+            openGroundStartOffsetDays = -18
         ),
         seasonalVegetable(
             id = "garlic",
@@ -505,10 +451,7 @@ object PlantCareCatalog {
                 "чеснок", "чеснока", "чеснок стрелкующийся", "чеснок нестрелкующийся",
                 "чеснок озимый стрелкующийся", "чеснок hardneck", "чеснок softneck"
             ),
-            openGroundStartOffsetDays = -21,
-            moistureIntervalDays = 8,
-            cropSpecificTask = "Осмотреть листья и основание",
-            cropSpecificNote = "Проверяйте посадки на пожелтение, повреждения и переувлажнение."
+            openGroundStartOffsetDays = -21
         )
     ).map(PlantCareTemplate::withoutSeasonLabels)
 
@@ -542,15 +485,12 @@ object PlantCareCatalog {
         name: String,
         aliases: Set<String>,
         openGroundStartOffsetDays: Int,
-        greenhouseStartOffsetDays: Int = -14,
-        moistureIntervalDays: Int,
-        cropSpecificTask: String,
-        cropSpecificNote: String
+        greenhouseStartOffsetDays: Int = -14
     ): PlantCareTemplate = PlantCareTemplate(
         id = id,
         canonicalName = name,
         aliases = aliases,
-        version = 2,
+        version = 3,
         supportedCultivationTypes = if (greenhouseStartOffsetDays < 0 && id in setOf("sweet-pepper", "eggplant")) {
             CultivationType.entries.toSet()
         } else {
@@ -558,35 +498,7 @@ object PlantCareCatalog {
         },
         openGroundStartOffsetDays = openGroundStartOffsetDays,
         greenhouseStartOffsetDays = greenhouseStartOffsetDays,
-        steps = listOf(
-            CareStepTemplate(
-                id = "adaptation_check",
-                title = "Проверить состояние растения",
-                offsetDays = 4,
-                note = "Оцените рост, окраску и упругость листьев; зафиксируйте необычные изменения."
-            ),
-            CareStepTemplate(
-                id = "moisture_check",
-                title = "Проверить влажность почвы",
-                offsetDays = 2,
-                recurrence = CareRecurrence(RepeatType.CUSTOM, moistureIntervalDays, 16),
-                note = "Решение о поливе принимайте по фактической влажности почвы и недавним осадкам."
-            ),
-            CareStepTemplate(
-                id = "crop_specific_check",
-                title = cropSpecificTask,
-                offsetDays = 9,
-                recurrence = CareRecurrence(RepeatType.CUSTOM, 10, 8),
-                note = cropSpecificNote
-            ),
-            CareStepTemplate(
-                id = "leaf_inspection",
-                title = "Осмотреть на признаки стресса и вредителей",
-                offsetDays = 7,
-                recurrence = CareRecurrence(RepeatType.WEEKLY, 1, 12),
-                note = "Сначала определите возможную причину; препарат выбирайте отдельно и применяйте только по инструкции."
-            )
-        ) + standardTreatmentSteps(name.lowercase(Locale.forLanguageTag("ru")))
+        steps = standardTreatmentSteps(name.lowercase(Locale.forLanguageTag("ru")))
     )
 
     fun find(userInput: String): PlantCareTemplate? {

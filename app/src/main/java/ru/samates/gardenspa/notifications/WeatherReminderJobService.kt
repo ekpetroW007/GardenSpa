@@ -18,7 +18,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import ru.samates.gardenspa.BookeeperApp
 import ru.samates.gardenspa.data.database.entity.locationOrNull
-import ru.samates.gardenspa.domain.PlantCareCatalog
+import ru.samates.gardenspa.domain.weatherLimits
 import ru.samates.gardenspa.domain.ScheduledTreatment
 import ru.samates.gardenspa.domain.WeatherLimits
 import ru.samates.gardenspa.domain.WeatherLimitKind
@@ -175,14 +175,8 @@ private fun restoreRegularReminderOrCancelWeather(
 }
 
 private fun ScheduledTreatment.isGeneratedWeatherSensitive(): Boolean {
-    val templateId = plant.programId ?: return false
-    val stepId = plant.programStepId ?: return false
-    val step = PlantCareCatalog.all()
-        .firstOrNull { it.id == templateId }
-        ?.steps
-        ?.firstOrNull { it.id == stepId }
-        ?: return false
-    return step.weatherLimits != WeatherLimits()
+    val limits = weatherLimits() ?: return false
+    return limits != WeatherLimits()
 }
 
 private fun ScheduledTreatment.notificationKey(): Pair<Int, LocalDate> = plant.id to originalDate
