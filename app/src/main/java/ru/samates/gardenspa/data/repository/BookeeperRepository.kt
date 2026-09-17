@@ -86,7 +86,7 @@ class BookeeperRepository(
     }
 
     suspend fun insertProcedure(procedure: ProcedureEntity) {
-        procedureDAO.insertProcedure(procedure)
+        procedureDAO.saveProcedureWithSnapshot(procedure)
     }
 
     suspend fun getAllPlantsOnce(): List<PlantEntity> = plantDAO.getAllPlantsOnce()

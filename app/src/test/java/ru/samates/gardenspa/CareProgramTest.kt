@@ -121,7 +121,7 @@ class CareProgramTest {
     }
 
     @Test
-    fun lateStartKeepsOnlyRemainingWorkAndRemainingRepeats() {
+    fun lateStartKeepsRemainingWorkAndMovesMissedOccurrencesToNextYear() {
         val tomato = requireNotNull(PlantCareCatalog.find("томат"))
         val selectedDate = LocalDate.of(2026, 6, 15)
 
@@ -134,10 +134,12 @@ class CareProgramTest {
         assertEquals(LocalDate.of(2026, 4, 28), program.recommendedStartDate)
         assertEquals(selectedDate, program.chosenStartDate)
         assertTrue(program.steps.all { !it.scheduledDate.isBefore(selectedDate) })
-        assertTrue(program.steps.none { it.templateStepId in setOf("fitosporin_roots", "gumi_omi_planting", "support") })
-        val feeding = program.steps.first { it.templateStepId == "gumi_omi_feeding" }
+        assertTrue(program.steps.filter { it.templateStepId in setOf("fitosporin_roots", "gumi_omi_planting") }
+            .all { it.scheduledDate == LocalDate.of(2027, 4, 28) })
+        val feeding = program.steps.first { it.templateStepId.startsWith("gumi_omi_feeding") }
         assertEquals(LocalDate.of(2026, 6, 19), feeding.scheduledDate)
-        assertEquals(4, feeding.recurrence?.count)
+        assertEquals(4, program.steps.count { it.templateStepId.startsWith("gumi_omi_feeding") && it.scheduledDate.year == 2026 })
+        assertEquals(2, program.steps.count { it.templateStepId.startsWith("gumi_omi_feeding") && it.scheduledDate.year == 2027 })
     }
 
     @Test
@@ -166,7 +168,7 @@ class CareProgramTest {
         )
 
         assertEquals(
-            listOf(LocalDate.of(2026, 2, 28), LocalDate.of(2026, 3, 31)),
+            listOf(LocalDate.of(2026, 2, 28), LocalDate.of(2026, 3, 31), LocalDate.of(2027, 1, 31)),
             program.steps.map { it.scheduledDate }
         )
         assertTrue(program.steps.all { it.recurrence == null })
@@ -174,17 +176,18 @@ class CareProgramTest {
     }
 
     @Test
-    fun lateStartFailsWhenEveryProcedureHasExpired() {
+    fun lateStartMovesEntireExpiredProgramToNextYearWithoutLosingOccurrences() {
         val tomato = requireNotNull(PlantCareCatalog.find("томат"))
 
-        val error = assertThrows(IllegalArgumentException::class.java) {
-            CareProgramGenerator().generate(
+        val program = CareProgramGenerator().generate(
                 tomato,
                 CareProgramContext(LocalDate.of(2026, 9, 1), CultivationType.OPEN_GROUND, climate)
             )
-        }
 
-        assertEquals(NO_REMAINING_CARE_MESSAGE, error.message)
+        assertTrue(program.steps.all { it.scheduledDate.year == 2027 })
+        assertEquals(tomato.steps.sumOf { it.recurrence?.count ?: 1 }, program.steps.size)
+        assertEquals(program.steps.size, program.steps.map { it.templateStepId }.distinct().size)
+        assertTrue(program.steps.all { it.needsWeatherConfirmation })
     }
 
     @Test

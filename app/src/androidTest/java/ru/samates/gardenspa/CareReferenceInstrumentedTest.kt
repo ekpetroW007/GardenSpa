@@ -54,8 +54,8 @@ class CareReferenceInstrumentedTest {
             }
         }
         capture("reference-hub")
-        compose.onNodeWithText("Удобрения").performClick()
-        compose.onNode(hasSetTextAction()).performTextInput("Агрикола")
+        compose.onNodeWithText(ProductSection.FERTILIZER.title).performClick()
+        compose.onNode(hasSetTextAction()).performTextInput("Агрикола Аква")
         compose.onNodeWithText("Агрикола Аква для гортензий").assertExists()
         compose.onNodeWithText("Показать инструкцию").performClick()
         compose.onNodeWithText("15 мл на 1 л воды", substring = true).assertExists()
@@ -118,7 +118,7 @@ class CareReferenceInstrumentedTest {
     @Test fun greenConeRecipeIsSearchableAndShowsTheConfirmedLiquidDose() {
         compose.setContent { MyApplicationTheme { BotanicalBackground { FolkRecipes(PaddingValues(), tankMixes = true) } } }
         compose.onNode(hasSetTextAction()).performTextInput("Зелёный конус")
-        compose.onNodeWithText("Зелёный конус. Биологические препараты").assertExists()
+        compose.onNodeWithText("Баковая смесь «Зелёный конус. Биологические препараты»").assertExists()
         compose.onNodeWithText("Показать рецепт").performClick()
         compose.onNodeWithText("Лепидоцид, жидкий препарат — 20 мл", substring = true).assertExists()
         capture("green-cone-recipe")

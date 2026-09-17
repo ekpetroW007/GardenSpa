@@ -23,7 +23,7 @@ class ProgramProductsTest {
         assertFalse(all.any { it.manufacturer == "Аминосил" || it.id == "maxi_nutrition" })
         val mildew = ProgramProductCatalog.treatments("cucumber", "powdery_mildew", CultivationType.OPEN_GROUND)
         assertTrue(mildew.any { it.id == "muchnistop" })
-        assertFalse(mildew.any { it.id == "biozashchitin" })
+        assertTrue(mildew.any { it.id == "biozashchitin" })
         assertFalse(ProgramProductCatalog.treatments("cucumber", "downy_mildew", CultivationType.OPEN_GROUND).any { it.id == "muchnistop" })
         assertTrue(ProgramProductCatalog.treatments("cucumber", "late_blight", CultivationType.OPEN_GROUND).isEmpty())
         assertTrue(ProgramProductCatalog.treatments("apple", null, CultivationType.OPEN_GROUND).any { it.id == "rayek_fruit" })
@@ -124,5 +124,29 @@ class ProgramProductsTest {
             val template = PlantCareCatalog.all().first { it.id == crop }
             assertTrue(template.steps.count { step -> ProgramProductCatalog.alternatives(crop, step.id).any { it.unavailableReason == null } } >= 3)
         }
+    }
+
+    @Test fun everyGenericProgramAllowsAddingProductsAndOptionalProblemTreatment() {
+        val crops = listOf("sweet-pepper", "eggplant", "zucchini", "pumpkin", "cabbage", "carrot", "beet", "onion", "garlic")
+        crops.forEach { crop ->
+            assertTrue(ProgramProductCatalog.supports(crop))
+            assertTrue(ProgramProductCatalog.alternatives(crop, "preventive_disease_treatment").any { it.unavailableReason == null })
+            assertTrue(ProgramProductCatalog.alternatives(crop, "pest_treatment_if_needed").any { it.unavailableReason == null })
+            assertTrue(ProgramProductCatalog.treatments(crop, null, CultivationType.OPEN_GROUND).any { it.unavailableReason == null })
+        }
+        assertTrue(ProgramProductCatalog.treatments("sweet-pepper", null, CultivationType.GREENHOUSE).isNotEmpty())
+        assertTrue(ProgramProductCatalog.treatments("carrot", null, CultivationType.GREENHOUSE).isEmpty())
+    }
+
+    @Test fun changingProductsOnMovedRepeatsPreservesDistinctOccurrenceKeys() {
+        val originalRepeat = plant(step = "fitosporin_spraying:remaining:1")
+        assertEquals(2, ScheduledTreatment(originalRepeat, date, date, false, false).weatherLimits()?.requiredDryHoursAfter)
+        val first = plant(step = "fitosporin_spraying:remaining:1").withProgramProduct("silver_prevention", date, 1)
+        assertNull(ScheduledTreatment(first, date, date, false, false).weatherLimits())
+        val second = plant(step = "fitosporin_spraying:remaining:2").withProgramProduct("silver_prevention", date, 1)
+        assertNotEquals(first.programStepId, second.programStepId)
+        val changedAgain = first.withProgramProduct("biozashchitin_prevention", date, 1)
+        assertTrue(changedAgain.programStepId!!.endsWith(":remaining:1"))
+        assertEquals("biozashchitin_prevention", ProgramProductCatalog.productForStep(changedAgain.programStepId)?.id)
     }
 }

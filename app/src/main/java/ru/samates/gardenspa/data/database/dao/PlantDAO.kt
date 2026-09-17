@@ -29,8 +29,17 @@ interface PlantDAO {
     @Query("DELETE FROM plants WHERE id = :id ")
     suspend fun deletePlant(id: Int)
 
-    @Query("DELETE FROM plants WHERE plant_card_id = :cardId")
-    suspend fun deletePlantCard(cardId: String)
+    @Query("DELETE FROM plants WHERE plant_card_id = :cardId OR ('legacy-' || id) = :cardId")
+    suspend fun deleteCardRows(cardId: String)
+
+    @Query("DELETE FROM procedure_history WHERE plant_card_id = :cardId OR plant_id IN (SELECT id FROM plants WHERE plant_card_id = :cardId)")
+    suspend fun deleteCardHistory(cardId: String)
+
+    @Transaction
+    suspend fun deletePlantCard(cardId: String) {
+        deleteCardHistory(cardId)
+        deleteCardRows(cardId)
+    }
 
     @Query("SELECT * FROM plants WHERE plant_card_id = :cardId ORDER BY id")
     suspend fun getPlantsForCardOnce(cardId: String): List<PlantEntity>
@@ -54,7 +63,7 @@ interface PlantDAO {
         require(getPlantById(expected.id.toLong()) == expected) {
             "Карточка изменилась или удалена. Откройте её заново."
         }
-        require(treatment.id == 0 && treatment.plantCardId == expected.plantCardId)
+        require(treatment.id == 0 && treatment.plantCardId == expected.plantCardId.ifBlank { "legacy-${expected.id}" })
         insertPlant(treatment)
     }
 

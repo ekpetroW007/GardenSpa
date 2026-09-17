@@ -34,7 +34,7 @@ class SpringCareProgramsTest {
         }
     }
 
-    @Test fun springChoicesAreCropSpecificAndExpiredSpringWorkDoesNotReturnWhenSeasonIsResumed() {
+    @Test fun springChoicesAreCropSpecificAndExpiredSpringWorkMovesToNextYear() {
         val apple = PlantCareCatalog.find("яблоня")!!
         val first = apple.steps.first()
         assertEquals(SpringCarePrograms.products.map { it.id }.toSet(),
@@ -52,7 +52,9 @@ class SpringCareProgramsTest {
         assertEquals(program.steps[1], changed.steps[1])
         val resumed = CareProgramGenerator().generate(apple,
             CareProgramContext(LocalDate.of(2026, 6, 1), CultivationType.OPEN_GROUND, climate))
-        assertTrue(resumed.steps.none { ProgramProductCatalog.baseStepId(it.templateStepId) in
-            setOf(SpringCarePrograms.EARLY_STEP, SpringCarePrograms.GREEN_STEP) })
+        val moved = resumed.steps.filter { ProgramProductCatalog.baseStepId(it.templateStepId) in
+            setOf(SpringCarePrograms.EARLY_STEP, SpringCarePrograms.GREEN_STEP) }
+        assertEquals(2, moved.size)
+        assertTrue(moved.all { it.scheduledDate.year == 2027 })
     }
 }

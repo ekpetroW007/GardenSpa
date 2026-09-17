@@ -3,8 +3,8 @@ package ru.samates.gardenspa.domain
 /** A shared reference view of program products; no copies are seeded into the user's database. */
 object ProgramReferenceCatalog {
     private val fertilizerSteps = setOf("gumi_omi_planting", "gumi_omi_feeding", "gumi_omi_7_8_leaves",
-        "borogum_flowering", "bogaty_flowering", "kornesil_planting")
-    private val sprayingSteps = setOf("fitosporin_roots", "fitosporin_spraying", "borogum_flowering", "bogaty_flowering")
+        "fitosporin_roots", "kornesil_planting")
+    private val sprayingSteps = setOf("fitosporin_spraying", "borogum_flowering", "bogaty_flowering")
 
     val products: List<ProgramProduct> by lazy {
         val originalProducts = PlantCareCatalog.all().filter { it.id in setOf("tomato", "cucumber") }.flatMap { crop ->
@@ -12,7 +12,7 @@ object ProgramReferenceCatalog {
                 val description = step.productDescription ?: return@mapNotNull null
                 val sections = buildSet {
                     if (step.id in fertilizerSteps) add(ProductSection.FERTILIZER)
-                    if (step.id in sprayingSteps || step.id == "gumi_omi_7_8_leaves") add(ProductSection.TREATMENT)
+                    if (step.id in sprayingSteps) add(ProductSection.TREATMENT)
                 }
                 ProgramProduct("original_${crop.id}_${step.id}", description.substringBefore(" — "), "БашИнком",
                     step.title, "${crop.canonicalName}: ${step.title}", step.note,
@@ -25,7 +25,7 @@ object ProgramReferenceCatalog {
             cucumberMixture.copy(id = "original_cucumber_gumi_omi_component", name = "Гуми-Оми Огурец, Кабачок, Бахчевые",
                 sections = setOf(ProductSection.FERTILIZER)),
             cucumberMixture.copy(id = "original_cucumber_fitosporin_as", name = "Фитоспорин-АС",
-                sections = setOf(ProductSection.TREATMENT))
+                sections = setOf(ProductSection.FERTILIZER))
         )
         ProgramProductCatalog.products + originalProducts + components
     }

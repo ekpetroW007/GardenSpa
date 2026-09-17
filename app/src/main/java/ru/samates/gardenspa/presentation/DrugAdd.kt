@@ -38,6 +38,7 @@ fun DrugAdd(navController: NavController, drugId: Int? = null) {
     var name by remember { mutableStateOf("") }
     var purpose by remember { mutableStateOf("") }
     var rate by remember { mutableStateOf("") }
+    var applicationMethod by remember { mutableStateOf("UNSPECIFIED") }
     var fieldsInitialized by remember(drugId) { mutableStateOf(false) }
 
     LaunchedEffect(drug, fieldsInitialized) {
@@ -45,6 +46,7 @@ fun DrugAdd(navController: NavController, drugId: Int? = null) {
             name = drug.name
             purpose = drug.purpose
             rate = drug.consumptionRate
+            applicationMethod = drug.applicationMethod
             fieldsInitialized = true
         }
     }
@@ -70,11 +72,16 @@ fun DrugAdd(navController: NavController, drugId: Int? = null) {
                             OutlinedTextField(name, { name = it }, label = { Text("Название") }, keyboardOptions = SentenceKeyboardOptions, singleLine = true, colors = glassTextFieldColors(), shape = CompactGlassShape, modifier = Modifier.fillMaxWidth())
                             OutlinedTextField(purpose, { purpose = it }, label = { Text("Назначение (необязательно)") }, keyboardOptions = SentenceKeyboardOptions, minLines = 3, colors = glassTextFieldColors(), shape = CompactGlassShape, modifier = Modifier.fillMaxWidth())
                             OutlinedTextField(rate, { rate = it }, label = { Text("Норма расхода (необязательно)") }, keyboardOptions = SentenceKeyboardOptions, singleLine = true, colors = glassTextFieldColors(), shape = CompactGlassShape, modifier = Modifier.fillMaxWidth())
+                            val methods = mapOf("UNSPECIFIED" to "Уточню позже", "TREATMENT" to "Внекорневое применение",
+                                "FERTILIZER" to "Корневое применение", "BOTH" to "Оба способа по инструкции")
+                            SelectionMenu(label = "Способ применения", value = methods.getValue(applicationMethod),
+                                options = methods.keys.toList(), optionLabel = { methods.getValue(it) },
+                                onSelected = { applicationMethod = it })
                             PrimaryAction(
                                 if (editing) "Сохранить изменения" else "Сохранить средство",
                                 onClick = {
                                     if (drugId == null) {
-                                        viewModel.addDrug(name.trim(), purpose.trim(), rate.trim())
+                                        viewModel.addDrug(name.trim(), purpose.trim(), rate.trim(), applicationMethod)
                                         navController.popBackStack()
                                     } else {
                                         viewModel.updateDrug(
@@ -82,6 +89,7 @@ fun DrugAdd(navController: NavController, drugId: Int? = null) {
                                             name = name.trim(),
                                             purpose = purpose.trim(),
                                             consumptionRate = rate.trim(),
+                                            applicationMethod = applicationMethod,
                                             onUpdated = { navController.popBackStack() }
                                         )
                                     }

@@ -48,13 +48,17 @@ fun PlantDetails(navController: NavController, plantId: Int) {
     val proceduresVm: ProceduresViewmodel = viewModel(factory = ProceduresViewmodelFactory(app.repository))
     val plants by plantsVm.plants.collectAsState()
     val procedures by proceduresVm.procedures.collectAsState()
-    val selectedPlant = plants.firstOrNull { it.id == plantId }
+    val selectedPlant = plants.firstOrNull { it.id == plantId } ?: procedures
+        .firstOrNull { it.plantId == plantId && it.plantCardId.isNotBlank() }
+        ?.let { archived -> plants.firstOrNull { it.resolvedCardId == archived.plantCardId } }
     val cardRows = selectedPlant?.let { selected ->
         plants.filter { it.resolvedCardId == selected.resolvedCardId }.sortedBy { it.id }
     }.orEmpty()
     val plant = cardRows.firstOrNull()
     val cardPlantIds = cardRows.map { it.id }.toSet()
-    val history = procedures.filter { it.plantId in cardPlantIds && it.status == "COMPLETED" }
+    val history = procedures.filter {
+        (it.plantCardId == plant?.resolvedCardId || it.plantId in cardPlantIds) && it.status == "COMPLETED"
+    }.sortedByDescending { it.completedDate }
     var deleteConfirmationOpen by remember { mutableStateOf(false) }
     var productWork by remember { mutableStateOf<PlantEntity?>(null) }
     var afterInspection by remember { mutableStateOf(false) }
@@ -149,21 +153,23 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                             }
                         }
                     }
-                    item { SectionTitle("История ухода") }
+                    item { SectionTitle("Архив выполненных процедур") }
                     if (history.isEmpty()) {
                         item { EmptyGlassState("История пока пуста", "Выполненные процедуры появятся здесь") }
                     }
                     items(history, key = { it.id }) { procedure ->
                         GlassCard(Modifier.fillMaxWidth()) {
                             Column {
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text(procedure.procedureName, color = Cream, style = MaterialTheme.typography.titleMedium)
-                                    Text("Готово", color = Leaf300)
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text(procedure.procedureName, color = Cream, style = MaterialTheme.typography.titleMedium,
+                                        modifier = Modifier.weight(1f))
+                                    Text("Готово", color = Leaf300, maxLines = 1)
                                 }
                                 Text("Запланировано: ${procedure.scheduledDate.toRussianDateOrSelf()}", color = Mist)
                                 Text("Выполнено: ${procedure.completedDate?.toRussianDateOrSelf() ?: "—"}", color = Mist)
+                                Text(if (procedure.drugName.isBlank()) "Препарат не указан" else procedure.drugName.toDrugDisplayText(), color = Leaf300)
                                 if (procedure.note.isNotBlank()) {
-                                    LinkifiedText(procedure.note, color = Cream, modifier = Modifier.padding(top = 6.dp))
+                                    ExpandableInfo("Инструкция на момент выполнения", procedure.note)
                                 }
                             }
                         }

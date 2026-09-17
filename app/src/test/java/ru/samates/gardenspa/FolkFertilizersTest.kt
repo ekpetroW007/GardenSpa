@@ -38,7 +38,7 @@ class FolkFertilizersTest {
 
     @Test fun greenConeContainsLiquidLepidocideAndKeepsIngredientsWhenAddedToMyProducts() {
         val recipe = FolkFertilizers.tankMixes.single { it.id == FolkFertilizers.GREEN_CONE_ID }
-        assertEquals("Зелёный конус. Биологические препараты", recipe.name)
+        assertEquals("Баковая смесь «Зелёный конус. Биологические препараты»", recipe.name)
         listOf("На 10 л воды", "Микохелп — 20 мл", "Фитохелп — 20 мл",
             "Лепидоцид, жидкий препарат — 20 мл", "Битоксибациллин — 40 г",
             "Фитоверм — 20 мл", "Липосам — 8 мл (1 пакет)", "Циркон — 1 мл").forEach {

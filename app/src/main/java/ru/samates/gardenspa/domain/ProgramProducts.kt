@@ -6,7 +6,7 @@ import ru.samates.gardenspa.data.database.entity.PlantEntity
 import ru.samates.gardenspa.data.database.entity.resolvedCardId
 
 enum class ProductSection(val title: String) {
-    TREATMENT("Средства для обработки"), FERTILIZER("Удобрения")
+    TREATMENT("Обработка — внекорневые процедуры"), FERTILIZER("Удобрение — корневые процедуры")
 }
 
 /** Product instructions are independent. Task-level alternatives are not dose equivalents. */
@@ -37,7 +37,8 @@ data class PlantProblem(val id: String, val label: String, val kind: PlantProble
 
 object ProgramProductCatalog {
     val supportedCrops = setOf("tomato", "cucumber", "peony", "hydrangea", "rose", "blackberry",
-        "raspberry", "currant", "garden-strawberry", "blueberry", "apple", "pear", "potato", "lawn")
+        "raspberry", "currant", "garden-strawberry", "blueberry", "apple", "pear", "potato", "lawn",
+        "sweet-pepper", "eggplant", "zucchini", "pumpkin", "cabbage", "carrot", "beet", "onion", "garlic")
 
     val allowedManufacturers = setOf("Август", "ЩёлковоАгрохим", "ФМРус", "BonaForte", "Фаско", "Гера",
         "Ортон", "Агрикола", "HB-101", "БашИнком", "Фармбиомед", "Syngenta", "Нэст-М", "Петрович",
@@ -64,7 +65,7 @@ object ProgramProductCatalog {
             "gray_mold" -> setOf("peony", "rose", "hydrangea", "blackberry", "raspberry", "currant", "garden-strawberry", "blueberry")
             "root_rot" -> supportedCrops
             "aphids" -> supportedCrops - "lawn"
-            "spider_mite", "thrips" -> setOf("peony", "rose", "hydrangea", "blackberry", "raspberry", "currant", "garden-strawberry", "apple", "pear")
+            "spider_mite", "thrips" -> supportedCrops - "lawn"
             else -> emptySet()
         })
     } + listOf(
@@ -82,6 +83,27 @@ object ProgramProductCatalog {
     private const val SILVER_CAUTION = "Не смешивать с другими средствами и не использовать для обеззараживания почвы. На сайте расходятся сведения о сроке ожидания: уточните его по своей упаковке. Производитель указывает, что продукт не является пестицидом. Это описание производителя, а не гарантия излечения."
 
     val products = listOf(
+        ProgramProduct("agricola_cucumber", "Агрикола 5 для огурцов, кабачков, патиссонов", "Агрикола",
+            "Подкормить огурец Агриколой 5", "Альтернатива по питанию, NPK 13:20:20 и микроэлементы. Выберите корневой или внекорневой способ по своей упаковке.",
+            "25 г на 10 л воды; в карточке указан расход на 10–25 м² в зависимости от способа внесения. Точный расход для выбранного способа сверьте на упаковке. Начало — 3-й настоящий лист при прямом посеве или через 5–7 дней после высадки рассады; далее интервал 7–10 дней, всего 4–5 подкормок с учётом уже выполненных.",
+            "https://agricola.ru/products/agrikola-5-dlya-ogurtsov-kabachkov-patissonov/", crops = setOf("cucumber"),
+            sections = setOf(ProductSection.FERTILIZER, ProductSection.TREATMENT)),
+        ProgramProduct("orton_tomato_leaf", "Ортон — Овощное для томатов", "Ортон",
+            "Подкормить томаты по листьям", "Внекорневая подкормка с фазы бутонизации; состав отличается от Богатого Овощи.",
+            "20 г на 10 л воды; опрыскивание 3 л на 10 м². По инструкции — с бутонизации, далее 2–3 раза с интервалом 10–15 дней. Учитывайте все подкормки, включая корневые.",
+            "https://orton.ru/catalog/udobreniya/kompleksnye_vodorastvorimye_udobreniya/orton---ovoshchnoe-dlya-tomatov/", crops = setOf("tomato")),
+        ProgramProduct("orton_tomato_root", "Ортон — Овощное для томатов", "Ортон",
+            "Подкормить томаты под корень", "Корневая подкормка с бутонизации; собственный состав и регламент.",
+            "20 г на 10 л воды, полив по влажной почве по 1–2 л на растение. По инструкции 2–3 подкормки с фазы бутонизации в те же сроки, что и листовые. Выберите способ и учитывайте уже внесённое питание.",
+            "https://orton.ru/catalog/udobreniya/kompleksnye_vodorastvorimye_udobreniya/orton---ovoshchnoe-dlya-tomatov/", crops = setOf("tomato"), sections = setOf(ProductSection.FERTILIZER)),
+        ProgramProduct("orton_cucumber_flowering", "Завязь для огурцов, 2 г", "Ортон",
+            "Обработать огурцы для завязывания плодов", "Альтернатива по задаче плодообразования. Регулятор роста, не борная подкормка.",
+            "2 г на 1,4 л воды, расход 0,3 л на 10 м². Первая обработка при появлении единичных цветков, вторая — при массовом цветении. Сухая безветренная погода, утро или вечер, +15…+25 °C. Рабочий раствор не хранить.",
+            "https://orton.ru/catalog/regulyatory_rosta_rasteniy/stimulyatory_plodoobrazovaniya/zavyaz-dlya-ogurcov/", crops = setOf("cucumber")),
+        ProgramProduct("biozashchitin_prevention", "Биозащитин, концентрат 5 мл", "Органик Микс",
+            "Провести профилактическую обработку по листьям", "Частичная альтернатива по заявленной производителем задаче профилактики. Средство на основе эфирного масла апельсина.",
+            "5 мл на 1 л воды. Встряхнуть концентрат, развести и равномерно смочить обе стороны листьев. Не под прямым солнцем. Производитель указывает профилактический интервал 14 дней; сначала проверьте переносимость на небольшом участке.",
+            "https://organic-mix.ru/catalog/biozashchitin-v-ampule-organicheskoe-sredstvo-zashchity-rasteniy-3-v-1-5-ml/", crops = supportedCrops - "lawn"),
         ProgramProduct("silver_prevention", "Серебромедин, концентрат", "Био-комплекс",
             "Провести листовую профилактику болезней", "Альтернатива по задаче профилактики, другой состав и регламент.",
             "По карточке: 40 мл на 1 л воды, смачивание листьев с обеих сторон, в сухую погоду выше +15 °C. Профилактическая частота — 1–2 раза в месяц. $SILVER_CAUTION", SILVER_URL),
@@ -154,28 +176,42 @@ object ProgramProductCatalog {
             "organic_tomato", "organic_cucumber", "amino_tomato", "amino_cucumber_planting",
             "amino_cucumber", "rostobion_seedling", "maxi_nutrition" ->
                 product.copy(sections = setOf(ProductSection.FERTILIZER))
-            "biozashchitin" -> product.copy(crops = supportedCrops - "lawn")
+            "biozashchitin" -> product.copy(crops = supportedCrops - "lawn",
+                problems = product.problems + setOf("powdery_mildew", "downy_mildew", "late_blight", "gray_mold", "leaf_spot", "scab"),
+                taskTitle = "Обработать растение при обнаруженной проблеме")
             "muchnistop" -> product.copy(crops = supportedCrops - setOf("potato", "lawn"))
             else -> product
         }
     } + SeasonalProgramProducts.products + SpringCarePrograms.products
 
     fun baseStepId(stepId: String): String = stepId.substringBefore("~").substringBefore(":remaining:")
+    fun stepWithProduct(stepId: String, productId: String): String =
+        "${baseStepId(stepId)}~$productId" + stepId.substringAfter(":remaining:", "")
+            .let { if (it.isBlank()) "" else ":remaining:$it" }
     fun productForStep(stepId: String?): ProgramProduct? = stepId?.substringAfter("~", "")
         ?.substringBefore(":remaining:")?.takeIf(String::isNotBlank)?.let { id -> products.firstOrNull { it.id == id } }
 
     fun alternatives(programId: String?, stepId: String?): List<ProgramProduct> {
         if (!supports(programId) || stepId == null) return emptyList()
+        val template = PlantCareCatalog.all().firstOrNull { it.id == programId } ?: return emptyList()
+        if (template.steps.none { baseStepId(it.id) == baseStepId(stepId) }) return emptyList()
         val ids = when (baseStepId(stepId)) {
             SpringCarePrograms.EARLY_STEP -> SpringCarePrograms.products.map { it.id }.toSet()
             "nutrition", "nutrition_review" -> SeasonalProgramProducts.feedingIds(programId!!)
             "lawn_autumn_nutrition" -> setOf("organic_lawn_autumn", "bona_lawn_autumn")
             "gumi_omi_planting" -> if (programId == "tomato") setOf("organic_tomato", "maxi_nutrition") else setOf("maxi_nutrition")
-            "fitosporin_spraying" -> setOf("silver_prevention")
-            "gumi_omi_feeding" -> setOf("amino_tomato", "organic_tomato", "maxi_nutrition", "bona_vegetables")
-            "gumi_omi_7_8_leaves" -> setOf("amino_cucumber", "organic_cucumber", "maxi_nutrition", "bona_vegetables")
+            "fitosporin_spraying", "preventive_disease_treatment" -> setOf("silver_prevention", "biozashchitin_prevention")
+            "pest_treatment_if_needed" -> products.filter { it.problems.any { problem ->
+                problems.any { p -> p.id == problem && p.kind == PlantProblemKind.PEST }
+            } }.map { it.id }.toSet()
+            "borogum_flowering" -> setOf("orton_cucumber_flowering", "orton_tomato_leaf")
+            "bogaty_flowering" -> setOf("orton_tomato_leaf", "agricola_cucumber")
+            "gumi_omi_feeding" -> setOf("amino_tomato", "organic_tomato", "maxi_nutrition", "bona_vegetables", "orton_tomato_root")
+            "gumi_omi_7_8_leaves" -> setOf("amino_cucumber", "organic_cucumber", "maxi_nutrition", "bona_vegetables", "agricola_cucumber")
             "kornesil_planting" -> setOf("amino_cucumber_planting", "rostobion_seedling")
-            else -> emptySet()
+            else -> if (PlantCareCatalog.all().firstOrNull { it.id == programId }?.steps
+                    ?.any { baseStepId(it.id) == baseStepId(stepId) && it.productDescription == null } == true)
+                products.filter { it.problems.isEmpty() }.map { it.id }.toSet() else emptySet()
         }
         return products.filter { it.id in ids && programId in it.crops }
     }
@@ -184,7 +220,7 @@ object ProgramProductCatalog {
 
     fun treatments(programId: String, problemId: String?, cultivationType: CultivationType): List<ProgramProduct> {
         if (!supports(programId)) return emptyList()
-        if (programId !in setOf("tomato", "cucumber") && cultivationType != CultivationType.OPEN_GROUND) return emptyList()
+        if (PlantCareCatalog.all().firstOrNull { it.id == programId }?.supportedCultivationTypes?.contains(cultivationType) != true) return emptyList()
         if (problemId != null && problemsFor(programId).none { it.id == problemId }) return emptyList()
         return products.filter {
             programId in it.crops && cultivationType in it.cultivationTypes && it.problems.isNotEmpty() &&
@@ -201,7 +237,7 @@ fun GeneratedCareProgram.withProduct(index: Int, productId: String, date: LocalD
     require(reminder in setOf(0, 1, 5))
     return copy(steps = steps.toMutableList().also {
         it[index] = previous.copy(
-            templateStepId = "${ProgramProductCatalog.baseStepId(previous.templateStepId)}~${product.id}",
+            templateStepId = ProgramProductCatalog.stepWithProduct(previous.templateStepId, product.id),
             title = product.taskTitle, scheduledDate = date, windowStart = date, windowEnd = date,
             recurrence = null, productDescription = product.displayName, note = product.note,
             reminderDaysBefore = reminder,
@@ -236,7 +272,7 @@ fun PlantEntity.withProgramProduct(productId: String, date: LocalDate, reminder:
     require(reminder in setOf(0, 1, 5))
     return copy(
         taskName = product.taskTitle, drugId = null, drugName = product.displayName,
-        creationDate = date.toString(), programStepId = "${ProgramProductCatalog.baseStepId(requireNotNull(programStepId))}~${product.id}",
+        creationDate = date.toString(), programStepId = ProgramProductCatalog.stepWithProduct(requireNotNull(programStepId), product.id),
         programNote = product.note, repeatType = RepeatType.NONE.name, repeatInterval = 1,
         wateringInterval = 1, repeatDaysOfWeek = "", repeatEndType = "NEVER", repeatEndDate = null,
         repeatCount = null, reminderDaysBefore = reminder, userLockedDate = true

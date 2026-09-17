@@ -14,6 +14,7 @@ import ru.samates.gardenspa.domain.NO_REMAINING_CARE_MESSAGE
 import ru.samates.gardenspa.domain.CultivationType
 import ru.samates.gardenspa.domain.withProgramProduct
 import ru.samates.gardenspa.domain.problemTreatment
+import ru.samates.gardenspa.domain.FolkFertilizerRecipe
 import kotlinx.coroutines.CancellationException
 import java.time.LocalDate
 import java.util.UUID
@@ -264,12 +265,13 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
         gardenName: String,
         reminderDaysBefore: Int? = null,
         photoUri: String? = null,
-        onSaved: () -> Unit = {}
+        onSaved: () -> Unit = {},
+        onError: (String) -> Unit = {}
     ) {
         viewModelScope.launch {
             try {
                 val first = existingRows.firstOrNull() ?: return@launch
-                if (taskNames.size != existingRows.size || taskDates.size != existingRows.size) return@launch
+                require(taskNames.size == existingRows.size && taskDates.size == existingRows.size) { "Список работ изменился. Откройте карточку заново." }
                 val updated = existingRows.mapIndexed { index, row ->
                     row.copy(
                         plantName = plantName.trim(),
@@ -289,8 +291,10 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                 }
                 repository.replacePlantCard(first.resolvedCardId, updated)
                 onSaved()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
-                Log.d("updateImportedProgramCard", e.toString())
+                onError(e.message ?: "Не удалось сохранить программу")
             }
         }
     }
@@ -313,6 +317,31 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                 throw cancelled
             } catch (e: Exception) {
                 onError(e.message ?: "Не удалось сохранить обработку. Повторите попытку.")
+            }
+        }
+    }
+
+    fun useTankMixture(plant: PlantEntity, recipe: FolkFertilizerRecipe, date: LocalDate,
+        onSaved: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                require(recipe.isTankMix)
+                require(!date.isBefore(LocalDate.now())) { "Выберите сегодняшнюю или будущую дату" }
+                repository.addProgramTreatment(plant, plant.copy(
+                    id = 0, plantCardId = plant.resolvedCardId,
+                    taskName = "Использовать: ${recipe.name}",
+                    creationDate = date.toString(), drugId = null, drugName = recipe.name,
+                    programStepId = "tank_mix:${recipe.id}", programImportKey = null,
+                    programNote = recipe.purposeForDrug() + "\n" + recipe.consumptionRate,
+                    repeatType = "NONE", repeatInterval = 1, wateringInterval = 1,
+                    repeatDaysOfWeek = "", repeatEndType = "NEVER", repeatEndDate = null,
+                    repeatCount = null, userLockedDate = true
+                ))
+                onSaved()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                onError(error.message ?: "Не удалось добавить процедуру")
             }
         }
     }

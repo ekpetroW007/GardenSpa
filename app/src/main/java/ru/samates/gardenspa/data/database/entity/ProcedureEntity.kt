@@ -2,22 +2,14 @@ package ru.samates.gardenspa.data.database.entity
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
-import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "procedure_history",
-    foreignKeys = [
-        ForeignKey(
-            entity = PlantEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["plant_id"],
-            onDelete = ForeignKey.CASCADE
-        )
-    ],
     indices = [
         Index(value = ["plant_id"]),
+        Index(value = ["plant_card_id"]),
         Index(value = ["plant_id", "scheduled_date"], unique = true)
     ]
 )
@@ -44,5 +36,11 @@ data class ProcedureEntity(
     val status: String = "PLANNED",
 
     @ColumnInfo(name = "note")
-    val note: String = ""
+    val note: String = "",
+
+    @ColumnInfo(name = "plant_card_id", defaultValue = "''")
+    val plantCardId: String = "",
+
+    @ColumnInfo(name = "drug_name", defaultValue = "''")
+    val drugName: String = ""
 )

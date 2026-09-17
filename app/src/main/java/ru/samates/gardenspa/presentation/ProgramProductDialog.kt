@@ -74,15 +74,22 @@ internal fun ProgramProductDialog(
         cultivation?.let { ProgramProductCatalog.treatments(programId, problemId, it) }.orEmpty()
     } else ProgramProductCatalog.alternatives(programId, stepId)
     val selected = options.firstOrNull { it.id == selectedId }
+    val goBack: () -> Unit = {
+        if (!saving) when {
+            selectedId != null -> { selectedId = null; confirmed = false }
+            afterInspection && choosingProduct -> choosingProduct = false
+            else -> onDismiss()
+        }
+    }
 
     LaunchedEffect(choosingProduct, selectedId) { scroll.scrollTo(0) }
 
-    Dialog(onDismissRequest = { if (!saving) onDismiss() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(onDismissRequest = goBack, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize().padding(10.dp), color = Forest900, shape = GlassShape) {
             Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
+                ScreenHeader(
                     if (afterInspection) "После осмотра" else if (earlySpring) "До распускания почек" else "Препараты-аналоги",
-                    color = Cream, style = MaterialTheme.typography.headlineMedium
+                    onBack = goBack
                 )
                 Column(Modifier.weight(1f).verticalScroll(scroll), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (!choosingProduct) {

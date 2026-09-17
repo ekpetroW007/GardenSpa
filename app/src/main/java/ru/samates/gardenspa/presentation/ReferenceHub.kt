@@ -17,24 +17,20 @@ import ru.samates.gardenspa.ui.theme.Leaf300
 import ru.samates.gardenspa.ui.theme.Mist
 
 @Composable
-fun ReferenceHub(innerPadding: PaddingValues, onOpen: (String) -> Unit) {
+fun ReferenceHub(innerPadding: PaddingValues, onBack: (() -> Unit)? = null, onOpen: (String) -> Unit) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(innerPadding),
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Полезная информация", color = Mist)
-                Text("Справочник", style = MaterialTheme.typography.headlineLarge, color = Cream)
-                Text("Выберите, что хотите найти", color = Mist)
-            }
+            ScreenHeader("Справочник", "Выберите, что хотите найти", onBack)
         }
         item {
             GlassCard(Modifier.fillMaxWidth(), onClick = { onOpen("Препараты") }) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Средства для обработки", color = Cream, style = MaterialTheme.typography.titleLarge)
-                    Text("Назначение, способ применения и ваши собственные средства", color = Mist)
+                    Text(ru.samates.gardenspa.domain.ProductSection.TREATMENT.title, color = Cream, style = MaterialTheme.typography.titleLarge)
+                    Text("Опрыскивание и другие процедуры по листьям и побегам", color = Mist)
                     Text("Открыть список  →", color = Leaf300)
                 }
             }
@@ -42,8 +38,8 @@ fun ReferenceHub(innerPadding: PaddingValues, onOpen: (String) -> Unit) {
         item {
             GlassCard(Modifier.fillMaxWidth(), onClick = { onOpen("Удобрения") }) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Удобрения", color = Cream, style = MaterialTheme.typography.titleLarge)
-                    Text("Подкормки из готовых программ и варианты других производителей", color = Mist)
+                    Text(ru.samates.gardenspa.domain.ProductSection.FERTILIZER.title, color = Cream, style = MaterialTheme.typography.titleLarge)
+                    Text("Полив под корень, внесение в почву и обработка корней", color = Mist)
                     Text("Открыть удобрения  →", color = Leaf300)
                 }
             }

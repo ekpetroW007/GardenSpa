@@ -55,7 +55,7 @@ import ru.samates.gardenspa.viewmodel.PlantsViewmodel
 import ru.samates.gardenspa.viewmodel.PlantsViewmodelFactory
 
 @Composable
-fun MyGardens(navController: NavController, innerPadding: PaddingValues) {
+fun MyGardens(navController: NavController, innerPadding: PaddingValues, onBack: (() -> Unit)? = null) {
     val context = LocalContext.current
     val application = context.applicationContext as BookeeperApp
     val gardensVm: GardensViewmodel = viewModel(factory = GardensViewmodelFactory(application.repository))
@@ -72,8 +72,7 @@ fun MyGardens(navController: NavController, innerPadding: PaddingValues) {
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Растения по участкам", color = Mist)
-                Text("Мой сад", style = MaterialTheme.typography.headlineLarge, color = Cream)
+                ScreenHeader("Мой сад", "Растения по участкам", onBack)
                 PrimaryAction("Создать новый сад", { navController.navigate(AppDestinations.GARDEN_ADD) }, Modifier.fillMaxWidth())
             }
         }

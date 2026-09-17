@@ -19,13 +19,14 @@ class DrugsViewmodel(
             initialValue = emptyList()
         )
 
-    fun addDrug(name: String, purpose: String, consumptionRate: String) {
+    fun addDrug(name: String, purpose: String, consumptionRate: String, applicationMethod: String = "UNSPECIFIED") {
         viewModelScope.launch {
             try {
                 val newDrug = DrugEntity(
                     name = name,
                     purpose = purpose,
-                    consumptionRate = consumptionRate
+                    consumptionRate = consumptionRate,
+                    applicationMethod = applicationMethod
                 )
                 repository.insertDrug(newDrug)
             } catch (e: Exception) {
@@ -39,6 +40,7 @@ class DrugsViewmodel(
         name: String,
         purpose: String,
         consumptionRate: String,
+        applicationMethod: String = "UNSPECIFIED",
         onUpdated: () -> Unit
     ) {
         viewModelScope.launch {
@@ -48,7 +50,8 @@ class DrugsViewmodel(
                         id = id,
                         name = name,
                         purpose = purpose,
-                        consumptionRate = consumptionRate
+                        consumptionRate = consumptionRate,
+                        applicationMethod = applicationMethod
                     )
                 )
                 onUpdated()

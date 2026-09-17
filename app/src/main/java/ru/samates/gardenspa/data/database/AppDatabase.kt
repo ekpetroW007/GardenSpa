@@ -19,7 +19,7 @@ import ru.samates.gardenspa.domain.careTitleWithoutSeasonLabel
         ProcedureEntity::class,
         GardenWorkEntity::class
     ],
-    version = 17,
+    version = 18,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -188,6 +188,36 @@ abstract class AppDatabase : RoomDatabase() {
         private val MIGRATION_15_17 = legacyMigrationTo17(15)
         private val MIGRATION_16_17 = legacyMigrationTo17(16)
 
+        private val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE procedure_history_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        plant_id INTEGER NOT NULL, procedure_name TEXT NOT NULL,
+                        scheduled_date TEXT NOT NULL, rescheduled_date TEXT, completed_date TEXT,
+                        status TEXT NOT NULL, note TEXT NOT NULL,
+                        plant_card_id TEXT NOT NULL DEFAULT '', drug_name TEXT NOT NULL DEFAULT ''
+                    )
+                """.trimIndent())
+                database.execSQL("""
+                    INSERT INTO procedure_history_new
+                    SELECT h.id, h.plant_id, h.procedure_name, h.scheduled_date, h.rescheduled_date,
+                        h.completed_date, h.status, h.note,
+                        COALESCE(NULLIF(p.plant_card_id, ''), 'legacy-' || h.plant_id),
+                        COALESCE(p.drugNameInPlant, '')
+                    FROM procedure_history h LEFT JOIN plants p ON h.plant_id = p.id
+                """.trimIndent())
+                database.execSQL("DROP TABLE procedure_history")
+                database.execSQL("ALTER TABLE procedure_history_new RENAME TO procedure_history")
+                database.execSQL("CREATE INDEX index_procedure_history_plant_id ON procedure_history(plant_id)")
+                database.execSQL("CREATE INDEX index_procedure_history_plant_card_id ON procedure_history(plant_card_id)")
+                database.execSQL("CREATE UNIQUE INDEX index_procedure_history_plant_id_scheduled_date ON procedure_history(plant_id, scheduled_date)")
+                database.execSQL("ALTER TABLE drug ADD COLUMN application_method TEXT NOT NULL DEFAULT 'UNSPECIFIED'")
+                database.execSQL("UPDATE plants SET drugNameInPlant = 'Баковая смесь «Зелёный конус. Биологические препараты»' WHERE drugNameInPlant = 'Зелёный конус. Биологические препараты'")
+                database.execSQL("UPDATE drug SET name = 'Баковая смесь «Зелёный конус. Биологические препараты»', application_method = 'TREATMENT' WHERE name = 'Зелёный конус. Биологические препараты'")
+            }
+        }
+
         internal fun configuredMigrations(): Array<Migration> = arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
@@ -204,7 +234,8 @@ abstract class AppDatabase : RoomDatabase() {
             MIGRATION_13_17,
             MIGRATION_14_17,
             MIGRATION_15_17,
-            MIGRATION_16_17
+            MIGRATION_16_17,
+            MIGRATION_17_18
         )
 
         private fun legacyMigrationTo17(startVersion: Int) = object : Migration(startVersion, 17) {

@@ -81,6 +81,12 @@ import ru.samates.gardenspa.domain.ProgramStartPlanner
 import ru.samates.gardenspa.domain.ProgramStartProposal
 import ru.samates.gardenspa.domain.ProgramProductCatalog
 import ru.samates.gardenspa.domain.withProduct
+import ru.samates.gardenspa.domain.withProgramProduct
+import ru.samates.gardenspa.domain.problemTreatment
+import ru.samates.gardenspa.domain.toDrugDisplayName
+import ru.samates.gardenspa.data.database.entity.PlantEntity
+import ru.samates.gardenspa.viewmodel.ProceduresViewmodel
+import ru.samates.gardenspa.viewmodel.ProceduresViewmodelFactory
 import ru.samates.gardenspa.domain.withProblemTreatment
 import ru.samates.gardenspa.notifications.TreatmentReminderScheduler
 import ru.samates.gardenspa.presentation.navigation.AppDestinations
@@ -146,6 +152,8 @@ fun PlantAdd(
     val drugs by drugsVm.drugs.collectAsState()
     val gardens by gardensVm.gardens.collectAsState()
     val plants by plantsVm.plants.collectAsState()
+    val proceduresVm: ProceduresViewmodel = viewModel(factory = ProceduresViewmodelFactory(app.repository))
+    val procedureHistory by proceduresVm.procedures.collectAsState()
     val coroutineScope = rememberCoroutineScope()
     val programGenerator = remember { CareProgramGenerator() }
     val editingPlant = plantId?.let { id -> plants.firstOrNull { it.id == id } }
@@ -174,6 +182,10 @@ fun PlantAdd(
     var countText by remember { mutableStateOf("10") }
     var reminderDaysBefore by remember { mutableStateOf(1) }
     var fieldsInitialized by remember(plantId) { mutableStateOf(false) }
+    var programRowsDraft by remember(plantId) { mutableStateOf<List<PlantEntity>>(emptyList()) }
+    var editProductIndex by remember { mutableStateOf<Int?>(null) }
+    var editAfterInspection by remember { mutableStateOf(false) }
+    var programSaving by remember { mutableStateOf(false) }
     var addDrugDialogOpen by remember { mutableStateOf(false) }
     var pendingNewDrugName by remember { mutableStateOf<String?>(null) }
     var cultivationType by remember { mutableStateOf(CultivationType.OPEN_GROUND) }
@@ -238,6 +250,7 @@ fun PlantAdd(
 
     LaunchedEffect(editingPlant, editingRows, drugs, gardens, fieldsInitialized) {
         if (editingPlant != null && !fieldsInitialized) {
+            programRowsDraft = editingRows
             plantName = editingPlant.plantName
             taskDrafts = editingRows.map { row ->
                 PlantTaskDraft(
@@ -427,7 +440,7 @@ fun PlantAdd(
                             }
                             if (!editing) {
                                 Text("Популярные растения", color = Mist)
-                                PlantCareCatalog.all().take(8).map { it.canonicalName }.chunked(2).forEach { names ->
+                                listOf("Томат", "Огурец", "Яблоня", "Груша", "Малина", "Смородина", "Газон", "Роза").chunked(2).forEach { names ->
                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         names.forEach { name ->
                                             SecondaryAction(
@@ -595,10 +608,32 @@ fun PlantAdd(
                                     }
                                 )
                                 if (editingProgram) {
-                                    editingRows.getOrNull(index)?.programNote
-                                        ?.takeIf(String::isNotBlank)
-                                        ?.let { LinkifiedText(it, color = Mist) }
+                                    programRowsDraft.getOrNull(index)?.let { row ->
+                                        Text(row.drugName.toDrugDisplayName(), color = Leaf300)
+                                        if (row.programNote.isNotBlank()) ExpandableInfo("Инструкция и ограничения", row.programNote)
+                                        val hasHistory = row.id > 0 && procedureHistory.any { it.plantId == row.id }
+                                        if (hasHistory) {
+                                            Text("У работы есть история. Другую обработку добавьте отдельно после осмотра.", color = Mist)
+                                        } else {
+                                            if (ProgramProductCatalog.alternatives(row.programId, row.programStepId).isNotEmpty()) {
+                                                SecondaryAction("Добавить или заменить препарат", { editProductIndex = index }, Modifier.fillMaxWidth())
+                                            }
+                                            if (drugs.isNotEmpty()) SelectionMenu(
+                                                label = "Мой препарат", value = "Выбрать из моих средств", options = drugs,
+                                                optionLabel = { it.name }, onSelected = { drug ->
+                                                    programRowsDraft = programRowsDraft.toMutableList().also { rows ->
+                                                        rows[index] = row.copy(drugId = drug.id, drugName = drug.name,
+                                                            programNote = listOf(drug.purpose, drug.consumptionRate).filter(String::isNotBlank).joinToString("\n"),
+                                                            repeatType = "NONE", repeatInterval = 1, wateringInterval = 1,
+                                                            repeatDaysOfWeek = "", repeatCount = null, repeatEndDate = null, repeatEndType = "NEVER")
+                                                    }
+                                                })
+                                        }
+                                    }
                                 }
+                            }
+                            if (editingProgram && ProgramProductCatalog.supports(editingPlant?.programId)) {
+                                SecondaryAction("После осмотра обнаружена проблема", { editAfterInspection = true }, Modifier.fillMaxWidth())
                             }
                             if (!editingProgram) {
                             SecondaryAction(
@@ -731,9 +766,11 @@ fun PlantAdd(
                             } else 1
                             val normalizedTaskNames = taskDrafts.map { it.name.trim() }
                             if (editingProgram) {
+                                programSaving = true
+                                programError = null
                                 plantsVm.updateImportedProgramCard(
                                     plantName = plantName,
-                                    existingRows = editingRows,
+                                    existingRows = programRowsDraft,
                                     taskNames = normalizedTaskNames,
                                     taskDates = taskDrafts.map { it.startDate },
                                     gardenId = selectedGarden?.id,
@@ -741,9 +778,11 @@ fun PlantAdd(
                                     reminderDaysBefore = reminderDaysBefore,
                                     photoUri = photoUri,
                                     onSaved = {
+                                        programSaving = false
                                         TreatmentReminderScheduler.refreshNow(app)
                                         navController.popBackStack()
-                                    }
+                                    },
+                                    onError = { programSaving = false; programError = it }
                                 )
                                 return@PrimaryAction
                             }
@@ -772,10 +811,11 @@ fun PlantAdd(
                                 }
                             )
                         },
-                        enabled = plantName.isNotBlank() && selectedGarden != null && taskDrafts.isNotEmpty() &&
+                        enabled = !programSaving && plantName.isNotBlank() && selectedGarden != null && taskDrafts.isNotEmpty() &&
                             taskDrafts.all { it.name.isNotBlank() } && !invalidRepeatEnd && !invalidRepeatCount && !photoLoading,
                         modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
                     )
+                    if (editingProgram) programError?.let { Text(it, color = Danger) }
                 }
             }
         }
@@ -790,6 +830,32 @@ fun PlantAdd(
                 addDrugDialogOpen = false
             }
         )
+    }
+
+    if (editAfterInspection || editProductIndex != null) {
+        val index = editProductIndex
+        val row = if (editAfterInspection) programRowsDraft.first() else programRowsDraft[requireNotNull(index)]
+        ProgramProductDialog(programId = requireNotNull(row.programId),
+            stepId = if (editAfterInspection) null else row.programStepId,
+            initialDate = if (editAfterInspection) LocalDate.now() else taskDrafts[requireNotNull(index)].startDate,
+            initialReminder = row.reminderDaysBefore,
+            onDismiss = { editProductIndex = null; editAfterInspection = false },
+            onConfirm = { product, problem, cultivation, date, reminder ->
+                if (editAfterInspection) {
+                    val added = row.problemTreatment(problem, product, cultivation, date, reminder)
+                    programRowsDraft = programRowsDraft + added
+                    taskDrafts = taskDrafts + PlantTaskDraft(added.taskName, date)
+                } else {
+                    val position = requireNotNull(index)
+                    val updated = row.withProgramProduct(product, date, reminder)
+                    programRowsDraft = programRowsDraft.toMutableList().also { it[position] = updated }
+                    taskDrafts = taskDrafts.toMutableList().also {
+                        it[position] = it[position].copy(name = updated.taskName, startDate = date)
+                    }
+                }
+                editProductIndex = null
+                editAfterInspection = false
+            })
     }
 
     generatedProgram?.let { program ->
@@ -893,7 +959,7 @@ private fun ProgramStartChoiceDialog(
                 if (proposal.recommendationHasPassed) {
                     "Рекомендуемая дата начала работ для вашего региона ($recommendedText) уже прошла. " +
                         "Перенести программу на следующий год или продолжить с выбранной даты? " +
-                        "При продолжении прошедшие работы будут исключены."
+                        "При продолжении пропущенные работы будут запланированы на следующий год."
                 } else {
                     "Запланировать начало работ на рекомендуемую дату — $recommendedText?"
                 },
@@ -1084,7 +1150,7 @@ private fun CareProgramPreviewDialog(
 }
 
 @Composable
-private fun <T> SelectionMenu(
+internal fun <T> SelectionMenu(
     label: String,
     value: String,
     options: List<T>,

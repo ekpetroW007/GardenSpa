@@ -432,7 +432,7 @@ class CareProgramGenerator {
             context.startDate.isBefore(recommendedStart) ->
                 "Выбранная дата раньше рекомендуемого начала работ ${recommendedStart}. Проверьте местные условия."
             continuesStartedSeason ->
-                "Программа продолжена с ${context.startDate}: работы и повторы, срок которых уже прошёл, исключены."
+                "Программа начата с ${context.startDate}: пропущенные работы и повторы запланированы на следующий год. Проверьте фазу развития растения перед выполнением."
             else -> null
         }
         val forecastByDate = context.forecast.associateBy { it.date }
@@ -508,7 +508,7 @@ class CareProgramGenerator {
             chosenStartDate = context.startDate,
             climateSummary = context.climate.displayName(),
             warning = warning,
-            steps = generatedSteps
+            steps = generatedSteps.sortedBy { it.scheduledDate }
         )
     }
 
@@ -520,7 +520,7 @@ class CareProgramGenerator {
 
         val repeat = recurrence
         if (repeat == null || repeat.type == RepeatType.NONE) {
-            if (windowEnd.isBefore(date)) return emptyList()
+            if (windowEnd.isBefore(date)) return listOf(moveToNextYear(date))
             return listOf(
                 copy(
                     scheduledDate = date,
@@ -534,34 +534,28 @@ class CareProgramGenerator {
         val occurrences = (0 until repeat.count).map { index ->
             occurrenceDate(scheduledDate, repeat, index)
         }
-        val remaining = occurrences.dropWhile { it.isBefore(date) }
-        if (remaining.isEmpty()) return emptyList()
-
-        val nextDate = remaining.first()
-        val skipped = occurrences.size - remaining.size
-        if (repeat.type == RepeatType.MONTHLY || repeat.type == RepeatType.YEARLY) {
-            return remaining.mapIndexed { index, occurrence ->
-                val shiftDays = ChronoUnit.DAYS.between(scheduledDate, occurrence)
-                copy(
-                    templateStepId = "$templateStepId:remaining:${skipped + index + 1}",
-                    scheduledDate = occurrence,
-                    windowStart = windowStart.plusDays(shiftDays),
-                    windowEnd = windowEnd.plusDays(shiftDays),
-                    recurrence = null,
-                    explanation = "Программа продолжена с $date: сохранена оставшаяся работа ${index + 1} из ${remaining.size}."
-                )
-            }
-        }
-
-        val shiftDays = ChronoUnit.DAYS.between(scheduledDate, nextDate)
-        return listOf(
-            copy(
-                scheduledDate = nextDate,
+        // Keep the original occurrence dates (including month ends) and a stable key for each work.
+        return occurrences.mapIndexed { index, occurrence ->
+            val shiftDays = ChronoUnit.DAYS.between(scheduledDate, occurrence)
+            val work = copy(
+                templateStepId = "$templateStepId:remaining:${index + 1}",
+                scheduledDate = occurrence,
                 windowStart = windowStart.plusDays(shiftDays),
                 windowEnd = windowEnd.plusDays(shiftDays),
-                recurrence = repeat.copy(count = remaining.size),
-                explanation = "Программа продолжена с $date: пропущено прошедших повторов — $skipped, осталось — ${remaining.size}."
+                recurrence = null
             )
+            if (occurrence.isBefore(date)) work.moveToNextYear(date) else work
+        }
+    }
+
+    private fun GeneratedCareStep.moveToNextYear(startDate: LocalDate): GeneratedCareStep {
+        val nextDate = scheduledDate.withYear(startDate.year + 1)
+        val shift = ChronoUnit.DAYS.between(scheduledDate, nextDate)
+        return copy(
+            scheduledDate = nextDate,
+            windowStart = windowStart.plusDays(shift), windowEnd = windowEnd.plusDays(shift),
+            weatherAdjusted = false, needsWeatherConfirmation = true,
+            explanation = "Пропущенная работа с $scheduledDate перенесена на $nextDate. Проверьте фазу развития растения и погоду ближе к сроку."
         )
     }
 

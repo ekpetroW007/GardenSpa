@@ -21,6 +21,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
@@ -43,16 +44,17 @@ import ru.samates.gardenspa.viewmodel.DrugsViewmodel
 import ru.samates.gardenspa.viewmodel.DrugsViewmodelFactory
 
 @Composable
-fun Drugs(navController: NavController, innerPadding: PaddingValues, section: ProductSection = ProductSection.TREATMENT) {
+fun Drugs(navController: NavController, innerPadding: PaddingValues, section: ProductSection = ProductSection.TREATMENT, onBack: (() -> Unit)? = null) {
     val application = LocalContext.current.applicationContext as BookeeperApp
     val drugsVm: DrugsViewmodel = viewModel(factory = DrugsViewmodelFactory(application.repository))
     val drugs by drugsVm.drugs.collectAsState()
-    var query by remember(section) { mutableStateOf("") }
+    var query by rememberSaveable(section) { mutableStateOf("") }
     val catalog = remember(section, query) { ProgramReferenceCatalog.entries(section, query) }
     var drugForActions by remember { mutableStateOf<DrugEntity?>(null) }
     var drugPendingDelete by remember { mutableStateOf<DrugEntity?>(null) }
     val filtered = drugs.filter {
-        query.isBlank() || it.name.contains(query, true) || it.purpose.contains(query, true)
+        it.applicationMethod in setOf(section.name, "BOTH", "UNSPECIFIED") &&
+            (query.isBlank() || it.name.contains(query, true) || it.purpose.contains(query, true))
     }
 
     LazyColumn(
@@ -61,14 +63,9 @@ fun Drugs(navController: NavController, innerPadding: PaddingValues, section: Pr
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column(Modifier.weight(1f)) {
-                    Text("Библиотека ухода", color = Mist)
-                    Text(section.title, style = MaterialTheme.typography.headlineLarge, color = Cream)
-                }
-                if (section == ProductSection.TREATMENT) {
-                    PrimaryAction("+ Добавить", { navController.navigate(AppDestinations.DRUG_ADD_ROUTE) })
-                }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ScreenHeader(section.title, onBack = onBack)
+                PrimaryAction("+ Добавить", { navController.navigate(AppDestinations.DRUG_ADD_ROUTE) }, Modifier.fillMaxWidth())
             }
         }
         item {
@@ -104,13 +101,11 @@ fun Drugs(navController: NavController, innerPadding: PaddingValues, section: Pr
                 }
             }
         }
-        if (catalog.isEmpty() && (section != ProductSection.TREATMENT || filtered.isEmpty())) {
+        if (catalog.isEmpty() && filtered.isEmpty()) {
             item { EmptyGlassState("Ничего не найдено", "Измените запрос или добавьте новый препарат") }
         }
-        if (section == ProductSection.TREATMENT) {
-            item { SectionTitle("Мои средства") }
-        }
-        items(if (section == ProductSection.TREATMENT) filtered else emptyList(), key = { "my:${it.id}" }) { drug ->
+        item { SectionTitle("Мои средства") }
+        items(filtered, key = { "my:${it.id}" }) { drug ->
             DrugCard(
                 drug = drug,
                 onOpen = {
@@ -157,6 +152,7 @@ fun DrugCard(drug: DrugEntity, onOpen: () -> Unit, onManage: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text(drug.name, style = MaterialTheme.typography.titleLarge, color = Cream)
                 Text(drug.purpose, color = Mist, maxLines = 2)
+                if (drug.applicationMethod == "UNSPECIFIED") Text("Способ применения не указан · уточните в редакторе", color = Mist)
                 Text("Норма: ${drug.consumptionRate}", color = Leaf300, modifier = Modifier.padding(top = 6.dp))
             }
             Text(

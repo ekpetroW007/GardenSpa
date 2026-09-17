@@ -35,6 +35,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -81,7 +82,7 @@ import ru.samates.gardenspa.viewmodel.ProceduresViewmodelFactory
 private data class UndoAction(val message: String, val plantId: Int, val originalDate: LocalDate)
 
 @Composable
-fun Calendar(innerPadding: PaddingValues, navController: NavController) {
+fun Calendar(innerPadding: PaddingValues, navController: NavController, onBack: (() -> Unit)? = null) {
     val application = LocalContext.current.applicationContext as BookeeperApp
     val plantsVm: PlantsViewmodel = viewModel(factory = PlantsViewmodelFactory(application.repository))
     val proceduresVm: ProceduresViewmodel = viewModel(factory = ProceduresViewmodelFactory(application.repository))
@@ -90,8 +91,10 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController) {
     val procedures by proceduresVm.procedures.collectAsState()
     val gardenWorkEntries by gardenWorkVm.entries.collectAsState()
     val today = LocalDate.now()
-    var selectedDate by remember { mutableStateOf(today) }
-    var visibleMonth by remember { mutableStateOf(YearMonth.from(today)) }
+    var selectedDateText by rememberSaveable { mutableStateOf(today.toString()) }
+    var visibleMonthText by rememberSaveable { mutableStateOf(YearMonth.from(today).toString()) }
+    val selectedDate = LocalDate.parse(selectedDateText)
+    val visibleMonth = YearMonth.parse(visibleMonthText)
     var undoAction by remember { mutableStateOf<UndoAction?>(null) }
 
     val datesWithGardenWork = gardenWorkEntries.mapNotNull { runCatching { LocalDate.parse(it.workDate) }.getOrNull() }.toSet()
@@ -107,8 +110,7 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController) {
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Понятный план ухода", color = Mist)
-                Text("Календарь", style = MaterialTheme.typography.headlineLarge, color = Cream)
+                ScreenHeader("Календарь", "Понятный план ухода", onBack)
                 PrimaryAction("Добавить работу", { navController.navigate(AppDestinations.plantAdd(selectedDate.toString())) }, Modifier.fillMaxWidth())
             }
         }
@@ -137,9 +139,9 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController) {
                 month = visibleMonth,
                 selectedDate = selectedDate,
                 datesWithTasks = markedDates,
-                onPreviousMonth = { visibleMonth = visibleMonth.minusMonths(1) },
-                onNextMonth = { visibleMonth = visibleMonth.plusMonths(1) },
-                onDateSelected = { selectedDate = it; visibleMonth = YearMonth.from(it) }
+                onPreviousMonth = { visibleMonthText = visibleMonth.minusMonths(1).toString() },
+                onNextMonth = { visibleMonthText = visibleMonth.plusMonths(1).toString() },
+                onDateSelected = { selectedDateText = it.toString(); visibleMonthText = YearMonth.from(it).toString() }
             )
         }
 
@@ -182,8 +184,8 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController) {
                                 TreatmentReminderScheduler.refreshNow(application)
                             }
                             undoAction = UndoAction("Работа перенесена на ${newDate.toRussianDate(false)}", treatment.plant.id, treatment.originalDate)
-                            selectedDate = newDate
-                            visibleMonth = YearMonth.from(newDate)
+                            selectedDateText = newDate.toString()
+                            visibleMonthText = YearMonth.from(newDate).toString()
                         }
                     )
                 }
@@ -287,7 +289,9 @@ private fun TreatmentCard(
             Text("${treatment.plant.plantName} · ${treatment.plant.gardenName}", color = Leaf300)
             Text(treatment.plant.drugName.toDrugDisplayName(), color = Mist)
             Text(treatment.plant.recurrenceDescription(), color = Mist)
-            SecondaryAction("Подробнее", onOpen, Modifier.fillMaxWidth())
+            SecondaryAction("Подробнее", onOpen, Modifier.fillMaxWidth().semantics {
+                contentDescription = "Открыть работу: ${treatment.plant.taskName}"
+            })
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SecondaryAction(
                     "Перенести",
@@ -305,7 +309,9 @@ private fun TreatmentCard(
                         onComplete()
                     },
                     enabled = !completed,
-                    modifier = Modifier.weight(1f).height(52.dp),
+                    modifier = Modifier.weight(1f).height(52.dp).semantics {
+                        contentDescription = "Выполнить работу: ${treatment.plant.taskName}"
+                    },
                     shape = RoundedCornerShape(18.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Leaf300,

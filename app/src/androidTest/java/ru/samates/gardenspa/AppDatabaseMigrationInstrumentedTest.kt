@@ -39,10 +39,49 @@ class AppDatabaseMigrationInstrumentedTest {
             assertTrue(plants.single().programNote.contains("Пользовательское описание растения"))
             assertEquals(1, procedures.size)
             assertEquals("Полив", procedures.single().procedureName)
+            assertEquals("Препарат", procedures.single().drugName)
+            assertEquals("card-1", procedures.single().plantCardId)
+            assertEquals("UNSPECIFIED", database.drugDao().getAllDrugs().first().single().applicationMethod)
         } finally {
             database.close()
             context.deleteDatabase(databaseName)
         }
+    }
+
+    @Test fun migratesVersion17AndKeepsCompletedProductWhenProcedureIsDeleted() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "migration17-${UUID.randomUUID()}.db"
+        val current = Room.databaseBuilder(context, AppDatabase::class.java, name).build()
+        current.openHelper.writableDatabase
+        current.close()
+        // Recreate the two changed tables exactly as in the preceding version.
+        context.openOrCreateDatabase(name, Context.MODE_PRIVATE, null).use { db ->
+            db.execSQL("PRAGMA foreign_keys = OFF")
+            db.execSQL("DROP TABLE procedure_history")
+            db.execSQL("DROP TABLE drug")
+            db.execSQL("CREATE TABLE drug (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT NOT NULL, target TEXT NOT NULL, amount TEXT NOT NULL)")
+            db.execSQL("""CREATE TABLE procedure_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, plant_id INTEGER NOT NULL,
+                procedure_name TEXT NOT NULL, scheduled_date TEXT NOT NULL, rescheduled_date TEXT,
+                completed_date TEXT, status TEXT NOT NULL, note TEXT NOT NULL,
+                FOREIGN KEY(plant_id) REFERENCES plants(id) ON UPDATE NO ACTION ON DELETE CASCADE)""")
+            db.execSQL("CREATE INDEX index_procedure_history_plant_id ON procedure_history(plant_id)")
+            db.execSQL("CREATE UNIQUE INDEX index_procedure_history_plant_id_scheduled_date ON procedure_history(plant_id, scheduled_date)")
+            db.execSQL("INSERT INTO plants(id, name, task, wateringInterval, creationDate, drugNameInPlant, gardenNameInPlant, plant_card_id) VALUES(1, 'Яблоня', 'Опрыскать', 1, '2026-05-01', 'Зелёный конус. Биологические препараты', 'Сад', 'migration-card')")
+            db.execSQL("INSERT INTO procedure_history(plant_id, procedure_name, scheduled_date, completed_date, status, note) VALUES(1, 'Опрыскать', '2026-05-01', '2026-05-01', 'COMPLETED', 'Старая инструкция')")
+            db.version = 17
+        }
+        val migrated = Room.databaseBuilder(context, AppDatabase::class.java, name)
+            .addMigrations(*AppDatabase.configuredMigrations()).build()
+        try {
+            val plant = migrated.plantDao().getAllPlantsOnce().single()
+            assertTrue(plant.drugName.startsWith("Баковая смесь"))
+            val archive = migrated.procedureDao().getAllProceduresOnce().single()
+            assertEquals("migration-card", archive.plantCardId)
+            assertEquals("Зелёный конус. Биологические препараты", archive.drugName)
+            migrated.plantDao().deletePlant(plant.id)
+            assertEquals(archive, migrated.procedureDao().getAllProceduresOnce().single())
+        } finally { migrated.close(); context.deleteDatabase(name) }
     }
 
     private fun createVersion15Database(context: Context, name: String) {

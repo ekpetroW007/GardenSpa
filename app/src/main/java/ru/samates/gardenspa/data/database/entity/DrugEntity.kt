@@ -16,5 +16,8 @@ data class DrugEntity(
     val purpose: String,
 
     @ColumnInfo(name = "amount")
-    val consumptionRate: String
+    val consumptionRate: String,
+
+    @ColumnInfo(name = "application_method", defaultValue = "'UNSPECIFIED'")
+    val applicationMethod: String = "UNSPECIFIED"
 )
