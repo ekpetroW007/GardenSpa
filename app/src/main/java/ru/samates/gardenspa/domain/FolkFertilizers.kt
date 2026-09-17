@@ -14,6 +14,8 @@ data class FolkFertilizerRecipe(
 ) {
     fun purposeForDrug(): String = buildString {
         append(purpose)
+        append(" Состав: ")
+        append(ingredients)
         append(" Приготовление: ")
         append(preparation)
         if (warning.isNotBlank()) {
@@ -24,6 +26,7 @@ data class FolkFertilizerRecipe(
 }
 
 object FolkFertilizers {
+    const val GREEN_CONE_ID = "green_cone_biological_tank_mix"
     private const val RSC_LATE_BLIGHT = "https://old.rosselhoscenter.ru/index.php/otchjoty-80/17718-rekomendatsii-spetsialistov-po-borbe-s-fitoftoroj"
     private const val RSC_RUST = "https://rosselhoscenter.ru/ob-uchrezhdenii/filialy/sibirskiy/omskaya-oblast/chto-delat-esli-poshla-rzhavchina-na-gorokhe/"
     private const val RSC_APHIDS = "https://rosselhoscenter.ru/ob-uchrezhdenii/filialy/tsentralnyy-okrug/kaluzhskaya-oblast/tlya-na-vishne-effektivnye-mery-borby/"
@@ -107,6 +110,23 @@ object FolkFertilizers {
             consumptionRate = "Расходовать согласно норме для обрабатываемой культуры и инструкциям применяемых препаратов.",
             warning = "",
             sourceName = "Рецепт пользователя",
+            sourceUrl = "",
+            isTankMix = true
+        ),
+        FolkFertilizerRecipe(
+            id = GREEN_CONE_ID,
+            name = "Зелёный конус. Биологические препараты",
+            purpose = "Баковая смесь для обработки деревьев и кустарников по зелёному конусу.",
+            ingredients = "На 10 л воды:\nМикохелп — 20 мл + Фитохелп — 20 мл — от болезней.\n" +
+                "Лепидоцид, жидкий препарат — 20 мл — от гусениц.\n" +
+                "Битоксибациллин — 40 г — от клеща, колорадского жука.\n" +
+                "Фитоверм — 20 мл — от тли, трипсов.\n" +
+                "Липосам — 8 мл (1 пакет) — прилипатель.\n" +
+                "Циркон — 1 мл — стимулятор роста и антистрессовый препарат.",
+            preparation = "Приготовить смесь на 10 л воды с учётом инструкций конкретных форм препаратов. Порядок разведения и совместимость компонентов проверить по их этикеткам. Использовать свежеприготовленный раствор.",
+            consumptionRate = "По зелёному конусу: почечные чешуи раздвинулись и показались зелёные кончики листьев. Расход на дерево или куст — по инструкциям применяемых препаратов для вашей культуры; 10 л — объём смеси, а не норма на одно растение.",
+            warning = "Рецепт пользователя; совместимость полного состава отдельно не подтверждена. Сверьте культуру, концентрации и рабочую температуру биопрепаратов. Не добавляйте в эту смесь железный купорос, бордосскую смесь, 30 Плюс или Профилактин; интервал после предыдущей обработки определяйте по инструкциям. Назначения компонентов перечислены по рецепту и не означают наличие всех этих вредителей на дереве или кусте.",
+            sourceName = "Рецепт пользователя; жидкий Лепидоцид — 20 мл",
             sourceUrl = "",
             isTankMix = true
         )

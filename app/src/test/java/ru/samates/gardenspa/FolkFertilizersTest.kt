@@ -11,7 +11,7 @@ class FolkFertilizersTest {
         assertEquals(
             setOf("milk_iodine_late_blight", "ash_spray_rust", "ash_soap_aphids",
                 "mustard_caterpillars", "mustard_apple_scab", "ash_feed_fruit_set",
-                "magic_plant_drink_tank_mix"),
+                "magic_plant_drink_tank_mix", FolkFertilizers.GREEN_CONE_ID),
             (FolkFertilizers.recipes + FolkFertilizers.tankMixes).map { it.id }.toSet()
         )
         val allowedHosts = setOf("old.rosselhoscenter.ru", "rosselhoscenter.ru", "lenta.ru")
@@ -34,5 +34,19 @@ class FolkFertilizersTest {
         ).forEach { ingredient ->
             assertTrue(recipe.ingredients.contains(ingredient))
         }
+    }
+
+    @Test fun greenConeContainsLiquidLepidocideAndKeepsIngredientsWhenAddedToMyProducts() {
+        val recipe = FolkFertilizers.tankMixes.single { it.id == FolkFertilizers.GREEN_CONE_ID }
+        assertEquals("Зелёный конус. Биологические препараты", recipe.name)
+        listOf("На 10 л воды", "Микохелп — 20 мл", "Фитохелп — 20 мл",
+            "Лепидоцид, жидкий препарат — 20 мл", "Битоксибациллин — 40 г",
+            "Фитоверм — 20 мл", "Липосам — 8 мл (1 пакет)", "Циркон — 1 мл").forEach {
+            assertTrue(recipe.ingredients.contains(it))
+            assertTrue(recipe.purposeForDrug().contains(it))
+        }
+        assertTrue(recipe.sourceUrl.isEmpty())
+        assertTrue(recipe.warning.contains("совместимость полного состава отдельно не подтверждена"))
+        assertTrue(FolkFertilizers.recipes.none { it.id == recipe.id })
     }
 }

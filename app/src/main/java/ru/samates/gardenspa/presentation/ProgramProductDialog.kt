@@ -34,6 +34,7 @@ import ru.samates.gardenspa.domain.PRODUCT_LABEL_NOTICE
 import ru.samates.gardenspa.domain.ProgramProductCatalog
 import ru.samates.gardenspa.domain.PlantCareCatalog
 import ru.samates.gardenspa.domain.SINGLE_PRODUCT_WORK_NOTICE
+import ru.samates.gardenspa.domain.SpringCarePrograms
 import ru.samates.gardenspa.ui.theme.Cream
 import ru.samates.gardenspa.ui.theme.Danger
 import ru.samates.gardenspa.ui.theme.Forest900
@@ -55,6 +56,7 @@ internal fun ProgramProductDialog(
     onConfirm: (productId: String, problemId: String?, cultivation: CultivationType, date: LocalDate, reminder: Int) -> Unit
 ) {
     val afterInspection = stepId == null
+    val earlySpring = stepId?.let(ProgramProductCatalog::baseStepId) == SpringCarePrograms.EARLY_STEP
     var choosingProduct by rememberSaveable { mutableStateOf(!afterInspection) }
     var problemId by rememberSaveable { mutableStateOf<String?>(null) }
     val cultivations = PlantCareCatalog.all().firstOrNull { it.id == programId }?.supportedCultivationTypes
@@ -79,7 +81,7 @@ internal fun ProgramProductDialog(
         Surface(Modifier.fillMaxSize().padding(10.dp), color = Forest900, shape = GlassShape) {
             Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    if (afterInspection) "После осмотра" else "Препараты-аналоги",
+                    if (afterInspection) "После осмотра" else if (earlySpring) "До распускания почек" else "Препараты-аналоги",
                     color = Cream, style = MaterialTheme.typography.headlineMedium
                 )
                 Column(Modifier.weight(1f).verticalScroll(scroll), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -108,6 +110,7 @@ internal fun ProgramProductDialog(
                                 ?: "Каталог без подбора по диагнозу", color = Mist)
                         } else {
                             Text("Выберите один вариант по задаче", color = Mist)
+                            if (earlySpring) Text("Средства от болезней и зимующих вредителей решают разные задачи. Не смешивайте перечисленные варианты.", color = Mist)
                         }
                         OutlinedTextField(value = productQuery, onValueChange = { productQuery = it },
                             placeholder = { Text("Название или производитель") }, singleLine = true,

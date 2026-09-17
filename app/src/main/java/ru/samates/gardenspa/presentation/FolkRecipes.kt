@@ -114,13 +114,15 @@ private fun FolkRecipeCard(
                 RecipeSection("Как использовать", recipe.consumptionRate)
                 RecipeSection(
                     "Меры осторожности",
-                    "Сначала проверьте состав на небольшом участке. Не смешивайте его с другими средствами без подтверждённой совместимости."
+                    recipe.warning.ifBlank { "Сначала проверьте состав на небольшом участке. Не смешивайте его с другими средствами без подтверждённой совместимости." }
                 )
                 if (recipe.sourceUrl.isNotBlank()) {
                     LinkifiedText(
                         "Источник: ${recipe.sourceName}\n${recipe.sourceUrl}",
                         color = Mist
                     )
+                } else {
+                    Text(recipe.sourceName, color = Mist)
                 }
                 Text("Справочник GardenSpa · сентябрь 2026", color = Mist)
                 PrimaryAction(

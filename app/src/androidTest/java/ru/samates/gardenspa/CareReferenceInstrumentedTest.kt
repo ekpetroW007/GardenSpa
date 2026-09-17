@@ -62,6 +62,7 @@ class CareReferenceInstrumentedTest {
         capture("fertilizer-search")
         compose.runOnIdle { section = "Справочник" }
         compose.onNodeWithText("Баковые смеси").performClick()
+        compose.onNode(hasSetTextAction()).performTextInput("Волшебный")
         compose.onNodeWithText("Баковая смесь «Волшебный напиток для растений»").assertExists()
         compose.onNodeWithText("Показать рецепт").performClick()
         compose.onNodeWithText("Алирин-Б — 4 таблетки", substring = true).assertExists()
@@ -112,5 +113,16 @@ class CareReferenceInstrumentedTest {
             .performScrollTo().performClick()
         compose.onNodeWithText("Выбрать этот препарат").performClick()
         compose.runOnIdle { assertEquals("agricola_hydrangea", chosen) }
+    }
+
+    @Test fun greenConeRecipeIsSearchableAndShowsTheConfirmedLiquidDose() {
+        compose.setContent { MyApplicationTheme { BotanicalBackground { FolkRecipes(PaddingValues(), tankMixes = true) } } }
+        compose.onNode(hasSetTextAction()).performTextInput("Зелёный конус")
+        compose.onNodeWithText("Зелёный конус. Биологические препараты").assertExists()
+        compose.onNodeWithText("Показать рецепт").performClick()
+        compose.onNodeWithText("Лепидоцид, жидкий препарат — 20 мл", substring = true).assertExists()
+        capture("green-cone-recipe")
+        compose.onNodeWithText("Рецепт пользователя; совместимость полного состава отдельно не подтверждена", substring = true)
+            .performScrollTo().assertIsDisplayed()
     }
 }

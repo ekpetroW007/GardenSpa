@@ -16,10 +16,10 @@ class SeasonalProgramsTest {
         val templates = names.map { requireNotNull(PlantCareCatalog.find(it)) }
         assertEquals(12, templates.map { it.id }.toSet().size)
         for (template in templates) {
-            assertEquals(6, template.version)
+            assertEquals(if (template.id in SpringCarePrograms.woodyCrops) 7 else 6, template.version)
             assertTrue(template.steps.size >= 4)
             assertEquals(template.steps.size, template.steps.map { it.id }.toSet().size)
-            val feeding = template.steps.first { it.productDescription != null }
+            val feeding = template.steps.first { it.id.startsWith("nutrition~") }
             val alternatives = ProgramProductCatalog.alternatives(template.id, feeding.id)
                 .filter { it.unavailableReason == null }
             assertTrue(template.id, alternatives.map { it.manufacturer }.toSet().size >= 2)
@@ -75,7 +75,8 @@ class SeasonalProgramsTest {
         assertTrue(reference.all { it.manufacturer in ProgramProductCatalog.allowedManufacturers })
         for (template in PlantCareCatalog.all().filter { ProgramProductCatalog.supports(it.id) }) {
             template.steps.mapNotNull { it.productDescription }.forEach { description ->
-                assertTrue("Missing reference: $description", reference.any { it.displayName == description })
+                assertTrue("Missing reference: $description", reference.any { it.displayName == description } ||
+                    FolkFertilizers.tankMixes.any { it.name == description })
             }
         }
         assertTrue(ProgramReferenceCatalog.entries(ProductSection.FERTILIZER, "Гуми-Оми").isNotEmpty())
@@ -91,7 +92,7 @@ class SeasonalProgramsTest {
     @Test fun tankMixtureIsMovedWithoutDuplicatingOrChangingItsRecipe() {
         assertEquals(6, FolkFertilizers.recipes.size)
         assertTrue(FolkFertilizers.recipes.none { it.isTankMix || it.id == "magic_plant_drink_tank_mix" })
-        val mixture = FolkFertilizers.tankMixes.single()
+        val mixture = FolkFertilizers.tankMixes.single { it.id == "magic_plant_drink_tank_mix" }
         assertEquals("magic_plant_drink_tank_mix", mixture.id)
         assertTrue(mixture.isTankMix)
         assertTrue(mixture.ingredients.contains("Алирин-Б — 4 таблетки"))

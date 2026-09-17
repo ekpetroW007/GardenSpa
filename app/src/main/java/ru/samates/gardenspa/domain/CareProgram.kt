@@ -352,7 +352,7 @@ object PlantCareCatalog {
             ),
             openGroundStartOffsetDays = -21
         )
-    ) + SeasonalCarePrograms.templates).map(PlantCareTemplate::withoutSeasonLabels)
+    ) + SeasonalCarePrograms.templates.map(SpringCarePrograms::withSpringStages)).map(PlantCareTemplate::withoutSeasonLabels)
 
     private fun standardTreatmentSteps(cropLabel: String): List<CareStepTemplate> = listOf(
         CareStepTemplate(

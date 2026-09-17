@@ -41,7 +41,8 @@ object ProgramProductCatalog {
 
     val allowedManufacturers = setOf("Август", "ЩёлковоАгрохим", "ФМРус", "BonaForte", "Фаско", "Гера",
         "Ортон", "Агрикола", "HB-101", "БашИнком", "Фармбиомед", "Syngenta", "Нэст-М", "Петрович",
-        "Green Belt", "Био-комплекс", "Аминосил", "Органик Микс", "5сезонов")
+        "Green Belt", "Био-комплекс", "Аминосил", "Органик Микс", "5сезонов",
+        "НПФ Собер") // Manufacturer of 30 Plus, explicitly requested in the spring-program update.
 
     fun supports(programId: String?): Boolean = programId in supportedCrops
 
@@ -157,7 +158,7 @@ object ProgramProductCatalog {
             "muchnistop" -> product.copy(crops = supportedCrops - setOf("potato", "lawn"))
             else -> product
         }
-    } + SeasonalProgramProducts.products
+    } + SeasonalProgramProducts.products + SpringCarePrograms.products
 
     fun baseStepId(stepId: String): String = stepId.substringBefore("~").substringBefore(":remaining:")
     fun productForStep(stepId: String?): ProgramProduct? = stepId?.substringAfter("~", "")
@@ -166,6 +167,7 @@ object ProgramProductCatalog {
     fun alternatives(programId: String?, stepId: String?): List<ProgramProduct> {
         if (!supports(programId) || stepId == null) return emptyList()
         val ids = when (baseStepId(stepId)) {
+            SpringCarePrograms.EARLY_STEP -> SpringCarePrograms.products.map { it.id }.toSet()
             "nutrition", "nutrition_review" -> SeasonalProgramProducts.feedingIds(programId!!)
             "lawn_autumn_nutrition" -> setOf("organic_lawn_autumn", "bona_lawn_autumn")
             "gumi_omi_planting" -> if (programId == "tomato") setOf("organic_tomato", "maxi_nutrition") else setOf("maxi_nutrition")
