@@ -52,6 +52,7 @@ fun FolkRecipes(innerPadding: PaddingValues, tankMixes: Boolean = false, onBack:
     var query by rememberSaveable(tankMixes) { mutableStateOf("") }
     var recipeToUse by remember { mutableStateOf<FolkFertilizerRecipe?>(null) }
     var success by remember { mutableStateOf<String?>(null) }
+    var saveError by remember { mutableStateOf<String?>(null) }
     val filteredRecipes = (if (tankMixes) FolkFertilizers.tankMixes else FolkFertilizers.recipes).filter { recipe ->
         query.isBlank() ||
             recipe.name.contains(query, ignoreCase = true) ||
@@ -68,6 +69,7 @@ fun FolkRecipes(innerPadding: PaddingValues, tankMixes: Boolean = false, onBack:
                 if (tankMixes) "Составы для совместного применения средств" else "Справочные варианты подкормок и ухода", onBack)
         }
         success?.let { message -> item { Text(message, color = Leaf300) } }
+        saveError?.let { message -> item { Text(message, color = Danger) } }
         item {
             OutlinedTextField(
                 value = query,
@@ -95,7 +97,9 @@ fun FolkRecipes(innerPadding: PaddingValues, tankMixes: Boolean = false, onBack:
                         name = recipe.name,
                         purpose = recipe.purposeForDrug(),
                         consumptionRate = recipe.consumptionRate,
-                        applicationMethod = if (recipe.isTankMix) "TREATMENT" else "UNSPECIFIED"
+                        applicationMethod = if (recipe.isTankMix) "TREATMENT" else "UNSPECIFIED",
+                        onSaved = { success = "Сохранено в «Мои средства»: ${recipe.name}"; saveError = null },
+                        onError = { saveError = it }
                     )
                 }
             )

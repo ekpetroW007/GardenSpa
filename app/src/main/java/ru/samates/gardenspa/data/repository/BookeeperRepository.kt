@@ -34,6 +34,8 @@ class BookeeperRepository(
         drugDao.insertDrug(drug)
     }
 
+    suspend fun saveToMyProducts(drug: DrugEntity): DrugEntity = drugDao.saveToMyProducts(drug)
+
     suspend fun updateDrug(drug: DrugEntity) {
         drugDao.updateDrug(drug)
         plantDAO.updateDrugName(drug.id, drug.name)

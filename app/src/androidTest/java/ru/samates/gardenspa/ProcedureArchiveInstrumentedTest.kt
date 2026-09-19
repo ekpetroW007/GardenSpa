@@ -12,9 +12,31 @@ import org.junit.runner.RunWith
 import ru.samates.gardenspa.data.database.AppDatabase
 import ru.samates.gardenspa.data.database.entity.PlantEntity
 import ru.samates.gardenspa.data.database.entity.ProcedureEntity
+import ru.samates.gardenspa.data.database.entity.DrugEntity
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
 
 @RunWith(AndroidJUnit4::class)
 class ProcedureArchiveInstrumentedTest {
+    @Test fun repeatedConfirmationsSaveOneOwnProductAndDifferentInstructionsRemainDistinct() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "my-products-${UUID.randomUUID()}.db"
+        fun open() = Room.databaseBuilder(context, AppDatabase::class.java, name).build()
+        var db = open()
+        try {
+            val product = DrugEntity(name = "  Моё средство  ", purpose = "Питание", consumptionRate = "10 г", applicationMethod = "FERTILIZER")
+            val copies = coroutineScope { (1..5).map { async { db.drugDao().saveToMyProducts(product) } }.awaitAll() }
+            assertEquals(1, copies.map { it.id }.distinct().size)
+            val other = db.drugDao().saveToMyProducts(product.copy(consumptionRate = "20 г"))
+            assertNotEquals(copies.first().id, other.id)
+            db.close(); db = open()
+            val saved = db.drugDao().getAllDrugs().first()
+            assertEquals(2, saved.size)
+            assertTrue(saved.all { it.name == "Моё средство" })
+        } finally { db.close(); context.deleteDatabase(name) }
+    }
     @Test fun completionSnapshotSurvivesEditsProcedureRemovalAndDatabaseReopen() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val name = "archive-${UUID.randomUUID()}.db"

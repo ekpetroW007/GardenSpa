@@ -84,6 +84,10 @@ import ru.samates.gardenspa.domain.withProduct
 import ru.samates.gardenspa.domain.withProgramProduct
 import ru.samates.gardenspa.domain.problemTreatment
 import ru.samates.gardenspa.domain.toDrugDisplayName
+import ru.samates.gardenspa.domain.ProgramReferenceCatalog
+import ru.samates.gardenspa.domain.asPersonalProduct
+import ru.samates.gardenspa.domain.withPersonalProduct
+import ru.samates.gardenspa.domain.careNote
 import ru.samates.gardenspa.data.database.entity.PlantEntity
 import ru.samates.gardenspa.viewmodel.ProceduresViewmodel
 import ru.samates.gardenspa.viewmodel.ProceduresViewmodelFactory
@@ -187,7 +191,12 @@ fun PlantAdd(
     var editAfterInspection by remember { mutableStateOf(false) }
     var programSaving by remember { mutableStateOf(false) }
     var addDrugDialogOpen by remember { mutableStateOf(false) }
-    var pendingNewDrugName by remember { mutableStateOf<String?>(null) }
+    var newDrugForRow by remember { mutableStateOf<Int?>(null) }
+    var drugSaving by remember { mutableStateOf(false) }
+    var drugError by remember { mutableStateOf<String?>(null) }
+    val availableDrugs = remember(drugs) {
+        (drugs + ProgramReferenceCatalog.allEntries().map { it.asPersonalProduct() }).distinctBy { it.name to it.consumptionRate }
+    }
     var cultivationType by remember { mutableStateOf(CultivationType.OPEN_GROUND) }
     var programStartDate by remember(startDate) { mutableStateOf(startDate) }
     var generatedProgram by remember { mutableStateOf<GeneratedCareProgram?>(null) }
@@ -283,11 +292,15 @@ fun PlantAdd(
         }
     }
 
-    LaunchedEffect(gardens, preselectedGardenId, editing) {
-        if (!editing && selectedGarden == null) {
-            selectedGarden = gardens.firstOrNull { it.id == preselectedGardenId }
-                ?: gardens.singleOrNull()
+    LaunchedEffect(gardens, preselectedGardenId, editing, editingPlant?.id) {
+        if (selectedGarden == null) {
+            selectedGarden = if (editing) gardens.firstOrNull { it.id == editingPlant?.gardenId }
+                else gardens.firstOrNull { it.id == preselectedGardenId } ?: gardens.singleOrNull()
         }
+    }
+
+    LaunchedEffect(drugs, editingPlant?.id) {
+        if (editing && selectedDrug == null) selectedDrug = drugs.firstOrNull { it.id == editingPlant?.drugId }
     }
 
     LaunchedEffect(matchedTemplate?.id) {
@@ -295,17 +308,6 @@ fun PlantAdd(
         if (supported.isNotEmpty() && cultivationType !in supported) {
             cultivationType = supported.first()
         }
-    }
-
-    LaunchedEffect(drugs, pendingNewDrugName) {
-        val newDrugName = pendingNewDrugName ?: return@LaunchedEffect
-        drugs
-            .filter { it.name.equals(newDrugName, ignoreCase = true) }
-            .maxByOrNull { it.id }
-            ?.let { newDrug ->
-                selectedDrug = newDrug
-                pendingNewDrugName = null
-            }
     }
 
     fun calculateProgramForStart(
@@ -618,16 +620,17 @@ fun PlantAdd(
                                             if (ProgramProductCatalog.alternatives(row.programId, row.programStepId).isNotEmpty()) {
                                                 SecondaryAction("Добавить или заменить препарат", { editProductIndex = index }, Modifier.fillMaxWidth())
                                             }
-                                            if (drugs.isNotEmpty()) SelectionMenu(
+                                            SelectionMenu(
                                                 label = "Мой препарат", value = "Выбрать из моих средств", options = drugs,
                                                 optionLabel = { it.name }, onSelected = { drug ->
                                                     programRowsDraft = programRowsDraft.toMutableList().also { rows ->
-                                                        rows[index] = row.copy(drugId = drug.id, drugName = drug.name,
-                                                            programNote = listOf(drug.purpose, drug.consumptionRate).filter(String::isNotBlank).joinToString("\n"),
-                                                            repeatType = "NONE", repeatInterval = 1, wateringInterval = 1,
-                                                            repeatDaysOfWeek = "", repeatCount = null, repeatEndDate = null, repeatEndType = "NEVER")
+                                                        rows[index] = row.withPersonalProduct(drug, taskDrafts[index].startDate, row.reminderDaysBefore)
                                                     }
-                                                })
+                                                    taskDrafts = taskDrafts.toMutableList().also { tasks ->
+                                                        tasks[index] = tasks[index].copy(name = programRowsDraft[index].taskName)
+                                                    }
+                                                }, addActionLabel = "+ Добавить новый препарат",
+                                                onAddAction = { newDrugForRow = index; addDrugDialogOpen = true })
                                         }
                                     }
                                 }
@@ -644,14 +647,24 @@ fun PlantAdd(
                             }
                             if (!editingProgram) {
                             SelectionMenu(
-                                label = "Средство для обработки",
+                                label = "Средство",
                                 value = selectedDrug?.name ?: "Препарат не требуется",
-                                options = drugs,
+                                options = availableDrugs,
                                 optionLabel = { it.name },
-                                onSelected = { selectedDrug = it },
+                                onSelected = { drug ->
+                                    if (drug.id > 0) selectedDrug = drug
+                                    else {
+                                        drugSaving = true; drugError = null
+                                        drugsVm.addDrug(drug.name, drug.purpose, drug.consumptionRate, drug.applicationMethod,
+                                            onSaved = { selectedDrug = it; drugSaving = false },
+                                            onError = { drugError = it; drugSaving = false })
+                                    }
+                                },
                                 addActionLabel = "+ Добавить новый препарат",
-                                onAddAction = { addDrugDialogOpen = true }
+                                onAddAction = { newDrugForRow = null; addDrugDialogOpen = true }
                             )
+                            if (drugSaving) Text("Сохраняем средство…", color = Mist)
+                            drugError?.let { Text(it, color = Danger) }
                             }
                         }
                     }
@@ -792,6 +805,7 @@ fun PlantAdd(
                                 tasks = taskDrafts,
                                 wateringInterval = interval,
                                 drugId = selectedDrug?.id,
+                                drugNote = selectedDrug?.careNote,
                                 gardenId = selectedGarden?.id,
                                 drugName = selectedDrug?.name ?: "Препарат не требуется",
                                 gardenName = selectedGarden?.name.orEmpty(),
@@ -811,7 +825,7 @@ fun PlantAdd(
                                 }
                             )
                         },
-                        enabled = !programSaving && plantName.isNotBlank() && selectedGarden != null && taskDrafts.isNotEmpty() &&
+                        enabled = !programSaving && !drugSaving && plantName.isNotBlank() && selectedGarden != null && taskDrafts.isNotEmpty() &&
                             taskDrafts.all { it.name.isNotBlank() } && !invalidRepeatEnd && !invalidRepeatCount && !photoLoading,
                         modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
                     )
@@ -824,9 +838,16 @@ fun PlantAdd(
     if (addDrugDialogOpen) {
         AddDrugDialog(
             onDismiss = { addDrugDialogOpen = false },
-            onSave = { name, purpose, rate ->
-                pendingNewDrugName = name.trim()
-                drugsVm.addDrug(name.trim(), purpose.trim(), rate.trim())
+            onSaved = { drug ->
+                val index = newDrugForRow
+                if (index == null) selectedDrug = drug
+                else programRowsDraft = programRowsDraft.toMutableList().also {
+                    it[index] = it[index].withPersonalProduct(drug, taskDrafts[index].startDate, it[index].reminderDaysBefore)
+                }
+                if (index != null) taskDrafts = taskDrafts.toMutableList().also {
+                    it[index] = it[index].copy(name = programRowsDraft[index].taskName)
+                }
+                newDrugForRow = null
                 addDrugDialogOpen = false
             }
         )
@@ -840,6 +861,18 @@ fun PlantAdd(
             initialDate = if (editAfterInspection) LocalDate.now() else taskDrafts[requireNotNull(index)].startDate,
             initialReminder = row.reminderDaysBefore,
             onDismiss = { editProductIndex = null; editAfterInspection = false },
+            onCustomConfirm = { drug, problem, _, date, reminder ->
+                val updated = row.withPersonalProduct(drug, date, reminder, editAfterInspection, problem)
+                if (editAfterInspection) {
+                    programRowsDraft = programRowsDraft + updated
+                    taskDrafts = taskDrafts + PlantTaskDraft(updated.taskName, date)
+                } else {
+                    val position = requireNotNull(index)
+                    programRowsDraft = programRowsDraft.toMutableList().also { it[position] = updated }
+                    taskDrafts = taskDrafts.toMutableList().also { it[position] = it[position].copy(name = updated.taskName, startDate = date) }
+                }
+                editProductIndex = null; editAfterInspection = false
+            },
             onConfirm = { product, problem, cultivation, date, reminder ->
                 if (editAfterInspection) {
                     val added = row.problemTreatment(problem, product, cultivation, date, reminder)
@@ -1129,6 +1162,9 @@ private fun CareProgramPreviewDialog(
             initialCultivation = program.cultivationType,
             initialReminder = program.steps[index].reminderDaysBefore ?: 1,
             onDismiss = { productStepIndex = null },
+            onCustomConfirm = { drug, _, _, date, reminder ->
+                onProgramChange(program.withPersonalProduct(index, drug, date, reminder)); productStepIndex = null
+            },
             onConfirm = { product, _, _, date, reminder ->
                 onProgramChange(program.withProduct(index, product, date, reminder))
                 productStepIndex = null
@@ -1141,6 +1177,9 @@ private fun CareProgramPreviewDialog(
             initialDate = maxOf(LocalDate.now(), program.chosenStartDate),
             minimumDate = maxOf(LocalDate.now(), program.chosenStartDate),
             onDismiss = { problemTreatmentOpen = false },
+            onCustomConfirm = { drug, problem, _, date, reminder ->
+                onProgramChange(program.withPersonalProduct(null, drug, date, reminder, problem)); problemTreatmentOpen = false
+            },
             onConfirm = { product, problem, _, date, reminder ->
                 onProgramChange(program.withProblemTreatment(problem, product, date, reminder))
                 problemTreatmentOpen = false
@@ -1201,23 +1240,28 @@ internal fun <T> SelectionMenu(
 }
 
 @Composable
-private fun AddDrugDialog(
+internal fun AddDrugDialog(
     onDismiss: () -> Unit,
-    onSave: (name: String, purpose: String, rate: String) -> Unit
+    onSaved: (DrugEntity) -> Unit
 ) {
+    val app = LocalContext.current.applicationContext as BookeeperApp
+    val vm: DrugsViewmodel = viewModel(factory = DrugsViewmodelFactory(app.repository))
     var name by remember { mutableStateOf("") }
     var purpose by remember { mutableStateOf("") }
     var rate by remember { mutableStateOf("") }
+    var method by remember { mutableStateOf("UNSPECIFIED") }
+    var saving by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!saving) onDismiss() },
         containerColor = Forest900,
         titleContentColor = Cream,
         textContentColor = Cream,
         title = { Text("Новый препарат") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("После сохранения препарат появится здесь и на вкладке «Препараты».", color = Mist)
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Средство сохранится в Справочнике — Мои средства.", color = Mist)
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -1248,18 +1292,26 @@ private fun AddDrugDialog(
                     shape = CompactGlassShape,
                     modifier = Modifier.fillMaxWidth()
                 )
+                val methods = mapOf("UNSPECIFIED" to "Уточню позже", "TREATMENT" to "Внекорневое применение",
+                    "FERTILIZER" to "Корневое применение", "BOTH" to "Оба способа по инструкции")
+                SelectionMenu("Способ применения", methods.getValue(method), methods.keys.toList(), { methods.getValue(it) }, { method = it })
+                error?.let { Text(it, color = Danger) }
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onSave(name, purpose, rate) },
-                enabled = name.isNotBlank()
+                onClick = {
+                    saving = true; error = null
+                    vm.addDrug(name, purpose, rate, method, onSaved = onSaved,
+                        onError = { error = it; saving = false })
+                },
+                enabled = name.isNotBlank() && !saving
             ) {
-                Text("Добавить", color = Leaf300)
+                Text(if (saving) "Сохраняем…" else "Добавить", color = Leaf300)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = onDismiss, enabled = !saving) {
                 Text("Отмена", color = Mist)
             }
         }

@@ -72,7 +72,7 @@ class CareWorkflowInstrumentedTest {
                 }
             }
         }
-        val screens = listOf("Сады", "Календарь", "Справочник", "Препараты", "Удобрения", "Рецепты", "Баковые смеси")
+        val screens = listOf("Сады", "Календарь", "Справочник", "Мои средства", "Препараты", "Удобрения", "Рецепты", "Баковые смеси")
         screens.forEach { page ->
             compose.runOnIdle { main.changeScreen(page) }
             if (page == "Календарь") screenshot("calendar-back")
@@ -121,6 +121,7 @@ class CareWorkflowInstrumentedTest {
         assertEquals(plannedDate.toString(), mixture.creationDate)
         assertEquals("NONE", mixture.repeatType)
         assertTrue(mixture.programNote.contains("Лепидоцид, жидкий препарат — 20 мл"))
+        assertNotNull(mixture.drugId)
         compose.onNodeWithContentDescription("Календарь работ").performClick()
         if (plannedDate.month != LocalDate.now().month) compose.onNodeWithContentDescription("Следующий месяц").performClick()
         compose.onNode(hasContentDescription(plannedDate.toRussianDate(), substring = true)).performClick()

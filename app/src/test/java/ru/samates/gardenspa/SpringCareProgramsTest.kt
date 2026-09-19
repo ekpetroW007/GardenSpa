@@ -14,18 +14,19 @@ class SpringCareProgramsTest {
         val mixture = FolkFertilizers.tankMixes.single { it.id == FolkFertilizers.GREEN_CONE_ID }
         SeasonalCarePrograms.templates.forEach { original ->
             val updated = PlantCareCatalog.all().single { it.id == original.id }
+            val retained = original.steps.filterNot { it.title.contains("осмотреть", ignoreCase = true) }
             if (original.id !in SpringCarePrograms.woodyCrops) {
-                assertEquals(original.steps.map { it.id }, updated.steps.map { it.id })
+                assertEquals(retained.map { it.id }, updated.steps.map { it.id })
                 assertEquals(original.openGroundStartOffsetDays, updated.openGroundStartOffsetDays)
             } else {
-                assertEquals(7, updated.version)
-                assertEquals(original.steps.size + 2, updated.steps.size)
+                assertEquals(8, updated.version)
+                assertEquals(retained.size + 2, updated.steps.size)
                 assertEquals(SpringCarePrograms.EARLY_STEP, ProgramProductCatalog.baseStepId(updated.steps[0].id))
                 assertEquals(SpringCarePrograms.GREEN_STEP, updated.steps[1].id)
                 assertEquals(mixture.name, updated.steps[1].productDescription)
                 assertTrue(updated.steps[1].note.contains(mixture.ingredients))
                 assertTrue(updated.steps.take(2).all { it.recurrence == null })
-                original.steps.zip(updated.steps.drop(2)).forEach { (old, new) ->
+                retained.zip(updated.steps.drop(2)).forEach { (old, new) ->
                     assertEquals(old.id, new.id)
                     assertEquals(original.openGroundStartOffsetDays + old.offsetDays,
                         updated.openGroundStartOffsetDays + new.offsetDays)

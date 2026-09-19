@@ -15,6 +15,8 @@ import ru.samates.gardenspa.domain.CultivationType
 import ru.samates.gardenspa.domain.withProgramProduct
 import ru.samates.gardenspa.domain.problemTreatment
 import ru.samates.gardenspa.domain.FolkFertilizerRecipe
+import ru.samates.gardenspa.domain.withPersonalProduct
+import ru.samates.gardenspa.data.database.entity.DrugEntity
 import kotlinx.coroutines.CancellationException
 import java.time.LocalDate
 import java.util.UUID
@@ -147,6 +149,7 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
         repeatCount: Int? = null,
         reminderDaysBefore: Int = 1,
         photoUri: String? = null,
+        drugNote: String? = null,
         onSaved: () -> Unit = {}
     ) {
         viewModelScope.launch {
@@ -186,7 +189,7 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                         programVersion = previous?.programVersion,
                         programStepId = previous?.programStepId,
                         programImportKey = previous?.programImportKey,
-                        programNote = previous?.programNote.orEmpty(),
+                        programNote = drugNote ?: previous?.programNote.orEmpty(),
                         userLockedDate = previous?.programId != null || previous?.userLockedDate == true,
                         photoUri = photoUri ?: previous?.photoUri
                     )
@@ -302,16 +305,16 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
     fun saveProgramProduct(
         plant: PlantEntity, productId: String, date: LocalDate, reminder: Int,
         afterInspection: Boolean, problemId: String?, cultivation: CultivationType,
-        onSaved: () -> Unit, onError: (String) -> Unit
+        onSaved: () -> Unit, onError: (String) -> Unit, personalProduct: DrugEntity? = null
     ) {
         viewModelScope.launch {
             try {
                 require(!date.isBefore(LocalDate.now())) { "Выберите сегодняшнюю или будущую дату" }
-                if (afterInspection) {
-                    repository.addProgramTreatment(plant, plant.problemTreatment(problemId, productId, cultivation, date, reminder))
-                } else {
-                    repository.replaceUnusedProgramProduct(plant, plant.withProgramProduct(productId, date, reminder))
-                }
+                val replacement = personalProduct?.let { plant.withPersonalProduct(it, date, reminder, afterInspection, problemId) }
+                    ?: if (afterInspection) plant.problemTreatment(problemId, productId, cultivation, date, reminder)
+                    else plant.withProgramProduct(productId, date, reminder)
+                if (afterInspection) repository.addProgramTreatment(plant, replacement)
+                else repository.replaceUnusedProgramProduct(plant, replacement)
                 onSaved()
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -327,10 +330,12 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
             try {
                 require(recipe.isTankMix)
                 require(!date.isBefore(LocalDate.now())) { "Выберите сегодняшнюю или будущую дату" }
+                val savedDrug = repository.saveToMyProducts(DrugEntity(name = recipe.name,
+                    purpose = recipe.purposeForDrug(), consumptionRate = recipe.consumptionRate, applicationMethod = "TREATMENT"))
                 repository.addProgramTreatment(plant, plant.copy(
                     id = 0, plantCardId = plant.resolvedCardId,
                     taskName = "Использовать: ${recipe.name}",
-                    creationDate = date.toString(), drugId = null, drugName = recipe.name,
+                    creationDate = date.toString(), drugId = savedDrug.id, drugName = recipe.name,
                     programStepId = "tank_mix:${recipe.id}", programImportKey = null,
                     programNote = recipe.purposeForDrug() + "\n" + recipe.consumptionRate,
                     repeatType = "NONE", repeatInterval = 1, wateringInterval = 1,

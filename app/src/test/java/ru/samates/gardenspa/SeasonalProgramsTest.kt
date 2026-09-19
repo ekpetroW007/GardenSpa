@@ -16,8 +16,11 @@ class SeasonalProgramsTest {
         val templates = names.map { requireNotNull(PlantCareCatalog.find(it)) }
         assertEquals(12, templates.map { it.id }.toSet().size)
         for (template in templates) {
-            assertEquals(if (template.id in SpringCarePrograms.woodyCrops) 7 else 6, template.version)
-            assertTrue(template.steps.size >= 4)
+            assertEquals(if (template.id in SpringCarePrograms.woodyCrops) 8 else 7, template.version)
+            val retained = SeasonalCarePrograms.templates.single { it.id == template.id }.steps
+                .count { !it.title.contains("осмотреть", ignoreCase = true) }
+            assertEquals(retained + if (template.id in SpringCarePrograms.woodyCrops) 2 else 0, template.steps.size)
+            assertTrue(template.steps.none { it.title.contains("осмотреть", ignoreCase = true) })
             assertEquals(template.steps.size, template.steps.map { it.id }.toSet().size)
             val feeding = template.steps.first { it.id.startsWith("nutrition~") }
             val alternatives = ProgramProductCatalog.alternatives(template.id, feeding.id)

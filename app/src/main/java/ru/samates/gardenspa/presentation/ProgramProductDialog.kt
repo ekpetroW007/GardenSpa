@@ -35,6 +35,9 @@ import ru.samates.gardenspa.domain.ProgramProductCatalog
 import ru.samates.gardenspa.domain.PlantCareCatalog
 import ru.samates.gardenspa.domain.SINGLE_PRODUCT_WORK_NOTICE
 import ru.samates.gardenspa.domain.SpringCarePrograms
+import ru.samates.gardenspa.domain.ProgramProduct
+import ru.samates.gardenspa.domain.careNote
+import ru.samates.gardenspa.data.database.entity.DrugEntity
 import ru.samates.gardenspa.ui.theme.Cream
 import ru.samates.gardenspa.ui.theme.Danger
 import ru.samates.gardenspa.ui.theme.Forest900
@@ -52,6 +55,7 @@ internal fun ProgramProductDialog(
     initialReminder: Int = 1,
     saving: Boolean = false,
     error: String? = null,
+    onCustomConfirm: ((DrugEntity, String?, CultivationType, LocalDate, Int) -> Unit)? = null,
     onDismiss: () -> Unit,
     onConfirm: (productId: String, problemId: String?, cultivation: CultivationType, date: LocalDate, reminder: Int) -> Unit
 ) {
@@ -64,6 +68,8 @@ internal fun ProgramProductDialog(
     var cultivationName by rememberSaveable { mutableStateOf((initialCultivation ?: cultivations.singleOrNull())?.name) }
     val cultivation = cultivationName?.let(CultivationType::valueOf)
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
+    var customProduct by remember { mutableStateOf<DrugEntity?>(null) }
+    var addingCustom by remember { mutableStateOf(false) }
     var dateText by rememberSaveable { mutableStateOf(maxOf(initialDate, minimumDate).toString()) }
     var reminder by rememberSaveable { mutableStateOf(initialReminder) }
     var confirmed by rememberSaveable { mutableStateOf(false) }
@@ -73,16 +79,18 @@ internal fun ProgramProductDialog(
     val options = if (afterInspection) {
         cultivation?.let { ProgramProductCatalog.treatments(programId, problemId, it) }.orEmpty()
     } else ProgramProductCatalog.alternatives(programId, stepId)
-    val selected = options.firstOrNull { it.id == selectedId }
+    val selected = customProduct?.let { ProgramProduct("personal:${it.id}", it.name, "Мои средства",
+        "Применить: ${it.name}", it.purpose, it.careNote, "", crops = setOf(programId)) }
+        ?: options.firstOrNull { it.id == selectedId }
     val goBack: () -> Unit = {
         if (!saving) when {
-            selectedId != null -> { selectedId = null; confirmed = false }
+            selected != null -> { selectedId = null; customProduct = null; confirmed = false }
             afterInspection && choosingProduct -> choosingProduct = false
             else -> onDismiss()
         }
     }
 
-    LaunchedEffect(choosingProduct, selectedId) { scroll.scrollTo(0) }
+    LaunchedEffect(choosingProduct, selectedId, customProduct) { scroll.scrollTo(0) }
 
     Dialog(onDismissRequest = goBack, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize().padding(10.dp), color = Forest900, shape = GlassShape) {
@@ -115,6 +123,8 @@ internal fun ProgramProductDialog(
                             Text(cultivation?.displayName.orEmpty(), color = Leaf300)
                             Text(ProgramProductCatalog.problemsFor(programId).firstOrNull { it.id == problemId }?.label
                                 ?: "Каталог без подбора по диагнозу", color = Mist)
+                            val available = options.filter { it.unavailableReason == null }
+                            Text("Вариантов: ${available.size} · производителей: ${available.map { it.manufacturer }.distinct().size}", color = Mist)
                         } else {
                             Text("Выберите один вариант по задаче", color = Mist)
                             if (earlySpring) Text("Средства от болезней и зимующих вредителей решают разные задачи. Не смешивайте перечисленные варианты.", color = Mist)
@@ -147,11 +157,14 @@ internal fun ProgramProductDialog(
                                 }
                             }
                         }
+                        if (onCustomConfirm != null) SecondaryAction("Свой препарат", { addingCustom = true },
+                            Modifier.fillMaxWidth(), enabled = !saving)
                     } else {
                         Text(selected.displayName, color = Leaf300, style = MaterialTheme.typography.titleLarge)
                         Text(selected.purpose, color = Cream)
                         LinkifiedText(selected.instruction, color = Cream)
-                        LinkifiedText("Инструкция производителя: ${selected.sourceUrl}", color = Leaf300)
+                        if (selected.sourceUrl.isNotBlank()) LinkifiedText("Инструкция производителя: ${selected.sourceUrl}", color = Leaf300)
+                        selected.retailUrl?.let { LinkifiedText("В каталоге Лемана Про: $it", color = Leaf300) }
                         selected.unavailableReason?.let { Text(it, color = Danger) }
                         Text("Одна обработка · без автоматического погодного окна", color = Mist)
                         ExpandableInfo("Правила обработки", "$SINGLE_PRODUCT_WORK_NOTICE\n$PRODUCT_LABEL_NOTICE")
@@ -181,9 +194,11 @@ internal fun ProgramProductDialog(
                         enabled = cultivation != null && !saving)
                 } else if (selected != null) {
                     PrimaryAction(if (saving) "Сохраняем…" else if (afterInspection) "Добавить обработку" else "Выбрать этот препарат", {
-                        onConfirm(selected.id, problemId, cultivation ?: CultivationType.OPEN_GROUND, LocalDate.parse(dateText), reminder)
+                        val custom = customProduct
+                        if (custom != null) onCustomConfirm?.invoke(custom, problemId, cultivation ?: CultivationType.OPEN_GROUND, LocalDate.parse(dateText), reminder)
+                        else onConfirm(selected.id, problemId, cultivation ?: CultivationType.OPEN_GROUND, LocalDate.parse(dateText), reminder)
                     }, Modifier.fillMaxWidth(), enabled = !saving && confirmed && selected.unavailableReason == null)
-                    SecondaryAction("К списку препаратов", { selectedId = null; confirmed = false }, Modifier.fillMaxWidth(), enabled = !saving)
+                    SecondaryAction("К списку препаратов", { selectedId = null; customProduct = null; confirmed = false }, Modifier.fillMaxWidth(), enabled = !saving)
                 } else if (afterInspection) {
                     SecondaryAction("Изменить проблему или грунт", { choosingProduct = false }, Modifier.fillMaxWidth(), enabled = !saving)
                 }
@@ -191,6 +206,9 @@ internal fun ProgramProductDialog(
             }
         }
     }
+    if (addingCustom) AddDrugDialog(onDismiss = { addingCustom = false }, onSaved = {
+        customProduct = it; selectedId = null; confirmed = false; addingCustom = false
+    })
     if (datePickerOpen) {
         GardenDatePickerDialog("Дата обработки", LocalDate.parse(dateText), { date ->
             dateText = maxOf(date, minimumDate).toString()

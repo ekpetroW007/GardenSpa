@@ -90,9 +90,18 @@ fun GardenLocationSetup(navController: NavController, gardenId: Int) {
                 if (garden == null) {
                     EmptyGlassState("Сад не найден", "Вернитесь назад и выберите сад ещё раз")
                 } else {
+                    if (!garden.locationName.isNullOrBlank()) GlassCard(Modifier.fillMaxWidth()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(garden.locationName, color = Cream, style = MaterialTheme.typography.titleLarge)
+                            garden.climateOrNull()?.let { Text("Климат: ${it.displayName()}", color = Mist) }
+                            garden.climateUpdatedAt?.substringBefore('T')?.let {
+                                Text("Расчёт обновлён ${it.toRussianDateOrSelf()}", color = Mist)
+                            }
+                        }
+                    }
                     GlassCard(Modifier.fillMaxWidth()) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("Укажите место", color = Cream, style = MaterialTheme.typography.titleLarge)
+                            Text(if (garden.locationName.isNullOrBlank()) "Укажите место" else "Изменить место сада", color = Cream, style = MaterialTheme.typography.titleLarge)
                             Text("GardenSpa использует его только для подбора сроков ухода.", color = Mist)
                             SecondaryAction(
                                 "Определить автоматически",
@@ -106,7 +115,8 @@ fun GardenLocationSetup(navController: NavController, gardenId: Int) {
                             )
                             OutlinedTextField(
                                 value = locality,
-                                onValueChange = { locality = it },
+                                enabled = !loading,
+                                onValueChange = { locality = it; resolvedLocation = null; climate = null },
                                 label = { Text("Город или посёлок") },
                                 keyboardOptions = SentenceKeyboardOptions,
                                 singleLine = true,

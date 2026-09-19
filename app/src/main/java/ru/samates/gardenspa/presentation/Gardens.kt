@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -24,6 +25,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -92,6 +94,14 @@ fun MyGardens(navController: NavController, innerPadding: PaddingValues, onBack:
                 }
             )
         }
+        val unassigned = plants.filter { row -> gardens.none { it.id == row.gardenId } }.toPlantCards()
+        if (unassigned.isNotEmpty()) item(key = "unassigned") {
+            GardenGlassCard(
+                garden = null, plantCards = unassigned, onActions = {}, onLocation = {},
+                onPlantOpen = { navController.navigate(AppDestinations.plantDetails(it)) },
+                onAddPlant = { navController.navigate(AppDestinations.plantAdd(LocalDate.now().toString())) }
+            )
+        }
     }
 
     gardenForActions?.let { garden ->
@@ -132,30 +142,25 @@ fun MyGardens(navController: NavController, innerPadding: PaddingValues, onBack:
 
 @Composable
 private fun GardenGlassCard(
-    garden: GardenEntity,
+    garden: GardenEntity?,
     plantCards: List<PlantCard>,
     onActions: () -> Unit,
     onLocation: () -> Unit,
     onPlantOpen: (Int) -> Unit,
     onAddPlant: () -> Unit
 ) {
+    var query by rememberSaveable(garden?.id) { mutableStateOf("") }
+    val visiblePlants = plantCards.filter { it.primary.plantName.contains(query.trim(), ignoreCase = true) }
     val next = plantCards.flatMap { it.procedures }
         .mapNotNull { row -> runCatching { LocalDate.parse(row.creationDate) }.getOrNull()?.let { it to row } }
         .filter { (date, _) -> !date.isBefore(LocalDate.now()) }
         .minByOrNull { it.first }
     GlassCard(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(garden.name, style = MaterialTheme.typography.headlineMedium, color = Cream)
-            if (garden.locationName.isNullOrBlank()) {
-                Text("Место не указано — сроки программ могут быть неточными", color = Mist)
-                SecondaryAction("Указать место сада", onLocation, Modifier.fillMaxWidth())
-            } else {
-                Text("Место: ${garden.locationName}", color = Leaf300)
-                garden.climateOrNull()?.let { Text("Условия: ${it.displayName()}", color = Mist) }
-                garden.climateUpdatedAt?.substringBefore('T')?.let {
-                    Text("Расчёт обновлён ${it.toRussianDateOrSelf()}", color = Mist)
-                }
-                Text("Изменить место", color = Mist, modifier = Modifier.clickable(onClick = onLocation))
+            Text(garden?.name ?: "Растения без сада", style = MaterialTheme.typography.headlineMedium, color = Cream)
+            if (garden != null) {
+                SecondaryAction(garden.locationName?.takeIf(String::isNotBlank)?.let { "Место: $it  ›" }
+                    ?: "Указать место сада", onLocation, Modifier.fillMaxWidth())
             }
             Text("${plantCountText(plantCards.size)} · ${plantCards.sumOf { it.procedures.size }} работ по уходу", color = Mist)
             next?.let { (date, row) ->
@@ -169,7 +174,11 @@ private fun GardenGlassCard(
             if (plantCards.isEmpty()) {
                 Text("В этом саду пока нет растений", color = Mist)
             } else {
-                plantCards.take(4).forEach { card ->
+                OutlinedTextField(value = query, onValueChange = { query = it },
+                    label = { Text("Поиск растений в этом саду") }, singleLine = true,
+                    colors = glassTextFieldColors(), modifier = Modifier.fillMaxWidth())
+                if (visiblePlants.isEmpty()) Text("Растения не найдены. Измените запрос.", color = Mist)
+                visiblePlants.forEach { card ->
                     val plant = card.primary
                     Row(
                         modifier = Modifier.fillMaxWidth().clickable { onPlantOpen(plant.id) }.padding(vertical = 7.dp),
@@ -185,7 +194,7 @@ private fun GardenGlassCard(
                 }
             }
             PrimaryAction("Добавить растение", onAddPlant, Modifier.fillMaxWidth())
-            SecondaryAction("Действия с садом", onActions, Modifier.fillMaxWidth())
+            if (garden != null) SecondaryAction("Действия с садом", onActions, Modifier.fillMaxWidth())
         }
     }
 }

@@ -40,6 +40,7 @@ fun DrugAdd(navController: NavController, drugId: Int? = null) {
     var rate by remember { mutableStateOf("") }
     var applicationMethod by remember { mutableStateOf("UNSPECIFIED") }
     var fieldsInitialized by remember(drugId) { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
 
     LaunchedEffect(drug, fieldsInitialized) {
         if (drug != null && !fieldsInitialized) {
@@ -81,8 +82,10 @@ fun DrugAdd(navController: NavController, drugId: Int? = null) {
                                 if (editing) "Сохранить изменения" else "Сохранить средство",
                                 onClick = {
                                     if (drugId == null) {
-                                        viewModel.addDrug(name.trim(), purpose.trim(), rate.trim(), applicationMethod)
-                                        navController.popBackStack()
+                                        saving = true
+                                        viewModel.addDrug(name.trim(), purpose.trim(), rate.trim(), applicationMethod,
+                                            onSaved = { navController.popBackStack() },
+                                            onError = { saving = false; android.widget.Toast.makeText(app, it, android.widget.Toast.LENGTH_LONG).show() })
                                     } else {
                                         viewModel.updateDrug(
                                             id = drugId,
@@ -94,7 +97,7 @@ fun DrugAdd(navController: NavController, drugId: Int? = null) {
                                         )
                                     }
                                 },
-                                enabled = name.isNotBlank(),
+                                enabled = !saving && name.isNotBlank(),
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }

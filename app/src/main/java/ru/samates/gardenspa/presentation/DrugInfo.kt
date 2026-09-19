@@ -26,7 +26,7 @@ fun DrugInfo(
 ) {
     BotanicalBackground {
         Column(Modifier.fillMaxSize()) {
-            ScreenHeader("Средство для обработки", "Назначение и применение", onBack = { navController.popBackStack() })
+            ScreenHeader("Средство", "Назначение и применение", onBack = { navController.popBackStack() })
             Column(
                 modifier = Modifier
                     .fillMaxSize()

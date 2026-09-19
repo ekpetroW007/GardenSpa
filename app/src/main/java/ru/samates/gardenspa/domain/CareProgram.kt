@@ -352,7 +352,11 @@ object PlantCareCatalog {
             ),
             openGroundStartOffsetDays = -21
         )
-    ) + SeasonalCarePrograms.templates.map(SpringCarePrograms::withSpringStages)).map(PlantCareTemplate::withoutSeasonLabels)
+    ) + SeasonalCarePrograms.templates.map(SpringCarePrograms::withSpringStages)).map { template ->
+        val clean = template.withoutSeasonLabels()
+        val steps = clean.steps.filterNot { it.title.contains("осмотреть", ignoreCase = true) }
+        clean.copy(steps = steps, version = clean.version + if (steps.size != clean.steps.size) 1 else 0)
+    }
 
     private fun standardTreatmentSteps(cropLabel: String): List<CareStepTemplate> = listOf(
         CareStepTemplate(
@@ -389,7 +393,7 @@ object PlantCareCatalog {
         id = id,
         canonicalName = name,
         aliases = aliases,
-        version = 3,
+        version = 4,
         supportedCultivationTypes = if (greenhouseStartOffsetDays < 0 && id in setOf("sweet-pepper", "eggplant")) {
             CultivationType.entries.toSet()
         } else {
@@ -397,7 +401,11 @@ object PlantCareCatalog {
         },
         openGroundStartOffsetDays = openGroundStartOffsetDays,
         greenhouseStartOffsetDays = greenhouseStartOffsetDays,
-        steps = standardTreatmentSteps(name.lowercase(Locale.forLanguageTag("ru")))
+        steps = standardTreatmentSteps(name.lowercase(Locale.forLanguageTag("ru"))) + CareStepTemplate(
+            id = "mineral_nutrition", title = "Корневая подкормка по потребности", offsetDays = 28,
+            windowBeforeDays = 7, windowAfterDays = 7,
+            note = "Выберите удобрение по составу, состоянию почвы и уже внесённому питанию. Проверьте фазу растения и назначьте дату по инструкции выбранного продукта. Все перечисленные удобрения одновременно не вносить."
+        )
     )
 
     fun find(userInput: String): PlantCareTemplate? {

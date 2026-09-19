@@ -27,6 +27,15 @@ fun ReferenceHub(innerPadding: PaddingValues, onBack: (() -> Unit)? = null, onOp
             ScreenHeader("Справочник", "Выберите, что хотите найти", onBack)
         }
         item {
+            GlassCard(Modifier.fillMaxWidth(), onClick = { onOpen("Мои средства") }) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Мои средства", color = Cream, style = MaterialTheme.typography.titleLarge)
+                    Text("Ваши препараты и сохранённые баковые смеси и народные рецепты", color = Mist)
+                    Text("Открыть мои средства  →", color = Leaf300)
+                }
+            }
+        }
+        item {
             GlassCard(Modifier.fillMaxWidth(), onClick = { onOpen("Препараты") }) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(ru.samates.gardenspa.domain.ProductSection.TREATMENT.title, color = Cream, style = MaterialTheme.typography.titleLarge)

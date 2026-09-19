@@ -44,16 +44,16 @@ import ru.samates.gardenspa.viewmodel.DrugsViewmodel
 import ru.samates.gardenspa.viewmodel.DrugsViewmodelFactory
 
 @Composable
-fun Drugs(navController: NavController, innerPadding: PaddingValues, section: ProductSection = ProductSection.TREATMENT, onBack: (() -> Unit)? = null) {
+fun Drugs(navController: NavController, innerPadding: PaddingValues, section: ProductSection? = ProductSection.TREATMENT, onBack: (() -> Unit)? = null) {
     val application = LocalContext.current.applicationContext as BookeeperApp
     val drugsVm: DrugsViewmodel = viewModel(factory = DrugsViewmodelFactory(application.repository))
     val drugs by drugsVm.drugs.collectAsState()
     var query by rememberSaveable(section) { mutableStateOf("") }
-    val catalog = remember(section, query) { ProgramReferenceCatalog.entries(section, query) }
+    val catalog = remember(section, query) { section?.let { ProgramReferenceCatalog.entries(it, query) }.orEmpty() }
     var drugForActions by remember { mutableStateOf<DrugEntity?>(null) }
     var drugPendingDelete by remember { mutableStateOf<DrugEntity?>(null) }
     val filtered = drugs.filter {
-        it.applicationMethod in setOf(section.name, "BOTH", "UNSPECIFIED") &&
+        section == null &&
             (query.isBlank() || it.name.contains(query, true) || it.purpose.contains(query, true))
     }
 
@@ -64,8 +64,8 @@ fun Drugs(navController: NavController, innerPadding: PaddingValues, section: Pr
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                ScreenHeader(section.title, onBack = onBack)
-                PrimaryAction("+ Добавить", { navController.navigate(AppDestinations.DRUG_ADD_ROUTE) }, Modifier.fillMaxWidth())
+                ScreenHeader(section?.title ?: "Мои средства", onBack = onBack)
+                if (section == null) PrimaryAction("+ Добавить новый препарат", { navController.navigate(AppDestinations.DRUG_ADD_ROUTE) }, Modifier.fillMaxWidth())
             }
         }
         item {
@@ -104,7 +104,6 @@ fun Drugs(navController: NavController, innerPadding: PaddingValues, section: Pr
         if (catalog.isEmpty() && filtered.isEmpty()) {
             item { EmptyGlassState("Ничего не найдено", "Измените запрос или добавьте новый препарат") }
         }
-        item { SectionTitle("Мои средства") }
         items(filtered, key = { "my:${it.id}" }) { drug ->
             DrugCard(
                 drug = drug,

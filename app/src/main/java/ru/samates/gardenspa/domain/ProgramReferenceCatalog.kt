@@ -2,6 +2,8 @@ package ru.samates.gardenspa.domain
 
 /** A shared reference view of program products; no copies are seeded into the user's database. */
 object ProgramReferenceCatalog {
+    fun allEntries(): List<ProgramProduct> = ProductSection.entries.flatMap { entries(it) }.distinctBy { it.id }
+
     private val fertilizerSteps = setOf("gumi_omi_planting", "gumi_omi_feeding", "gumi_omi_7_8_leaves",
         "fitosporin_roots", "kornesil_planting")
     private val sprayingSteps = setOf("fitosporin_spraying", "borogum_flowering", "bogaty_flowering")
@@ -37,7 +39,8 @@ object ProgramReferenceCatalog {
             variants.first().copy(
                 crops = variants.flatMap { it.crops }.toSet(),
                 purpose = variants.map { it.purpose }.distinct().joinToString("\n"),
-                instruction = variants.map { "${it.taskTitle}\n${it.instruction}\nИсточник: ${it.sourceUrl}" }
+                instruction = variants.map { "${it.taskTitle}\n${it.instruction}\nИсточник: ${it.sourceUrl}" +
+                    (it.retailUrl?.let { url -> "\nВ каталоге Лемана Про: $url" } ?: "") }
                     .distinct().joinToString("\n\n")
             )
         }

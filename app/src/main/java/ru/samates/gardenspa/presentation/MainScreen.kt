@@ -43,6 +43,7 @@ fun MainScreen(
                     userViewModel = userViewModel
                 )
                 "Справочник" -> ReferenceHub(innerPadding, onBack, viewModel::changeScreen)
+                "Мои средства" -> Drugs(navController, innerPadding, section = null, onBack = onBack)
                 "Препараты" -> Drugs(navController, innerPadding, onBack = onBack)
                 "Удобрения" -> Drugs(navController, innerPadding, ru.samates.gardenspa.domain.ProductSection.FERTILIZER, onBack)
                 "Рецепты" -> FolkRecipes(innerPadding, onBack = onBack)

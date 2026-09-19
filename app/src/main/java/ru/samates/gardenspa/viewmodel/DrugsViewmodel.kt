@@ -8,6 +8,7 @@ import ru.samates.gardenspa.data.repository.BookeeperRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 
 class DrugsViewmodel(
     private val repository: BookeeperRepository
@@ -19,7 +20,8 @@ class DrugsViewmodel(
             initialValue = emptyList()
         )
 
-    fun addDrug(name: String, purpose: String, consumptionRate: String, applicationMethod: String = "UNSPECIFIED") {
+    fun addDrug(name: String, purpose: String, consumptionRate: String, applicationMethod: String = "UNSPECIFIED",
+        onSaved: (DrugEntity) -> Unit = {}, onError: (String) -> Unit = {}) {
         viewModelScope.launch {
             try {
                 val newDrug = DrugEntity(
@@ -28,9 +30,11 @@ class DrugsViewmodel(
                     consumptionRate = consumptionRate,
                     applicationMethod = applicationMethod
                 )
-                repository.insertDrug(newDrug)
+                onSaved(repository.saveToMyProducts(newDrug))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
-                Log.d("addDrug", e.toString())
+                onError(e.message ?: "Не удалось сохранить средство")
             }
         }
     }

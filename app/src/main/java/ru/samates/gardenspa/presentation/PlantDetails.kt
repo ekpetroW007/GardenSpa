@@ -187,6 +187,14 @@ fun PlantDetails(navController: NavController, plantId: Int) {
             initialReminder = work.reminderDaysBefore,
             saving = productSaving, error = productError,
             onDismiss = { if (!productSaving) productWork = null },
+            onCustomConfirm = { drug, problem, cultivation, date, reminder ->
+                productSaving = true; productError = null
+                plantsVm.saveProgramProduct(work, "", date, reminder, afterInspection, problem, cultivation,
+                    onSaved = {
+                        TreatmentReminderScheduler.refreshNow(app)
+                        productSaving = false; productWork = null
+                    }, onError = { productError = it; productSaving = false }, personalProduct = drug)
+            },
             onConfirm = { product, problem, cultivation, date, reminder ->
                 productSaving = true
                 productError = null

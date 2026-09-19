@@ -22,7 +22,8 @@ data class ProgramProduct(
     val problems: Set<String> = emptySet(),
     val cultivationTypes: Set<CultivationType> = CultivationType.entries.toSet(),
     val unavailableReason: String? = null,
-    val sections: Set<ProductSection> = setOf(ProductSection.TREATMENT)
+    val sections: Set<ProductSection> = setOf(ProductSection.TREATMENT),
+    val retailUrl: String? = null
 ) {
     val displayName: String get() = "$name — $manufacturer"
     val note: String get() = "$purpose\n$instruction\nИсточник: $sourceUrl\n$PRODUCT_LABEL_NOTICE\n$SINGLE_PRODUCT_WORK_NOTICE"
@@ -43,7 +44,7 @@ object ProgramProductCatalog {
     val allowedManufacturers = setOf("Август", "ЩёлковоАгрохим", "ФМРус", "BonaForte", "Фаско", "Гера",
         "Ортон", "Агрикола", "HB-101", "БашИнком", "Фармбиомед", "Syngenta", "Нэст-М", "Петрович",
         "Green Belt", "Био-комплекс", "Аминосил", "Органик Микс", "5сезонов",
-        "НПФ Собер") // Manufacturer of 30 Plus, explicitly requested in the spring-program update.
+        "НПФ Собер", "Буйский химический завод", "Ваше хозяйство")
 
     fun supports(programId: String?): Boolean = programId in supportedCrops
 
@@ -180,9 +181,15 @@ object ProgramProductCatalog {
                 problems = product.problems + setOf("powdery_mildew", "downy_mildew", "late_blight", "gray_mold", "leaf_spot", "scab"),
                 taskTitle = "Обработать растение при обнаруженной проблеме")
             "muchnistop" -> product.copy(crops = supportedCrops - setOf("potato", "lawn"))
+            "silver_prevention" -> product.copy(crops = product.crops + "sweet-pepper")
             else -> product
         }
-    } + SeasonalProgramProducts.products + SpringCarePrograms.products
+    } + SeasonalProgramProducts.products.map { product ->
+        if (product.id.startsWith("fitoverm_")) product.copy(retailUrl = "https://ufa.lemanapro.ru/catalogue/zashchita-rasteniy-ot-bolezney/insekticidy-dlya-rasteniy/")
+        else if (product.id.startsWith("ordan_") || product.id.startsWith("rayek_"))
+            product.copy(retailUrl = "https://ulyanovsk.lemanapro.ru/catalogue/zashchita-rasteniy-ot-bolezney/")
+        else product
+    } + SpringCarePrograms.products + MineralProgramProducts.products + LemanaProgramProducts.products
 
     fun baseStepId(stepId: String): String = stepId.substringBefore("~").substringBefore(":remaining:")
     fun stepWithProduct(stepId: String, productId: String): String =
@@ -200,7 +207,7 @@ object ProgramProductCatalog {
             "nutrition", "nutrition_review" -> SeasonalProgramProducts.feedingIds(programId!!)
             "lawn_autumn_nutrition" -> setOf("organic_lawn_autumn", "bona_lawn_autumn")
             "gumi_omi_planting" -> if (programId == "tomato") setOf("organic_tomato", "maxi_nutrition") else setOf("maxi_nutrition")
-            "fitosporin_spraying", "preventive_disease_treatment" -> setOf("silver_prevention", "biozashchitin_prevention")
+            "fitosporin_spraying", "preventive_disease_treatment" -> setOf("silver_prevention", "biozashchitin_prevention", "sporobacterin_vegetables")
             "pest_treatment_if_needed" -> products.filter { it.problems.any { problem ->
                 problems.any { p -> p.id == problem && p.kind == PlantProblemKind.PEST }
             } }.map { it.id }.toSet()
@@ -213,7 +220,8 @@ object ProgramProductCatalog {
                     ?.any { baseStepId(it.id) == baseStepId(stepId) && it.productDescription == null } == true)
                 products.filter { it.problems.isEmpty() }.map { it.id }.toSet() else emptySet()
         }
-        return products.filter { it.id in ids && programId in it.crops }
+        val mineralIds = MineralProgramProducts.forStep(requireNotNull(programId), baseStepId(stepId))
+        return products.filter { it.id in (ids + mineralIds) && programId in it.crops }
     }
 
     fun problemsFor(programId: String): List<PlantProblem> = problems.filter { programId in it.crops }
