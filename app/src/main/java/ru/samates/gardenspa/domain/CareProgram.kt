@@ -14,7 +14,8 @@ enum class CultivationType(val displayName: String) {
 
 enum class CareAnchor {
     START_DATE,
-    SAFE_SPRING_DATE
+    SAFE_SPRING_DATE,
+    SAFE_AUTUMN_DATE
 }
 
 data class WeatherLimits(
@@ -40,7 +41,8 @@ data class CareStepTemplate(
     val weatherLimits: WeatherLimits = WeatherLimits(),
     val recurrence: CareRecurrence? = null,
     val productDescription: String? = null,
-    val note: String
+    val note: String,
+    val excludeInSouthernRegion: Boolean = false
 )
 
 data class PlantCareTemplate(
@@ -58,7 +60,8 @@ data class CareProgramContext(
     val startDate: LocalDate,
     val cultivationType: CultivationType,
     val climate: ClimateFingerprint,
-    val forecast: List<ForecastWeatherDay> = emptyList()
+    val forecast: List<ForecastWeatherDay> = emptyList(),
+    val isSouthernRegion: Boolean = false
 )
 
 data class GeneratedCareStep(
@@ -352,9 +355,10 @@ object PlantCareCatalog {
             ),
             openGroundStartOffsetDays = -21
         )
-    ) + SeasonalCarePrograms.templates.map(SpringCarePrograms::withSpringStages)).map { template ->
+    ) + ExpandedCarePrograms.expand(SeasonalCarePrograms.templates).map(SpringCarePrograms::withSpringStages)).map { template ->
         val clean = template.withoutSeasonLabels()
-        val steps = clean.steps.filterNot { it.title.contains("осмотреть", ignoreCase = true) }
+        val steps = clean.steps.filterNot { it.title.contains("осмотреть", ignoreCase = true) ||
+            it.id.substringBefore("~").substringBefore(":remaining:") == "after_flowering" }
         clean.copy(steps = steps, version = clean.version + if (steps.size != clean.steps.size) 1 else 0)
     }
 
@@ -445,10 +449,11 @@ class CareProgramGenerator {
         }
         val forecastByDate = context.forecast.associateBy { it.date }
 
-        val generatedSteps = template.steps.map { step ->
+        val generatedSteps = template.steps.filterNot { it.excludeInSouthernRegion && context.isSouthernRegion }.map { step ->
             val anchorDate = when (step.anchor) {
                 CareAnchor.START_DATE -> if (continuesStartedSeason) recommendedStart else context.startDate
                 CareAnchor.SAFE_SPRING_DATE -> recommendedStart
+                CareAnchor.SAFE_AUTUMN_DATE -> context.climate.safeAutumnDate(context.startDate.year)
             }
             val initialDate = anchorDate.plusDays(step.offsetDays.toLong())
             val windowStart = initialDate.minusDays(step.windowBeforeDays.toLong())
@@ -496,7 +501,18 @@ class CareProgramGenerator {
             )
         }.let { steps ->
             if (continuesStartedSeason) {
-                steps.flatMap { it.remainingFrom(context.startDate) }
+                // Keep the three dependent leaf checks together, including a start between checks.
+                val leafCheck = steps.firstOrNull { it.templateStepId.startsWith("hydrangea_pale_acid") }
+                val leafShift = leafCheck?.remainingFrom(context.startDate)?.firstOrNull()?.let {
+                    ChronoUnit.DAYS.between(leafCheck.scheduledDate, it.scheduledDate)
+                } ?: 0L
+                steps.flatMap { step ->
+                    if (step.templateStepId.substringBefore("~") in setOf("hydrangea_pale_acid", "hydrangea_pale_iron", "hydrangea_yellow_magnesium"))
+                        listOf(step.copy(scheduledDate = step.scheduledDate.plusDays(leafShift),
+                            windowStart = step.windowStart.plusDays(leafShift), windowEnd = step.windowEnd.plusDays(leafShift),
+                            explanation = if (leafShift == 0L) step.explanation else "Цепочка осмотров перенесена целиком с сохранением интервалов 5 дней."))
+                    else step.remainingFrom(context.startDate)
+                }
             } else {
                 steps
             }

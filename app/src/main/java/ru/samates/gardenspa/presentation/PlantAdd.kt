@@ -174,6 +174,7 @@ fun PlantAdd(
     val editingProgram = editingRows.isNotEmpty() && editingRows.any { it.programId != null }
 
     var plantName by remember { mutableStateOf("") }
+    var southernRegion by rememberSaveable { mutableStateOf(false) }
     var taskDrafts by remember(plantId, requestedDate) { mutableStateOf(listOf(PlantTaskDraft("", startDate))) }
     var taskDatePickerIndex by remember { mutableStateOf<Int?>(null) }
     var selectedDrug by remember { mutableStateOf<DrugEntity?>(null) }
@@ -333,7 +334,8 @@ fun PlantAdd(
                         startDate = effectiveStartDate,
                         cultivationType = cultivationType,
                         climate = climate,
-                        forecast = forecast
+                        forecast = forecast,
+                        isSouthernRegion = southernRegion
                     )
                 )
             }.onSuccess {
@@ -512,6 +514,11 @@ fun PlantAdd(
                                                 )
                                             )
                                         }
+                                    }
+                                    if (matchedTemplate.id == "hydrangea-macrophylla") {
+                                        FilterChip(selected = southernRegion, onClick = { southernRegion = !southernRegion },
+                                            label = { Text(if (southernRegion) "Южный регион — без укрытия" else "Другой регион — добавить укрытие") })
+                                        Text("Нажмите, чтобы указать южный регион: осеннее укрытие будет исключено из новой программы.", color = Mist)
                                     }
                                     SecondaryAction(
                                         "Желаемая дата: ${programStartDate.toRussianDate()}",

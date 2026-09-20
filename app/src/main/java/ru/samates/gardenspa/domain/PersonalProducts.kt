@@ -16,11 +16,11 @@ fun PlantEntity.withPersonalProduct(drug: DrugEntity, date: LocalDate, reminder:
     require(drug.id > 0 && reminder in setOf(0, 1, 5))
     val problem = ProgramProductCatalog.problems.firstOrNull { it.id == problemId }?.label ?: "Болезнь / вредитель не указаны пользователем"
     return copy(id = if (afterInspection) 0 else id, plantCardId = resolvedCardId,
-        taskName = "Применить: ${drug.name}",
+        taskName = if (afterInspection) "Применить: ${drug.name}" else selectedProductTitle(programId, programStepId, "Применить: ${drug.name}"),
         drugId = drug.id, drugName = drug.name, creationDate = date.toString(),
         programStepId = if (afterInspection) "problem:personal:${UUID.randomUUID()}" else programStepId?.let { ProgramProductCatalog.stepWithProduct(it, "personal:${drug.id}") },
         programImportKey = if (afterInspection) null else programImportKey,
-        programNote = (if (afterInspection) "После осмотра: $problem.\n" else "") + drug.careNote,
+        programNote = if (afterInspection) "После осмотра: $problem.\n${drug.careNote}" else selectedProductNote(programId, programStepId, drug.careNote),
         repeatType = "NONE", repeatInterval = 1, wateringInterval = 1, repeatDaysOfWeek = "",
         repeatEndType = "NEVER", repeatEndDate = null, repeatCount = null,
         reminderDaysBefore = reminder, userLockedDate = true)
@@ -34,10 +34,10 @@ fun GeneratedCareProgram.withPersonalProduct(index: Int?, drug: DrugEntity, date
     val added = GeneratedCareStep(
         templateStepId = previous?.templateStepId?.let { ProgramProductCatalog.stepWithProduct(it, "personal:${drug.id}") }
             ?: "problem:personal:${UUID.randomUUID()}",
-        title = "Применить: ${drug.name}", scheduledDate = date, windowStart = date, windowEnd = date,
+        title = selectedProductTitle(templateId, previous?.templateStepId, "Применить: ${drug.name}"), scheduledDate = date, windowStart = date, windowEnd = date,
         recurrence = null, weatherAdjusted = false, needsWeatherConfirmation = true,
         explanation = "Выбрано собственное средство. Условия применения — по его инструкции.",
-        productDescription = drug.name, note = (if (index == null) "После осмотра: $problem.\n" else "") + drug.careNote,
+        productDescription = drug.name, note = if (index == null) "После осмотра: $problem.\n${drug.careNote}" else selectedProductNote(templateId, previous?.templateStepId, drug.careNote),
         reminderDaysBefore = reminder)
     return copy(steps = if (index == null) steps + added else steps.toMutableList().also { it[index] = added })
 }

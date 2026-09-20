@@ -26,7 +26,7 @@ data class ProgramProduct(
     val retailUrl: String? = null
 ) {
     val displayName: String get() = "$name — $manufacturer"
-    val note: String get() = "$purpose\n$instruction\nИсточник: $sourceUrl\n$PRODUCT_LABEL_NOTICE\n$SINGLE_PRODUCT_WORK_NOTICE"
+    val note: String get() = "$purpose\n$instruction\nИсточник: ${sourceUrl.ifBlank { "Рецепт пользователя" }}\n$PRODUCT_LABEL_NOTICE\n$SINGLE_PRODUCT_WORK_NOTICE"
 }
 
 const val PRODUCT_LABEL_NOTICE = "Сверьте точную форму препарата, культуру, грунт, цель обработки, норму, срок ожидания и меры защиты с этикеткой. Не смешивайте выбранные альтернативы."
@@ -37,14 +37,16 @@ enum class PlantProblemKind(val label: String) { DISEASE("Болезнь"), PEST
 data class PlantProblem(val id: String, val label: String, val kind: PlantProblemKind, val crops: Set<String>)
 
 object ProgramProductCatalog {
-    val supportedCrops = setOf("tomato", "cucumber", "peony", "hydrangea", "rose", "blackberry",
+    private val originalCrops = setOf("tomato", "cucumber", "peony", "hydrangea", "rose", "blackberry",
         "raspberry", "currant", "garden-strawberry", "blueberry", "apple", "pear", "potato", "lawn",
         "sweet-pepper", "eggplant", "zucchini", "pumpkin", "cabbage", "carrot", "beet", "onion", "garlic")
+    val supportedCrops = originalCrops + ExpandedCarePrograms.hydrangeas.keys + ExpandedCarePrograms.conifers.keys +
+        ExpandedCarePrograms.flowers.keys + ExpandedCarePrograms.stoneFruit.keys
 
     val allowedManufacturers = setOf("Август", "ЩёлковоАгрохим", "ФМРус", "BonaForte", "Фаско", "Гера",
         "Ортон", "Агрикола", "HB-101", "БашИнком", "Фармбиомед", "Syngenta", "Нэст-М", "Петрович",
         "Green Belt", "Био-комплекс", "Аминосил", "Органик Микс", "5сезонов",
-        "НПФ Собер", "Буйский химический завод", "Ваше хозяйство")
+        "НПФ Собер", "Буйский химический завод", "Ваше хозяйство", "Fertika", "Агровит")
 
     fun supports(programId: String?): Boolean = programId in supportedCrops
 
@@ -53,7 +55,7 @@ object ProgramProductCatalog {
         PlantProblem("alternaria", "Альтернариоз", PlantProblemKind.DISEASE, setOf("tomato")),
         PlantProblem("powdery_mildew", "Настоящая мучнистая роса", PlantProblemKind.DISEASE, setOf("tomato", "cucumber")),
         PlantProblem("downy_mildew", "Пероноспороз (ложная мучнистая роса)", PlantProblemKind.DISEASE, setOf("cucumber")),
-        PlantProblem("gray_mold", "Серая гниль", PlantProblemKind.DISEASE, setOf("tomato", "cucumber")),
+        PlantProblem("gray_mold", "Ботритис (серая гниль)", PlantProblemKind.DISEASE, setOf("tomato", "cucumber", "lily", "tulip")),
         PlantProblem("root_rot", "Корневая гниль / увядание", PlantProblemKind.DISEASE, setOf("tomato", "cucumber")),
         PlantProblem("whitefly", "Тепличная белокрылка", PlantProblemKind.PEST, setOf("tomato", "cucumber")),
         PlantProblem("aphids", "Тля", PlantProblemKind.PEST, setOf("tomato", "cucumber")),
@@ -61,7 +63,8 @@ object ProgramProductCatalog {
         PlantProblem("thrips", "Трипсы", PlantProblemKind.PEST, setOf("tomato", "cucumber"))
     ).map { problem ->
         problem.copy(crops = problem.crops + when (problem.id) {
-            "late_blight", "alternaria" -> setOf("potato")
+            "late_blight" -> setOf("potato", "sweet-pepper", "eggplant")
+            "alternaria" -> setOf("potato", "cucumber")
             "powdery_mildew" -> supportedCrops - setOf("potato")
             "gray_mold" -> setOf("peony", "rose", "hydrangea", "blackberry", "raspberry", "currant", "garden-strawberry", "blueberry")
             "root_rot" -> supportedCrops
@@ -70,7 +73,11 @@ object ProgramProductCatalog {
             else -> emptySet()
         })
     } + listOf(
-        PlantProblem("scab", "Парша", PlantProblemKind.DISEASE, setOf("apple", "pear")),
+        PlantProblem("scab", "Парша", PlantProblemKind.DISEASE, setOf("apple", "pear", "cherry", "plum")),
+        PlantProblem("black_spot", "Чёрная пятнистость", PlantProblemKind.DISEASE, setOf("rose")),
+        PlantProblem("fusarium", "Фузариоз / фузариозное увядание", PlantProblemKind.DISEASE, setOf("tomato", "sweet-pepper", "eggplant", "gladiolus", "iris")),
+        PlantProblem("cladosporium", "Кладоспориоз (бурая пятнистость)", PlantProblemKind.DISEASE, setOf("tomato", "sweet-pepper", "eggplant")),
+        PlantProblem("moniliosis", "Монилиоз (плодовая гниль)", PlantProblemKind.DISEASE, setOf("apple", "pear", "cherry", "plum")),
         PlantProblem("leaf_spot", "Пятнистости листьев", PlantProblemKind.DISEASE,
             setOf("peony", "rose", "hydrangea", "blackberry", "raspberry", "currant", "garden-strawberry", "blueberry", "lawn")),
         PlantProblem("rust", "Ржавчина", PlantProblemKind.DISEASE, setOf("rose", "pear", "raspberry", "currant", "lawn")),
@@ -83,7 +90,7 @@ object ProgramProductCatalog {
     private const val SILVER_URL = "https://bio-kompleks.ru/catalog/vsya_produktsiya/bio_kompleks_serebromedin_/"
     private const val SILVER_CAUTION = "Не смешивать с другими средствами и не использовать для обеззараживания почвы. На сайте расходятся сведения о сроке ожидания: уточните его по своей упаковке. Производитель указывает, что продукт не является пестицидом. Это описание производителя, а не гарантия излечения."
 
-    val products = listOf(
+    val products = (listOf(
         ProgramProduct("agricola_cucumber", "Агрикола 5 для огурцов, кабачков, патиссонов", "Агрикола",
             "Подкормить огурец Агриколой 5", "Альтернатива по питанию, NPK 13:20:20 и микроэлементы. Выберите корневой или внекорневой способ по своей упаковке.",
             "25 г на 10 л воды; в карточке указан расход на 10–25 м² в зависимости от способа внесения. Точный расход для выбранного способа сверьте на упаковке. Начало — 3-й настоящий лист при прямом посеве или через 5–7 дней после высадки рассады; далее интервал 7–10 дней, всего 4–5 подкормок с учётом уже выполненных.",
@@ -104,7 +111,7 @@ object ProgramProductCatalog {
         ProgramProduct("biozashchitin_prevention", "Биозащитин, концентрат 5 мл", "Органик Микс",
             "Провести профилактическую обработку по листьям", "Частичная альтернатива по заявленной производителем задаче профилактики. Средство на основе эфирного масла апельсина.",
             "5 мл на 1 л воды. Встряхнуть концентрат, развести и равномерно смочить обе стороны листьев. Не под прямым солнцем. Производитель указывает профилактический интервал 14 дней; сначала проверьте переносимость на небольшом участке.",
-            "https://organic-mix.ru/catalog/biozashchitin-v-ampule-organicheskoe-sredstvo-zashchity-rasteniy-3-v-1-5-ml/", crops = supportedCrops - "lawn"),
+            "https://organic-mix.ru/catalog/biozashchitin-v-ampule-organicheskoe-sredstvo-zashchity-rasteniy-3-v-1-5-ml/", crops = originalCrops - "lawn"),
         ProgramProduct("silver_prevention", "Серебромедин, концентрат", "Био-комплекс",
             "Провести листовую профилактику болезней", "Альтернатива по задаче профилактики, другой состав и регламент.",
             "По карточке: 40 мл на 1 л воды, смачивание листьев с обеих сторон, в сухую погоду выше +15 °C. Профилактическая частота — 1–2 раза в месяц. $SILVER_CAUTION", SILVER_URL),
@@ -177,10 +184,10 @@ object ProgramProductCatalog {
             "organic_tomato", "organic_cucumber", "amino_tomato", "amino_cucumber_planting",
             "amino_cucumber", "rostobion_seedling", "maxi_nutrition" ->
                 product.copy(sections = setOf(ProductSection.FERTILIZER))
-            "biozashchitin" -> product.copy(crops = supportedCrops - "lawn",
+            "biozashchitin" -> product.copy(crops = originalCrops - "lawn",
                 problems = product.problems + setOf("powdery_mildew", "downy_mildew", "late_blight", "gray_mold", "leaf_spot", "scab"),
                 taskTitle = "Обработать растение при обнаруженной проблеме")
-            "muchnistop" -> product.copy(crops = supportedCrops - setOf("potato", "lawn"))
+            "muchnistop" -> product.copy(crops = originalCrops - setOf("potato", "lawn"))
             "silver_prevention" -> product.copy(crops = product.crops + "sweet-pepper")
             else -> product
         }
@@ -189,7 +196,9 @@ object ProgramProductCatalog {
         else if (product.id.startsWith("ordan_") || product.id.startsWith("rayek_"))
             product.copy(retailUrl = "https://ulyanovsk.lemanapro.ru/catalogue/zashchita-rasteniy-ot-bolezney/")
         else product
-    } + SpringCarePrograms.products + MineralProgramProducts.products + LemanaProgramProducts.products
+    }.let { it + SpringCarePrograms.products + SpringCarePrograms.mixtureProducts + MineralProgramProducts.products +
+        LemanaProgramProducts.products + ExpandedProgramProducts.products + ExpandedDiseaseProducts.products })
+        .map(ExpandedProgramProducts::includePlantVariants)
 
     fun baseStepId(stepId: String): String = stepId.substringBefore("~").substringBefore(":remaining:")
     fun stepWithProduct(stepId: String, productId: String): String =
@@ -203,8 +212,15 @@ object ProgramProductCatalog {
         val template = PlantCareCatalog.all().firstOrNull { it.id == programId } ?: return emptyList()
         if (template.steps.none { baseStepId(it.id) == baseStepId(stepId) }) return emptyList()
         val ids = when (baseStepId(stepId)) {
-            SpringCarePrograms.EARLY_STEP -> SpringCarePrograms.products.map { it.id }.toSet()
-            "nutrition", "nutrition_review" -> SeasonalProgramProducts.feedingIds(programId!!)
+            SpringCarePrograms.EARLY_STEP -> SpringCarePrograms.diseaseIds
+            SpringCarePrograms.PEST_STEP -> SpringCarePrograms.pestIds
+            SpringCarePrograms.GREEN_STEP, SpringCarePrograms.AFTER_FLOWERING_STEP -> SpringCarePrograms.mixtureProducts.map { it.id }.toSet()
+            SpringCarePrograms.AUTUMN_STEP -> setOf("autumn_iron")
+            "hydrangea_pale_acid" -> setOf("hydrangea_citric_acid")
+            "hydrangea_pale_iron" -> setOf("hydrangea_ferovit", "hydrangea_antichlorozin")
+            "hydrangea_yellow_magnesium" -> setOf("hydrangea_magnesium", "hydrangea_magbor")
+            "acid_plants_autumn_nutrition" -> setOf("blueberry_fertika_autumn")
+            "nutrition", "nutrition_review" -> SeasonalProgramProducts.feedingIds(programId!!) + ExpandedProgramProducts.feedingIds(programId)
             "lawn_autumn_nutrition" -> setOf("organic_lawn_autumn", "bona_lawn_autumn")
             "gumi_omi_planting" -> if (programId == "tomato") setOf("organic_tomato", "maxi_nutrition") else setOf("maxi_nutrition")
             "fitosporin_spraying", "preventive_disease_treatment" -> setOf("silver_prevention", "biozashchitin_prevention", "sporobacterin_vegetables")
@@ -216,7 +232,8 @@ object ProgramProductCatalog {
             "gumi_omi_feeding" -> setOf("amino_tomato", "organic_tomato", "maxi_nutrition", "bona_vegetables", "orton_tomato_root")
             "gumi_omi_7_8_leaves" -> setOf("amino_cucumber", "organic_cucumber", "maxi_nutrition", "bona_vegetables", "agricola_cucumber")
             "kornesil_planting" -> setOf("amino_cucumber_planting", "rostobion_seedling")
-            else -> if (PlantCareCatalog.all().firstOrNull { it.id == programId }?.steps
+            else -> if (baseStepId(stepId).startsWith("conifer_") || baseStepId(stepId) in setOf("hydrangea_pruning", ExpandedCarePrograms.SHELTER_STEP)) emptySet()
+                else if (PlantCareCatalog.all().firstOrNull { it.id == programId }?.steps
                     ?.any { baseStepId(it.id) == baseStepId(stepId) && it.productDescription == null } == true)
                 products.filter { it.problems.isEmpty() }.map { it.id }.toSet() else emptySet()
         }
@@ -237,6 +254,29 @@ object ProgramProductCatalog {
     }
 }
 
+private fun preservedStage(programId: String?, stepId: String?): CareStepTemplate? {
+    val base = stepId?.let(ProgramProductCatalog::baseStepId) ?: return null
+    if (base !in setOf(SpringCarePrograms.EARLY_STEP, SpringCarePrograms.PEST_STEP, SpringCarePrograms.GREEN_STEP,
+            SpringCarePrograms.AFTER_FLOWERING_STEP, SpringCarePrograms.AUTUMN_STEP,
+            "hydrangea_pale_acid", "hydrangea_pale_iron", "hydrangea_yellow_magnesium")) return null
+    return PlantCareCatalog.all().firstOrNull { it.id == programId }?.steps?.firstOrNull { ProgramProductCatalog.baseStepId(it.id) == base }
+}
+
+internal fun selectedProductTitle(programId: String?, stepId: String?, productTitle: String): String =
+    preservedStage(programId, stepId)?.title ?: productTitle
+
+internal fun selectedProductNote(programId: String?, stepId: String?, productNote: String): String {
+    val stage = preservedStage(programId, stepId) ?: return productNote
+    val condition = when (ProgramProductCatalog.baseStepId(stage.id)) {
+        "hydrangea_pale_acid", "hydrangea_pale_iron" -> "Только если после осмотра сохраняются бледные листья. Выберите одно средство; сначала оцените причину."
+        "hydrangea_yellow_magnesium" -> "Только если после осмотра сохраняется пожелтение и подтверждена потребность в соответствующих элементах. Выберите одно средство."
+        SpringCarePrograms.AUTUMN_STEP -> "Только после полного листопада, до морозов; не применять по вечнозелёной хвое."
+        SpringCarePrograms.AFTER_FLOWERING_STEP -> "Только после фактического окончания цветения. ${FolkFertilizers.POLLINATION_NOTICE}"
+        else -> "Учитывайте фактическую фазу: ${stage.title.lowercase()}. ${SpringCarePrograms.TEMPERATURE_NOTICE}"
+    }
+    return "$condition\n$productNote"
+}
+
 fun GeneratedCareProgram.withProduct(index: Int, productId: String, date: LocalDate, reminder: Int = 1): GeneratedCareProgram {
     val previous = steps[index]
     val product = ProgramProductCatalog.alternatives(templateId, previous.templateStepId)
@@ -246,8 +286,8 @@ fun GeneratedCareProgram.withProduct(index: Int, productId: String, date: LocalD
     return copy(steps = steps.toMutableList().also {
         it[index] = previous.copy(
             templateStepId = ProgramProductCatalog.stepWithProduct(previous.templateStepId, product.id),
-            title = product.taskTitle, scheduledDate = date, windowStart = date, windowEnd = date,
-            recurrence = null, productDescription = product.displayName, note = product.note,
+            title = selectedProductTitle(templateId, previous.templateStepId, product.taskTitle), scheduledDate = date, windowStart = date, windowEnd = date,
+            recurrence = null, productDescription = product.displayName, note = selectedProductNote(templateId, previous.templateStepId, product.note),
             reminderDaysBefore = reminder,
             weatherAdjusted = false, needsWeatherConfirmation = true,
             explanation = "Вы выбрали другую схему. Дату и условия применения проверьте по инструкции этого средства."
@@ -279,9 +319,9 @@ fun PlantEntity.withProgramProduct(productId: String, date: LocalDate, reminder:
         .first { it.id == productId && it.unavailableReason == null }
     require(reminder in setOf(0, 1, 5))
     return copy(
-        taskName = product.taskTitle, drugId = null, drugName = product.displayName,
+        taskName = selectedProductTitle(programId, programStepId, product.taskTitle), drugId = null, drugName = product.displayName,
         creationDate = date.toString(), programStepId = ProgramProductCatalog.stepWithProduct(requireNotNull(programStepId), product.id),
-        programNote = product.note, repeatType = RepeatType.NONE.name, repeatInterval = 1,
+        programNote = selectedProductNote(programId, programStepId, product.note), repeatType = RepeatType.NONE.name, repeatInterval = 1,
         wateringInterval = 1, repeatDaysOfWeek = "", repeatEndType = "NEVER", repeatEndDate = null,
         repeatCount = null, reminderDaysBefore = reminder, userLockedDate = true
     )

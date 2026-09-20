@@ -7,17 +7,36 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import ru.samates.gardenspa.BookeeperApp
+import ru.samates.gardenspa.domain.searchReference
+import ru.samates.gardenspa.viewmodel.DrugsViewmodel
+import ru.samates.gardenspa.viewmodel.DrugsViewmodelFactory
 import ru.samates.gardenspa.ui.theme.Cream
 import ru.samates.gardenspa.ui.theme.Leaf300
 import ru.samates.gardenspa.ui.theme.Mist
 
 @Composable
 fun ReferenceHub(innerPadding: PaddingValues, onBack: (() -> Unit)? = null, onOpen: (String) -> Unit) {
+    val app = LocalContext.current.applicationContext as BookeeperApp
+    val vm: DrugsViewmodel = viewModel(factory = DrugsViewmodelFactory(app.repository))
+    val personal by vm.drugs.collectAsState()
+    var query by rememberSaveable { mutableStateOf("") }
+    val results = remember(query, personal) { searchReference(query, personal) }
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(innerPadding),
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
@@ -26,6 +45,23 @@ fun ReferenceHub(innerPadding: PaddingValues, onBack: (() -> Unit)? = null, onOp
         item {
             ScreenHeader("Справочник", "Выберите, что хотите найти", onBack)
         }
+        item {
+            OutlinedTextField(query, { query = it }, label = { Text("Поиск по всем категориям") },
+                singleLine = true, colors = glassTextFieldColors(), modifier = Modifier.fillMaxWidth())
+        }
+        if (query.isNotBlank()) {
+            if (results.isEmpty()) item { EmptyGlassState("Ничего не найдено", "Измените название, состав или назначение") }
+            items(results, key = { it.key }) { result ->
+                GlassCard(Modifier.fillMaxWidth()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(result.title, color = Cream, style = MaterialTheme.typography.titleMedium)
+                        Text(result.category, color = Leaf300)
+                        ExpandableInfo("Подробнее", result.details)
+                        SecondaryAction("Открыть раздел", { onOpen(result.screen) }, Modifier.fillMaxWidth())
+                    }
+                }
+            }
+        } else {
         item {
             GlassCard(Modifier.fillMaxWidth(), onClick = { onOpen("Мои средства") }) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -70,6 +106,7 @@ fun ReferenceHub(innerPadding: PaddingValues, onBack: (() -> Unit)? = null, onOp
                     Text("Открыть рецепты  →", color = Leaf300)
                 }
             }
+        }
         }
     }
 }

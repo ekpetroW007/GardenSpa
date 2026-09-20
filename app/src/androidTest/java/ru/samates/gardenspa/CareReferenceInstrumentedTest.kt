@@ -10,11 +10,14 @@ import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import ru.samates.gardenspa.domain.*
+import ru.samates.gardenspa.data.database.entity.GardenEntity
+import ru.samates.gardenspa.viewmodel.UserViewModel
 import ru.samates.gardenspa.presentation.*
 import ru.samates.gardenspa.ui.theme.MyApplicationTheme
 
@@ -124,5 +127,61 @@ class CareReferenceInstrumentedTest {
         capture("green-cone-recipe")
         compose.onNodeWithText("Рецепт пользователя; совместимость полного состава отдельно не подтверждена", substring = true)
             .performScrollTo().assertIsDisplayed()
+    }
+
+    @Test fun globalSearchFindsRecipesFertilizersAndFoliarProductsWithoutOpeningCategories() {
+        compose.setContent { MyApplicationTheme { BotanicalBackground { ReferenceHub(PaddingValues()) {} } } }
+        val search = compose.onNodeWithText("Поиск по всем категориям")
+        search.performTextInput("коктейль аптеки")
+        compose.onNodeWithText("Коктейль из аптеки").assertExists()
+        compose.onNodeWithText("Народные рецепты").assertExists()
+        search.performTextReplacement("газонное Fertika")
+        compose.onNodeWithText("Газонное весна–лето, бесхлорное — Fertika").assertExists()
+        compose.onNodeWithText(ProductSection.FERTILIZER.title).assertExists()
+        search.performTextReplacement("Феровит")
+        compose.onAllNodesWithText(ProductSection.TREATMENT.title).onFirst().assertExists()
+        search.performTextReplacement("зеленый конус")
+        compose.onNodeWithText("Баковые смеси").assertExists()
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        capture("global-reference-search")
+    }
+
+    @Test fun greenConeAllowsChoosingNewTankMixtureAndShowsTenLiterRecipe() {
+        var chosen: String? = null
+        compose.setContent { MyApplicationTheme {
+            ProgramProductDialog("apple", stepId = SpringCarePrograms.GREEN_STEP,
+                onDismiss = {}, onConfirm = { product, _, _, _, _ -> chosen = product })
+        } }
+        compose.onNode(hasSetTextAction()).performTextInput("Фитолавин")
+        compose.onNodeWithText("Подробнее: Баковая смесь «Фитолавин + стимулятор»").performScrollTo().performClick()
+        compose.onNodeWithText("На 10 л воды: Фитолавин — 20 мл", substring = true).assertExists()
+        compose.onNodeWithText("Я сверил(а) этикетку: средство подходит для моей культуры, цели и условий")
+            .performScrollTo().performClick()
+        capture("green-cone-choice")
+        compose.onNodeWithText("Выбрать этот препарат").performClick()
+        compose.runOnIdle { assertEquals("mix_fitolavin_tank_mix", chosen) }
+    }
+
+    @Test fun largeLeafHydrangeaCanSelectSouthernRegionInRealPlantSetup() {
+        val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as BookeeperApp
+        val garden = runBlocking { app.repository.insertGarden(GardenEntity(name = "Сад гортензий для проверки",
+            locationName = "Москва", latitude = 55.75, longitude = 37.62,
+            climateSafeSpringDay = "--04-25", climateSafeAutumnDay = "--10-10", climateFrostFreeDays = 168,
+            climateGdd5 = 2600.0, climateGdd10 = 1750.0, climateWarmPrecipitation = 420.0,
+            climateWinterMinimumP10 = -18.0, climateConfidence = "HIGH", climateSourceYears = 20)).toInt() }
+        try {
+            val user = UserViewModel(PreferencesManager(app), app.climateService)
+            compose.setContent { MyApplicationTheme { PlantAdd(rememberNavController(), "", userViewModel = user) } }
+            compose.onNodeWithText("Например, томат или яблоня").performTextInput("Гортензия кр")
+            compose.onNodeWithText("Гортензия крупнолистная").performClick()
+            androidx.test.espresso.Espresso.closeSoftKeyboard()
+            compose.onNodeWithContentDescription("Сад. Сейчас:", substring = true).performScrollTo().performClick()
+            compose.onAllNodesWithText("Сад гортензий для проверки").onLast().performClick()
+            compose.onNodeWithText("Другой регион — добавить укрытие").performScrollTo().performClick()
+            compose.onNodeWithText("Южный регион — без укрытия").assertExists()
+            capture("hydrangea-southern-region")
+        } finally {
+            runBlocking { app.repository.deleteGarden(garden) }
+        }
     }
 }

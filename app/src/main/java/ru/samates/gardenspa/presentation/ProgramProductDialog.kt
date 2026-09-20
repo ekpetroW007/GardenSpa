@@ -60,7 +60,7 @@ internal fun ProgramProductDialog(
     onConfirm: (productId: String, problemId: String?, cultivation: CultivationType, date: LocalDate, reminder: Int) -> Unit
 ) {
     val afterInspection = stepId == null
-    val earlySpring = stepId?.let(ProgramProductCatalog::baseStepId) == SpringCarePrograms.EARLY_STEP
+    val earlySpring = stepId?.let(ProgramProductCatalog::baseStepId) in setOf(SpringCarePrograms.EARLY_STEP, SpringCarePrograms.PEST_STEP)
     var choosingProduct by rememberSaveable { mutableStateOf(!afterInspection) }
     var problemId by rememberSaveable { mutableStateOf<String?>(null) }
     val cultivations = PlantCareCatalog.all().firstOrNull { it.id == programId }?.supportedCultivationTypes
@@ -96,7 +96,7 @@ internal fun ProgramProductDialog(
         Surface(Modifier.fillMaxSize().padding(10.dp), color = Forest900, shape = GlassShape) {
             Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 ScreenHeader(
-                    if (afterInspection) "После осмотра" else if (earlySpring) "До распускания почек" else "Препараты-аналоги",
+                    if (afterInspection) "После осмотра" else if (earlySpring) "До распускания почек" else "Выбор средства",
                     onBack = goBack
                 )
                 Column(Modifier.weight(1f).verticalScroll(scroll), verticalArrangement = Arrangement.spacedBy(12.dp)) {

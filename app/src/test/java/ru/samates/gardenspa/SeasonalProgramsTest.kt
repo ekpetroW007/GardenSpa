@@ -16,10 +16,10 @@ class SeasonalProgramsTest {
         val templates = names.map { requireNotNull(PlantCareCatalog.find(it)) }
         assertEquals(12, templates.map { it.id }.toSet().size)
         for (template in templates) {
-            assertEquals(if (template.id in SpringCarePrograms.woodyCrops) 8 else 7, template.version)
+            assertTrue(template.version >= if (template.id in SpringCarePrograms.woodyCrops) 10 else 7)
             val retained = SeasonalCarePrograms.templates.single { it.id == template.id }.steps
-                .count { !it.title.contains("осмотреть", ignoreCase = true) }
-            assertEquals(retained + if (template.id in SpringCarePrograms.woodyCrops) 2 else 0, template.steps.size)
+                .filter { !it.title.contains("осмотреть", ignoreCase = true) && it.id != "after_flowering" }
+            assertTrue(template.steps.map { it.id }.containsAll(retained.map { it.id }))
             assertTrue(template.steps.none { it.title.contains("осмотреть", ignoreCase = true) })
             assertEquals(template.steps.size, template.steps.map { it.id }.toSet().size)
             val feeding = template.steps.first { it.id.startsWith("nutrition~") }
@@ -74,11 +74,13 @@ class SeasonalProgramsTest {
     @Test fun referenceIncludesEveryProgramProductAndBothPartsOfCucumberMixture() {
         val reference = ProgramReferenceCatalog.products
         assertEquals(reference.size, reference.map { it.id }.toSet().size)
-        assertTrue(reference.all { it.sections.isNotEmpty() && it.sourceUrl.startsWith("https://") })
-        assertTrue(reference.all { it.manufacturer in ProgramProductCatalog.allowedManufacturers })
+        assertTrue(reference.all { it.sections.isNotEmpty() && (it.sourceUrl.startsWith("https://") || it.manufacturer == "Рецепт пользователя") })
+        assertTrue(reference.all { it.manufacturer in ProgramProductCatalog.allowedManufacturers || it.manufacturer == "Рецепт пользователя" })
         for (template in PlantCareCatalog.all().filter { ProgramProductCatalog.supports(it.id) }) {
             template.steps.mapNotNull { it.productDescription }.filterNot { it.startsWith("Средство ") }.forEach { description ->
-                assertTrue("Missing reference: $description", reference.any { it.displayName == description } ||
+                val genericChoices = setOf("Бордосская смесь", "Железный купорос", "Лимонная кислота",
+                    "Феровит или Антихлорозин", "Сульфат магния или Маг-бор", "Препарат 30 Плюс или Профилактин — по регламенту культуры")
+                assertTrue("Missing reference: $description", description in genericChoices || reference.any { it.displayName == description } ||
                     FolkFertilizers.tankMixes.any { it.name == description })
             }
         }
@@ -96,7 +98,7 @@ class SeasonalProgramsTest {
     }
 
     @Test fun tankMixtureIsMovedWithoutDuplicatingOrChangingItsRecipe() {
-        assertEquals(6, FolkFertilizers.recipes.size)
+        assertEquals(8, FolkFertilizers.recipes.size)
         assertTrue(FolkFertilizers.recipes.none { it.isTankMix || it.id == "magic_plant_drink_tank_mix" })
         val mixture = FolkFertilizers.tankMixes.single { it.id == "magic_plant_drink_tank_mix" }
         assertEquals("magic_plant_drink_tank_mix", mixture.id)

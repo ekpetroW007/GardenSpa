@@ -126,7 +126,7 @@ object SeasonalProgramProducts {
 
     fun feedingIds(crop: String): Set<String> = when (crop) {
         "peony", "rose" -> setOf("organic_flowers", "bona_flowers")
-        "hydrangea" -> setOf("organic_hydrangea", "agricola_hydrangea", "bona_hydrangea")
+        in ExpandedCarePrograms.hydrangeaIds -> setOf("organic_hydrangea", "agricola_hydrangea", "bona_hydrangea")
         in berries -> setOf("organic_berries", "bona_berries")
         "blueberry" -> setOf("organic_blueberry", "bona_blueberry")
         "apple", "pear" -> setOf("bona_fruit", "organic_fruit")

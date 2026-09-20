@@ -118,8 +118,8 @@ class ProgramProductsTest {
     @Test fun catalogueHasUniqueIdsAndSourcesAndBothCropsGetAlternatives() {
         val products = ProgramProductCatalog.products
         assertEquals(products.size, products.map { it.id }.toSet().size)
-        assertTrue(products.all { it.sourceUrl.startsWith("https://") && it.instruction.isNotBlank() })
-        assertTrue(products.all { it.manufacturer in ProgramProductCatalog.allowedManufacturers })
+        assertTrue(products.all { (it.sourceUrl.startsWith("https://") || it.manufacturer == "Рецепт пользователя") && it.instruction.isNotBlank() })
+        assertTrue(products.all { it.manufacturer in ProgramProductCatalog.allowedManufacturers || it.manufacturer == "Рецепт пользователя" })
         for (crop in listOf("tomato", "cucumber")) {
             val template = PlantCareCatalog.all().first { it.id == crop }
             assertTrue(template.steps.count { step -> ProgramProductCatalog.alternatives(crop, step.id).any { it.unavailableReason == null } } >= 3)

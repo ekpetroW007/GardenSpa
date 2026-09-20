@@ -27,6 +27,13 @@ data class FolkFertilizerRecipe(
 
 object FolkFertilizers {
     const val GREEN_CONE_ID = "green_cone_biological_tank_mix"
+    const val POLLINATION_NOTICE = "Использовать только до или после периода цветения косточковых и семечковых растений, чтобы не мешать процессу опыления насекомыми."
+    private const val MIX_NOTICE = "Рецепт пользователя. Совместимость полного состава отдельно не подтверждена: сверяйте формы, культуру, температуру и ограничения каждой этикетки. Эпин и Циркон — варианты на выбор, не добавляйте оба."
+    private fun mixture(id: String, name: String, purpose: String, ingredients: String, preparation: String =
+        "Разводить компоненты по их этикеткам, довести рабочий раствор до 10 л. Использовать сразу после приготовления.") =
+        FolkFertilizerRecipe(id, "Баковая смесь «$name»", purpose, "На 10 л воды: $ingredients", preparation,
+            "Объём рабочей смеси — 10 л. Расход на растение и допустимая кратность — по этикеткам компонентов для вашей культуры.",
+            MIX_NOTICE, "Рецепт пользователя, объём воды подтверждён 20.09.2026", "", true)
     private const val RSC_LATE_BLIGHT = "https://old.rosselhoscenter.ru/index.php/otchjoty-80/17718-rekomendatsii-spetsialistov-po-borbe-s-fitoftoroj"
     private const val RSC_RUST = "https://rosselhoscenter.ru/ob-uchrezhdenii/filialy/sibirskiy/omskaya-oblast/chto-delat-esli-poshla-rzhavchina-na-gorokhe/"
     private const val RSC_APHIDS = "https://rosselhoscenter.ru/ob-uchrezhdenii/filialy/tsentralnyy-okrug/kaluzhskaya-oblast/tlya-na-vishne-effektivnye-mery-borby/"
@@ -129,8 +136,33 @@ object FolkFertilizers {
             sourceName = "Рецепт пользователя; жидкий Лепидоцид — 20 мл",
             sourceUrl = "",
             isTankMix = true
-        )
-    )
+        ),
+        FolkFertilizerRecipe("pharmacy_cocktail", "Коктейль из аптеки",
+            "Народный рецепт для растений, замедливших рост.",
+            "На 1 л воды: по 1 ампуле витаминов В1, В6, В12 и глюкозы. По желанию — половина чайной ложки ЭМ-бактерий.",
+            "Смешать компоненты в 1 л воды. Добавление ЭМ-бактерий необязательно.",
+            "Опрыскивать или поливать растения, замедлившие рост.",
+            "Рецепт пользователя. Объём и концентрация ампул не уточнены; не считать любой аптечный препарат взаимозаменяемым. Сначала проверить переносимость на небольшой части растения.",
+            "Рецепт пользователя", ""),
+        FolkFertilizerRecipe("yeast_tincture", "Дрожжевая настойка",
+            "Народная подкормка для толчка роста в начале сезона.",
+            "10 г дрожжей, 1 столовая ложка сахара, 1 л воды; после брожения — вода до 10 л.",
+            "Растворить дрожжи и сахар в 1 л воды. После брожения довести общий объём до 10 л.",
+            "Применять в начале сезона. Расход на растение и частота в пользовательском рецепте не заданы.",
+            "Рецепт пользователя; не заменяет сбалансированное питание. Сначала проверить на небольшом участке.",
+            "Рецепт пользователя", ""),
+        mixture("alirin_gamair_tank_mix", "Алирин + Гамаир + стимулятор", "Против грибковых и бактериальных заболеваний.",
+            "Алирин — 10–15 таблеток; Гамаир — 10–15 таблеток; Эпин — 1 мл ИЛИ Циркон — 1 мл."),
+        mixture("fitolavin_tank_mix", "Фитолавин + стимулятор", "Защита от бактериозов.",
+            "Фитолавин — 20 мл; Эпин — 1 мл ИЛИ Циркон — 1 мл."),
+        mixture("biological_pests_tank_mix", "Биопрепараты от гусениц и других вредителей", "От гусениц и прочих вредителей.",
+            "Битоксибациллин — 40 г; Фитоверм — 20 мл; Лепидоцид, жидкий — 20 мл; Эпин — 1 мл ИЛИ Циркон — 1 мл."),
+        mixture("btu_protection_tank_mix", "Биозащита Комплекс БТУ + Лепидоцид + Битоксибациллин", "Против болезней и вредителей.",
+            "Биозащита Комплекс БТУ — 20 мл; Лепидоцид, жидкий — 20 мл; Битоксибациллин — 40 г."),
+        mixture("fitosporin_stock_tank_mix", "Фитоспорин-М — маточный раствор", "Для профилактики заболеваний.",
+            "10 мл маточного раствора Фитоспорина-М.",
+            "Маточный раствор: пакет пасты Фитоспорин-М 200 г развести в 400 мл воды. Для рабочего раствора взять 10 мл маточного раствора на 10 л воды. Не заменять пасту порошком или жидкой формой с другой концентрацией.")
+    ).map { if (it.isTankMix) it.copy(warning = listOf(it.warning, POLLINATION_NOTICE).filter(String::isNotBlank).joinToString("\n")) else it }
 
     val recipes = allRecipes.filterNot { it.isTankMix }
     val tankMixes = allRecipes.filter { it.isTankMix }

@@ -40,7 +40,7 @@ class CareProgramTest {
 
     @Test
     fun catalogRecognizesAliasesButNotUnknownPlants() {
-        assertEquals(23, PlantCareCatalog.all().size)
+        assertEquals(36, PlantCareCatalog.all().size)
         assertEquals("tomato", PlantCareCatalog.find("  ПОМИДОР ")?.id)
         assertEquals("garden-strawberry", PlantCareCatalog.find("Клубника")?.id)
         assertEquals("apple", PlantCareCatalog.find("Яблоня на карликовом подвое")?.id)

@@ -29,7 +29,16 @@ object ProgramReferenceCatalog {
             cucumberMixture.copy(id = "original_cucumber_fitosporin_as", name = "Фитоспорин-АС",
                 sections = setOf(ProductSection.FERTILIZER))
         )
-        ProgramProductCatalog.products + originalProducts + components
+        val mixtureComponents = listOf("Алирин", "Гамаир", "Эпин", "Циркон", "Силиплант", "Микохелп", "Фитохелп",
+            "Лепидоцид", "Битоксибациллин", "Липосам", "Фитолавин", "Биозащита Комплекс БТУ", "Фитоспорин-М, паста").mapIndexed { index, name ->
+            val recipes = FolkFertilizers.tankMixes.filter { it.ingredients.contains(name) || name == "Фитоспорин-М, паста" && it.id == "fitosporin_stock_tank_mix" }
+            ProgramProduct("recipe_component_$index", name, "Рецепт пользователя", "Компонент баковой смеси: $name",
+                "Входит в сохранённые рецепты. Производитель и точная форма в рецепте могут быть не указаны.",
+                recipes.joinToString("\n\n") { "${it.name}\n${it.ingredients}\n${it.preparation}" } +
+                    "\nЭто сведения о составе смеси, не инструкция для отдельного применения. Выберите производителя и сверяйте форму, культуру, дозу и совместимость по этикетке.",
+                "", crops = emptySet())
+        }
+        ProgramProductCatalog.products.filterNot { it.id.startsWith("mix_") } + originalProducts + components + mixtureComponents
     }
 
     fun entries(section: ProductSection, query: String = ""): List<ProgramProduct> = products

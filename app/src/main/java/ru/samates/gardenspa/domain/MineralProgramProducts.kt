@@ -4,8 +4,8 @@ package ru.samates.gardenspa.domain
 object MineralProgramProducts {
     private val vegetables = setOf("tomato", "cucumber", "sweet-pepper", "eggplant", "zucchini", "pumpkin", "cabbage", "carrot", "beet", "onion", "garlic", "potato")
     private val berries = setOf("blackberry", "raspberry", "currant", "garden-strawberry")
-    private val fruit = setOf("apple", "pear")
-    private val crops = vegetables + berries + fruit + setOf("rose", "peony")
+    private val fruit = setOf("apple", "pear", "cherry", "plum")
+    private val crops = vegetables + berries + fruit + setOf("rose", "peony", "lily", "tulip", "gladiolus", "iris")
     private const val BASE = "https://bhzshop.ru/catalog/traditsionnye-udobreniya/"
     private const val NOTICE = "Выберите одну схему питания с учётом состояния почвы и уже внесённых удобрений. Простое удобрение восполняет отдельные элементы и не равно полному комплексу. Нормы относятся только к указанному продукту; на упаковке другой марки состав может отличаться."
 
