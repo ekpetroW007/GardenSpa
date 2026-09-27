@@ -96,6 +96,10 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController, onBack: 
     val selectedDate = LocalDate.parse(selectedDateText)
     val visibleMonth = YearMonth.parse(visibleMonthText)
     var undoAction by remember { mutableStateOf<UndoAction?>(null) }
+    var actionError by remember { mutableStateOf<String?>(null) }
+    val completeWork = rememberCompleteWorkAction(proceduresVm) { treatment ->
+        undoAction = UndoAction("Работа отмечена как выполненная", treatment.plant.id, treatment.originalDate)
+    }
 
     val datesWithGardenWork = gardenWorkEntries.mapNotNull { runCatching { LocalDate.parse(it.workDate) }.getOrNull() }.toSet()
     val markedDates = (1..visibleMonth.lengthOfMonth()).mapNotNull { day ->
@@ -124,16 +128,19 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController, onBack: 
                             color = Leaf300,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.clickable {
-                                proceduresVm.undoChange(action.plantId, action.originalDate) {
-                                    TreatmentReminderScheduler.refreshNow(application)
-                                }
-                                undoAction = null
+                                proceduresVm.undoChange(action.plantId, action.originalDate,
+                                    onError = { actionError = it.message ?: "Не удалось отменить действие" },
+                                    onSaved = {
+                                        TreatmentReminderScheduler.refreshNow(application)
+                                        undoAction = null
+                                    })
                             }
                         )
                     }
                 }
             }
         }
+        actionError?.let { message -> item { Text(message, color = Warning) } }
         item {
             MonthCalendar(
                 month = visibleMonth,
@@ -167,16 +174,11 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController, onBack: 
                     TreatmentCard(
                         treatment = treatment,
                         onOpen = { navController.navigate(AppDestinations.plantDetails(treatment.plant.id)) },
-                        onComplete = {
-                            proceduresVm.markCompleted(
-                                treatment.plant.id,
-                                treatment.plant.taskName,
-                                treatment.originalDate,
-                                treatment.scheduledDate
-                            ) {
-                                TreatmentReminderScheduler.cancelTreatmentNotification(application, treatment.plant.id, treatment.originalDate.toString())
-                            }
-                            undoAction = UndoAction("Работа отмечена как выполненная", treatment.plant.id, treatment.originalDate)
+                        onComplete = { completeWork(treatment) },
+                        onRepeat = { interval ->
+                            plantsVm.updateProgramRepeat(treatment.plant, interval,
+                                onSaved = { actionError = null; TreatmentReminderScheduler.refreshNow(application) },
+                                onError = { actionError = it })
                         },
                         onReschedule = { newDate ->
                             proceduresVm.reschedule(treatment.plant.id, treatment.plant.taskName, treatment.originalDate, newDate) {
@@ -276,19 +278,21 @@ internal fun MonthCalendar(
 private fun TreatmentCard(
     treatment: ScheduledTreatment,
     onComplete: () -> Unit,
+    onRepeat: (Int?) -> Unit,
     onReschedule: (LocalDate) -> Unit,
     onOpen: () -> Unit
 ) {
     val context = LocalContext.current
-    var completionRequested by remember(treatment.plant.id, treatment.originalDate) { mutableStateOf(false) }
-    val completed = treatment.completed || completionRequested
+    val completed = treatment.completed
     GlassCard(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (treatment.rescheduled) Text("Перенесено с ${treatment.originalDate.toRussianDate(false)}", color = Warning)
             Text(treatment.plant.taskName, style = MaterialTheme.typography.titleLarge, color = Cream)
             Text("${treatment.plant.plantName} · ${treatment.plant.gardenName}", color = Leaf300)
             Text(treatment.plant.drugName.toDrugDisplayName(), color = Mist)
-            Text(treatment.plant.recurrenceDescription(), color = Mist)
+            if (treatment.plant.programId != null) {
+                ProgramRepeatSelector(treatment.plant.recurrenceDescription(), onRepeat)
+            } else Text(treatment.plant.recurrenceDescription(), color = Mist)
             SecondaryAction("Подробнее", onOpen, Modifier.fillMaxWidth().semantics {
                 contentDescription = "Открыть работу: ${treatment.plant.taskName}"
             })
@@ -301,13 +305,11 @@ private fun TreatmentCard(
                             datePicker.minDate = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
                         }.show()
                     },
-                    modifier = Modifier.weight(1f).height(52.dp)
+                    modifier = Modifier.weight(1f).height(52.dp),
+                    enabled = !completed
                 )
                 Button(
-                    onClick = {
-                        completionRequested = true
-                        onComplete()
-                    },
+                    onClick = onComplete,
                     enabled = !completed,
                     modifier = Modifier.weight(1f).height(52.dp).semantics {
                         contentDescription = "Выполнить работу: ${treatment.plant.taskName}"

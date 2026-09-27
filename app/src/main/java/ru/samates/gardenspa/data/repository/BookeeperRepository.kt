@@ -87,16 +87,18 @@ class BookeeperRepository(
         plantDAO.replacePlantCard(cardId, plants)
     }
 
-    suspend fun insertProcedure(procedure: ProcedureEntity) {
+    suspend fun insertProcedure(procedure: ProcedureEntity): ProcedureEntity =
         procedureDAO.saveProcedureWithSnapshot(procedure)
-    }
+
+    suspend fun scheduleNextSeason(procedureId: Int, today: LocalDate = LocalDate.now()): LocalDate =
+        procedureDAO.scheduleNextSeason(procedureId, today)
 
     suspend fun getAllPlantsOnce(): List<PlantEntity> = plantDAO.getAllPlantsOnce()
 
     suspend fun getAllProceduresOnce(): List<ProcedureEntity> = procedureDAO.getAllProceduresOnce()
 
     suspend fun undoProcedureChange(plantId: Int, scheduledDate: LocalDate) =
-        procedureDAO.deleteForSchedule(plantId, scheduledDate.toString())
+        procedureDAO.undoChange(plantId, scheduledDate.toString())
 
     suspend fun getGardenWorkForDate(date: LocalDate): List<GardenWorkEntity> =
         gardenWorkDAO.getEntriesForDate(date.toString())

@@ -9,6 +9,7 @@ import java.time.LocalDate
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 
 class ProceduresViewmodel(private val repository: BookeeperRepository) : ViewModel() {
     val procedures = repository.allProcedures.stateIn(
@@ -26,20 +27,43 @@ class ProceduresViewmodel(private val repository: BookeeperRepository) : ViewMod
         procedureName: String,
         originalDate: LocalDate,
         scheduledDate: LocalDate,
+        onCompleted: (ProcedureEntity) -> Unit = {},
+        onError: (Throwable) -> Unit = {},
         onSaved: () -> Unit = {}
     ) {
         viewModelScope.launch {
-            repository.insertProcedure(
-                ProcedureEntity(
-                    plantId = plantId,
-                    procedureName = procedureName,
-                    scheduledDate = originalDate.toString(),
-                    rescheduledDate = scheduledDate.toString().takeIf { scheduledDate != originalDate },
-                    completedDate = LocalDate.now().toString(),
-                    status = "COMPLETED"
+            try {
+                val completed = repository.insertProcedure(
+                    ProcedureEntity(
+                        plantId = plantId,
+                        procedureName = procedureName,
+                        scheduledDate = originalDate.toString(),
+                        rescheduledDate = scheduledDate.toString().takeIf { scheduledDate != originalDate },
+                        completedDate = LocalDate.now().toString(),
+                        status = "COMPLETED"
+                    )
                 )
-            )
-            onSaved()
+                onCompleted(completed)
+                onSaved()
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                onError(error)
+            }
+        }
+    }
+
+    fun scheduleNextSeason(
+        procedureId: Int,
+        onError: (Throwable) -> Unit = {},
+        onSaved: (LocalDate) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            try {
+                onSaved(repository.scheduleNextSeason(procedureId))
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                onError(error)
+            }
         }
     }
 
@@ -64,10 +88,20 @@ class ProceduresViewmodel(private val repository: BookeeperRepository) : ViewMod
         }
     }
 
-    fun undoChange(plantId: Int, originalDate: LocalDate, onSaved: () -> Unit = {}) {
+    fun undoChange(
+        plantId: Int,
+        originalDate: LocalDate,
+        onError: (Throwable) -> Unit = {},
+        onSaved: () -> Unit = {}
+    ) {
         viewModelScope.launch {
-            repository.undoProcedureChange(plantId, originalDate)
-            onSaved()
+            try {
+                repository.undoProcedureChange(plantId, originalDate)
+                onSaved()
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                onError(error)
+            }
         }
     }
 }

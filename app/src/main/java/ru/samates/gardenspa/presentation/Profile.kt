@@ -30,6 +30,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -79,6 +81,7 @@ fun Profile(
     val gardens by gardensVm.gardens.collectAsState()
     val plants by plantsVm.plants.collectAsState()
     val procedures by proceduresVm.procedures.collectAsState()
+    val completeWork = rememberCompleteWorkAction(proceduresVm)
     val gardenWorkEntries by gardenWorkVm.entries.collectAsState()
     var today by remember { mutableStateOf(LocalDate.now()) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
@@ -162,16 +165,7 @@ fun Profile(
                 TodayCareCard(
                     treatment = treatment,
                     onOpen = { navController.navigate(AppDestinations.plantDetails(treatment.plant.id)) },
-                    onComplete = {
-                        proceduresVm.markCompleted(
-                            treatment.plant.id,
-                            treatment.plant.taskName,
-                            treatment.originalDate,
-                            treatment.scheduledDate
-                        ) {
-                            TreatmentReminderScheduler.cancelTreatmentNotification(app, treatment.plant.id, treatment.originalDate.toString())
-                        }
-                    }
+                    onComplete = { completeWork(treatment) }
                 )
             }
         }
@@ -275,8 +269,7 @@ private fun TodayCareCard(
     onOpen: () -> Unit,
     onComplete: () -> Unit
 ) {
-    var completedLocally by remember(treatment.plant.id, treatment.originalDate) { mutableStateOf(false) }
-    val completed = treatment.completed || completedLocally
+    val completed = treatment.completed
     GlassCard(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(treatment.plant.taskName, style = MaterialTheme.typography.titleLarge, color = Cream)
@@ -285,12 +278,11 @@ private fun TodayCareCard(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SecondaryAction("Подробнее", onOpen, Modifier.weight(1f).height(52.dp))
                 Button(
-                    onClick = {
-                        completedLocally = true
-                        onComplete()
-                    },
+                    onClick = onComplete,
                     enabled = !completed,
-                    modifier = Modifier.weight(1f).height(52.dp),
+                    modifier = Modifier.weight(1f).height(52.dp).semantics {
+                        contentDescription = "Выполнить работу: ${treatment.plant.taskName}"
+                    },
                     shape = RoundedCornerShape(18.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Leaf300,

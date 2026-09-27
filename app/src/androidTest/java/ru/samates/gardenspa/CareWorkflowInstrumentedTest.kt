@@ -128,6 +128,9 @@ class CareWorkflowInstrumentedTest {
         val task = compose.onNode(hasScrollToNodeAction())
         task.performScrollToNode(hasContentDescription("Выполнить работу: ${mixture.taskName}"))
         compose.onNodeWithContentDescription("Выполнить работу: ${mixture.taskName}").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Сохранить работу на следующий год?").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Сохранить работу на следующий год?").assertExists()
+        compose.onNodeWithText("Нет, только в архив").performClick()
         compose.waitUntil(10_000) { runBlocking { app.repository.getAllProceduresOnce().any { it.plantId == mixture.id && it.status == "COMPLETED" } } }
         task.performScrollToNode(hasContentDescription("Открыть работу: ${mixture.taskName}"))
         compose.onNodeWithContentDescription("Открыть работу: ${mixture.taskName}").performClick()

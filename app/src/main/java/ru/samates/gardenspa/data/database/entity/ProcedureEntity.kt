@@ -42,5 +42,17 @@ data class ProcedureEntity(
     val plantCardId: String = "",
 
     @ColumnInfo(name = "drug_name", defaultValue = "''")
-    val drugName: String = ""
+    val drugName: String = "",
+
+    @ColumnInfo(name = "program_id")
+    val programId: String? = null,
+
+    @ColumnInfo(name = "program_version")
+    val programVersion: Int? = null,
+
+    @ColumnInfo(name = "program_step_id")
+    val programStepId: String? = null,
+
+    @ColumnInfo(name = "reminder_days_before", defaultValue = "1")
+    val reminderDaysBefore: Int = 1
 )

@@ -28,7 +28,7 @@ data class WeatherLimits(
 data class CareRecurrence(
     val type: RepeatType,
     val interval: Int,
-    val count: Int
+    val count: Int?
 )
 
 data class CareStepTemplate(
@@ -555,7 +555,10 @@ class CareProgramGenerator {
             )
         }
 
-        val occurrences = (0 until repeat.count).map { index ->
+        val count = repeat.count
+        // Keep an unlimited rule's original anchor; materializing or moving it would change its dates.
+        if (count == null) return listOf(this)
+        val occurrences = (0 until count).map { index ->
             occurrenceDate(scheduledDate, repeat, index)
         }
         // Keep the original occurrence dates (including month ends) and a stable key for each work.

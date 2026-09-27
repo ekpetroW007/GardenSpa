@@ -16,6 +16,7 @@ import ru.samates.gardenspa.domain.withProgramProduct
 import ru.samates.gardenspa.domain.problemTreatment
 import ru.samates.gardenspa.domain.FolkFertilizerRecipe
 import ru.samates.gardenspa.domain.withPersonalProduct
+import ru.samates.gardenspa.domain.withProgramRepeat
 import ru.samates.gardenspa.data.database.entity.DrugEntity
 import kotlinx.coroutines.CancellationException
 import java.time.LocalDate
@@ -233,7 +234,7 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                         } else {
                             ""
                         },
-                        repeatEndType = if (recurrence == null) "NEVER" else "COUNT",
+                        repeatEndType = if (recurrence?.count == null) "NEVER" else "COUNT",
                         repeatCount = recurrence?.count,
                         reminderDaysBefore = step.reminderDaysBefore ?: reminderDaysBefore,
                         plantCardId = program.instanceId,
@@ -255,6 +256,26 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
             } catch (e: Exception) {
                 Log.d("importCareProgram", e.toString())
                 onError(e.message ?: "Не удалось добавить программу")
+            }
+        }
+    }
+
+    fun updateProgramRepeat(
+        plant: PlantEntity,
+        intervalDays: Int?,
+        onSaved: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            try {
+                val current = repository.getAllPlantsOnce().firstOrNull { it.id == plant.id }
+                require(current != null && current.programId != null) { "Работа изменилась или удалена. Откройте карточку заново." }
+                repository.updatePlant(current.withProgramRepeat(intervalDays))
+                onSaved()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (e: Exception) {
+                onError(e.message ?: "Не удалось изменить повтор. Повторите попытку.")
             }
         }
     }

@@ -88,6 +88,9 @@ import ru.samates.gardenspa.domain.ProgramReferenceCatalog
 import ru.samates.gardenspa.domain.asPersonalProduct
 import ru.samates.gardenspa.domain.withPersonalProduct
 import ru.samates.gardenspa.domain.careNote
+import ru.samates.gardenspa.domain.withProgramRepeat
+import ru.samates.gardenspa.domain.programRepeatDescription
+import ru.samates.gardenspa.domain.recurrenceDescription
 import ru.samates.gardenspa.data.database.entity.PlantEntity
 import ru.samates.gardenspa.viewmodel.ProceduresViewmodel
 import ru.samates.gardenspa.viewmodel.ProceduresViewmodelFactory
@@ -618,6 +621,18 @@ fun PlantAdd(
                                 )
                                 if (editingProgram) {
                                     programRowsDraft.getOrNull(index)?.let { row ->
+                                        ProgramRepeatSelector(
+                                            description = row.recurrenceDescription(),
+                                            onSelected = { days ->
+                                                programRowsDraft = programRowsDraft.toMutableList().also { rows ->
+                                                    rows[index] = row.withProgramRepeat(days)
+                                                }
+                                            },
+                                            enabled = !programSaving
+                                        )
+                                        if (row.repeatType != RepeatType.NONE.name && row.repeatEndType == RepeatEndType.NEVER.name) {
+                                            Text("Повторять до отключения", color = Mist)
+                                        }
                                         Text(row.drugName.toDrugDisplayName(), color = Leaf300)
                                         if (row.programNote.isNotBlank()) ExpandableInfo("Инструкция и ограничения", row.programNote)
                                         val hasHistory = row.id > 0 && procedureHistory.any { it.plantId == row.id }
@@ -1067,7 +1082,7 @@ private fun ProgramContinuationUnavailableDialog(
 }
 
 @Composable
-private fun CareProgramPreviewDialog(
+internal fun CareProgramPreviewDialog(
     program: GeneratedCareProgram,
     onProgramChange: (GeneratedCareProgram) -> Unit,
     error: String?,
@@ -1104,8 +1119,17 @@ private fun CareProgramPreviewDialog(
                         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                             Text(step.title, color = Cream, style = MaterialTheme.typography.titleMedium)
                             Text(step.scheduledDate.toRussianDate(), color = Leaf300)
-                            step.recurrence?.let { recurrence ->
-                                Text("Повтор: ${recurrence.count} раз", color = Mist)
+                            ProgramRepeatSelector(
+                                description = step.programRepeatDescription(),
+                                onSelected = { days ->
+                                    onProgramChange(program.copy(steps = program.steps.toMutableList().also {
+                                        it[index] = step.withProgramRepeat(days)
+                                    }))
+                                },
+                                enabled = !importing
+                            )
+                            if (step.recurrence != null && step.recurrence.count == null) {
+                                Text("Повторять до отключения", color = Mist)
                             }
                             step.productDescription?.let { description ->
                                 Text("Какое средство потребуется", color = Leaf300)

@@ -19,7 +19,7 @@ import ru.samates.gardenspa.domain.careTitleWithoutSeasonLabel
         ProcedureEntity::class,
         GardenWorkEntity::class
     ],
-    version = 18,
+    version = 19,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -218,6 +218,24 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_18_19 = object : Migration(18, 19) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE procedure_history ADD COLUMN program_id TEXT")
+                database.execSQL("ALTER TABLE procedure_history ADD COLUMN program_version INTEGER")
+                database.execSQL("ALTER TABLE procedure_history ADD COLUMN program_step_id TEXT")
+                database.execSQL("ALTER TABLE procedure_history ADD COLUMN reminder_days_before INTEGER NOT NULL DEFAULT 1")
+                // Older archives keep their original name, product and note. Only settings still
+                // available on the original work can be recovered during migration.
+                database.execSQL("""
+                    UPDATE procedure_history SET
+                        program_id = (SELECT program_id FROM plants WHERE id = plant_id),
+                        program_version = (SELECT program_version FROM plants WHERE id = plant_id),
+                        program_step_id = (SELECT program_step_id FROM plants WHERE id = plant_id),
+                        reminder_days_before = COALESCE((SELECT reminder_days_before FROM plants WHERE id = plant_id), 1)
+                """.trimIndent())
+            }
+        }
+
         internal fun configuredMigrations(): Array<Migration> = arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
@@ -235,7 +253,8 @@ abstract class AppDatabase : RoomDatabase() {
             MIGRATION_14_17,
             MIGRATION_15_17,
             MIGRATION_16_17,
-            MIGRATION_17_18
+            MIGRATION_17_18,
+            MIGRATION_18_19
         )
 
         private fun legacyMigrationTo17(startVersion: Int) = object : Migration(startVersion, 17) {

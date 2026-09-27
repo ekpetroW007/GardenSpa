@@ -16,6 +16,53 @@ import ru.samates.gardenspa.data.database.AppDatabase
 
 @RunWith(AndroidJUnit4::class)
 class AppDatabaseMigrationInstrumentedTest {
+    @Test fun migratesVersion18ArchiveAndCanRestoreNextSeasonWithOriginalInstructions() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "migration18-${UUID.randomUUID()}.db"
+        Room.databaseBuilder(context, AppDatabase::class.java, name).build().let { current ->
+            current.openHelper.writableDatabase
+            current.close()
+        }
+        context.openOrCreateDatabase(name, Context.MODE_PRIVATE, null).use { db ->
+            db.execSQL("DROP TABLE procedure_history")
+            db.execSQL("""CREATE TABLE procedure_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, plant_id INTEGER NOT NULL,
+                procedure_name TEXT NOT NULL, scheduled_date TEXT NOT NULL, rescheduled_date TEXT,
+                completed_date TEXT, status TEXT NOT NULL, note TEXT NOT NULL,
+                plant_card_id TEXT NOT NULL DEFAULT '', drug_name TEXT NOT NULL DEFAULT '')""")
+            db.execSQL("CREATE INDEX index_procedure_history_plant_id ON procedure_history(plant_id)")
+            db.execSQL("CREATE INDEX index_procedure_history_plant_card_id ON procedure_history(plant_card_id)")
+            db.execSQL("CREATE UNIQUE INDEX index_procedure_history_plant_id_scheduled_date ON procedure_history(plant_id, scheduled_date)")
+            db.execSQL("""INSERT INTO plants(id, name, task, wateringInterval, creationDate,
+                drugNameInPlant, gardenNameInPlant, plant_card_id, program_id, program_version,
+                program_step_id, reminder_days_before)
+                VALUES(1, 'Яблоня', 'Новая работа', 1, '2026-05-01', 'Новый препарат', 'Сад',
+                'migration-card', 'apple', 10, 'green_cone_biological', 4)""")
+            db.execSQL("""INSERT INTO procedure_history(plant_id, procedure_name, scheduled_date,
+                completed_date, status, note, plant_card_id, drug_name)
+                VALUES(1, 'Старая работа', '2026-05-01', '2026-05-01', 'COMPLETED',
+                'Старая инструкция', 'migration-card', 'Старый препарат')""")
+            db.version = 18
+        }
+        val migrated = Room.databaseBuilder(context, AppDatabase::class.java, name)
+            .addMigrations(*AppDatabase.configuredMigrations()).build()
+        try {
+            val history = migrated.procedureDao().getAllProceduresOnce().single()
+            assertEquals("Старый препарат", history.drugName)
+            assertEquals("Старая инструкция", history.note)
+            assertEquals("apple", history.programId)
+            assertEquals(4, history.reminderDaysBefore)
+            migrated.procedureDao().scheduleNextSeason(history.id, java.time.LocalDate.of(2026, 9, 27))
+            val next = migrated.plantDao().getAllPlantsOnce().single { it.id != 1 }
+            assertEquals("2027-05-01", next.creationDate)
+            assertEquals("Старая работа", next.taskName)
+            assertEquals("Старый препарат", next.drugName)
+            assertEquals("Старая инструкция", next.programNote)
+            assertEquals(4, next.reminderDaysBefore)
+            assertEquals(history, migrated.procedureDao().getAllProceduresOnce().single())
+        } finally { migrated.close(); context.deleteDatabase(name) }
+    }
+
     @Test
     fun migratesPublicVersion15WithoutLosingGardenPlantOrProcedure() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext

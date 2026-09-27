@@ -16,6 +16,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -26,6 +27,7 @@ import ru.samates.gardenspa.BookeeperApp
 import ru.samates.gardenspa.data.database.entity.resolvedCardId
 import ru.samates.gardenspa.data.database.entity.PlantEntity
 import ru.samates.gardenspa.domain.ProgramProductCatalog
+import ru.samates.gardenspa.domain.nextSeasonScheduledDate
 import java.time.LocalDate
 import ru.samates.gardenspa.domain.recurrenceDescription
 import ru.samates.gardenspa.domain.toPlantCards
@@ -36,6 +38,7 @@ import ru.samates.gardenspa.presentation.navigation.AppDestinations
 import ru.samates.gardenspa.ui.theme.Cream
 import ru.samates.gardenspa.ui.theme.Leaf300
 import ru.samates.gardenspa.ui.theme.Mist
+import ru.samates.gardenspa.ui.theme.Danger
 import ru.samates.gardenspa.viewmodel.PlantsViewmodel
 import ru.samates.gardenspa.viewmodel.PlantsViewmodelFactory
 import ru.samates.gardenspa.viewmodel.ProceduresViewmodel
@@ -64,6 +67,11 @@ fun PlantDetails(navController: NavController, plantId: Int) {
     var afterInspection by remember { mutableStateOf(false) }
     var productSaving by remember { mutableStateOf(false) }
     var productError by remember { mutableStateOf<String?>(null) }
+    var repeatSaving by remember { mutableStateOf(false) }
+    var repeatError by remember { mutableStateOf<String?>(null) }
+    var nextSeasonId by rememberSaveable { mutableStateOf<Int?>(null) }
+    var nextSeasonSaving by remember { mutableStateOf(false) }
+    var nextSeasonError by remember { mutableStateOf<String?>(null) }
 
     BotanicalBackground {
         Column(Modifier.fillMaxSize()) {
@@ -128,13 +136,22 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                         }
                     }
                     item { SectionTitle("План ухода") }
+                    repeatError?.let { message -> item { Text(message, color = Danger) } }
                     items(cardRows, key = { "card-procedure:${it.id}" }) { procedure ->
                         GlassCard(Modifier.fillMaxWidth()) {
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(procedure.taskName, color = Cream, style = MaterialTheme.typography.titleMedium)
                                 Text(procedure.drugName.toDrugDisplayName(), color = Leaf300)
                                 Text("Дата: ${procedure.creationDate.toRussianDateOrSelf()}", color = Mist)
-                                Text(procedure.recurrenceDescription(), color = Mist)
+                                if (procedure.programId != null) {
+                                    ProgramRepeatSelector(procedure.recurrenceDescription(), onSelected = { interval ->
+                                        repeatSaving = true
+                                        repeatError = null
+                                        plantsVm.updateProgramRepeat(procedure, interval,
+                                            onSaved = { repeatSaving = false; TreatmentReminderScheduler.refreshNow(app) },
+                                            onError = { repeatSaving = false; repeatError = it })
+                                    }, enabled = !repeatSaving)
+                                } else Text(procedure.recurrenceDescription(), color = Mist)
                                 if (procedure.programNote.isNotBlank()) {
                                     ExpandableInfo("Инструкция и ограничения", procedure.programNote)
                                 }
@@ -171,12 +188,37 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                                 if (procedure.note.isNotBlank()) {
                                     ExpandableInfo("Инструкция на момент выполнения", procedure.note)
                                 }
+                                val nextSeasonDate = procedure.nextSeasonScheduledDate(plants, procedures)
+                                if (nextSeasonDate != null) {
+                                    Text("Запланировано на ${nextSeasonDate.toRussianDate()}", color = Leaf300)
+                                } else {
+                                    SecondaryAction("Сохранить на следующий сезон", {
+                                        nextSeasonId = procedure.id
+                                        nextSeasonError = null
+                                    }, Modifier.fillMaxWidth())
+                                }
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    history.firstOrNull { it.id == nextSeasonId }?.let { archived ->
+        NextSeasonDialog(archived, nextSeasonSaving, nextSeasonError,
+            onDismiss = { nextSeasonId = null; nextSeasonError = null },
+            onConfirm = {
+                nextSeasonSaving = true
+                nextSeasonError = null
+                proceduresVm.scheduleNextSeason(archived.id,
+                    onSaved = {
+                        nextSeasonSaving = false
+                        nextSeasonId = null
+                        TreatmentReminderScheduler.refreshNow(app)
+                    },
+                    onError = { nextSeasonSaving = false; nextSeasonError = it.message ?: "Не удалось сохранить работу" })
+            })
     }
 
     productWork?.let { work ->
