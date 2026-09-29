@@ -99,6 +99,18 @@ data class PlantEntity(
 
     @ColumnInfo(name = "photo_uri")
     val photoUri: String? = null,
+
+    @ColumnInfo(name = "selected_variant_id")
+    val selectedVariantId: String? = null,
+
+    @ColumnInfo(name = "variant_choices", defaultValue = "''")
+    val variantChoices: String = "",
+
+    @ColumnInfo(name = "user_edited", defaultValue = "0")
+    val userEdited: Boolean = false,
+
+    @ColumnInfo(name = "program_baseline")
+    val programBaseline: String? = null,
 )
 
 val PlantEntity.resolvedCardId: String

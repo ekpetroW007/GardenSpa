@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,6 +36,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -52,6 +54,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import kotlinx.coroutines.launch
 import androidx.navigation.NavController
 import java.time.LocalDate
 import java.time.YearMonth
@@ -61,6 +66,10 @@ import java.util.Locale
 import kotlin.math.roundToInt
 import ru.samates.gardenspa.BookeeperApp
 import ru.samates.gardenspa.domain.ScheduledTreatment
+import ru.samates.gardenspa.domain.ProgramVariants
+import ru.samates.gardenspa.domain.gardenWorkDate
+import ru.samates.gardenspa.domain.nearestIncompleteTreatment
+import ru.samates.gardenspa.data.database.entity.climateOrNull
 import ru.samates.gardenspa.domain.recurrenceDescription
 import ru.samates.gardenspa.domain.scheduledTreatmentsOn
 import ru.samates.gardenspa.domain.toDrugDisplayName
@@ -73,6 +82,9 @@ import ru.samates.gardenspa.ui.theme.Leaf300
 import ru.samates.gardenspa.ui.theme.Mist
 import ru.samates.gardenspa.ui.theme.Warning
 import ru.samates.gardenspa.viewmodel.GardenWorkViewModel
+import ru.samates.gardenspa.viewmodel.GardensViewmodel
+import ru.samates.gardenspa.viewmodel.GardensViewmodelFactory
+import ru.samates.gardenspa.viewmodel.UserViewModel
 import ru.samates.gardenspa.viewmodel.GardenWorkViewModelFactory
 import ru.samates.gardenspa.viewmodel.PlantsViewmodel
 import ru.samates.gardenspa.viewmodel.PlantsViewmodelFactory
@@ -82,39 +94,88 @@ import ru.samates.gardenspa.viewmodel.ProceduresViewmodelFactory
 private data class UndoAction(val message: String, val plantId: Int, val originalDate: LocalDate)
 
 @Composable
-fun Calendar(innerPadding: PaddingValues, navController: NavController, onBack: (() -> Unit)? = null) {
+fun Calendar(
+    innerPadding: PaddingValues,
+    navController: NavController,
+    onBack: (() -> Unit)? = null,
+    userViewModel: UserViewModel? = null,
+    onScreenSelected: (String) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
     val application = LocalContext.current.applicationContext as BookeeperApp
+    val preferences = remember(application) { PreferencesManager(application) }
+    val scope = rememberCoroutineScope()
     val plantsVm: PlantsViewmodel = viewModel(factory = PlantsViewmodelFactory(application.repository))
     val proceduresVm: ProceduresViewmodel = viewModel(factory = ProceduresViewmodelFactory(application.repository))
     val gardenWorkVm: GardenWorkViewModel = viewModel(factory = GardenWorkViewModelFactory(application.repository))
+    val gardensVm: GardensViewmodel = viewModel(factory = GardensViewmodelFactory(application.repository))
     val plants by plantsVm.plants.collectAsState()
+    val gardens by gardensVm.gardens.collectAsState()
     val procedures by proceduresVm.procedures.collectAsState()
     val gardenWorkEntries by gardenWorkVm.entries.collectAsState()
-    val today = LocalDate.now()
+    val gardenActivityEnabled by (userViewModel?.gardenActivityEnabled ?: preferences.gardenActivityEnabled).collectAsState(false)
+    val userWeightKg by (userViewModel?.userWeightKg ?: preferences.userWeightKg).collectAsState(70.0)
+    var today by remember { mutableStateOf(LocalDate.now()) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { today = LocalDate.now() }
     var selectedDateText by rememberSaveable { mutableStateOf(today.toString()) }
     var visibleMonthText by rememberSaveable { mutableStateOf(YearMonth.from(today).toString()) }
     val selectedDate = LocalDate.parse(selectedDateText)
     val visibleMonth = YearMonth.parse(visibleMonthText)
     var undoAction by remember { mutableStateOf<UndoAction?>(null) }
     var actionError by remember { mutableStateOf<String?>(null) }
+    var variantSaving by remember { mutableStateOf(false) }
     val completeWork = rememberCompleteWorkAction(proceduresVm) { treatment ->
         undoAction = UndoAction("Работа отмечена как выполненная", treatment.plant.id, treatment.originalDate)
     }
-
+    val todayTreatments = scheduledTreatmentsOn(plants, procedures, today)
+    val nextTreatments = (1L..7L).flatMap { offset ->
+        scheduledTreatmentsOn(plants, procedures, today.plusDays(offset))
+    }.take(3)
+    val nearestTreatment = remember(plants, procedures, today) { nearestIncompleteTreatment(plants, procedures, today) }
+    val weatherGarden = selectWeatherGarden(gardens, listOfNotNull(nearestTreatment?.plant?.gardenId))
+    val activityDate = gardenWorkDate()
     val datesWithGardenWork = gardenWorkEntries.mapNotNull { runCatching { LocalDate.parse(it.workDate) }.getOrNull() }.toSet()
     val markedDates = (1..visibleMonth.lengthOfMonth()).mapNotNull { day ->
         visibleMonth.atDay(day).takeIf { scheduledTreatmentsOn(plants, procedures, it).isNotEmpty() }
     }.toSet() + datesWithGardenWork
-    val agendaDays = listOf(selectedDate)
 
+    fun reschedule(treatment: ScheduledTreatment, newDate: LocalDate) {
+        proceduresVm.reschedule(treatment.plant.id, treatment.plant.taskName, treatment.originalDate, newDate) {
+            TreatmentReminderScheduler.cancelTreatmentNotification(application, treatment.plant.id, treatment.originalDate.toString())
+            TreatmentReminderScheduler.refreshNow(application)
+        }
+        undoAction = UndoAction("Работа перенесена на ${newDate.toRussianDate(false)}", treatment.plant.id, treatment.originalDate)
+        selectedDateText = newDate.toString()
+        visibleMonthText = YearMonth.from(newDate).toString()
+    }
+    fun LazyListScope.careItems(treatments: List<ScheduledTreatment>, prefix: String) {
+        items(treatments, key = { "$prefix:${it.plant.id}:${it.originalDate}" }) { treatment ->
+            TreatmentCard(treatment = treatment,
+                variantSaving = variantSaving,
+                completedYears = ProgramVariants.completedYears(treatment.plant, procedures),
+                onVariant = { variant, choices ->
+                    variantSaving = true
+                    plantsVm.selectProgramVariant(treatment.plant.id, variant, choices,
+                        onSaved = { variantSaving = false; actionError = null; TreatmentReminderScheduler.refreshNow(application) },
+                        onError = { variantSaving = false; actionError = it.message ?: "Не удалось выбрать вариант" })
+                },
+                onOpen = { navController.navigate(AppDestinations.plantDetails(treatment.plant.id)) },
+                onComplete = { completeWork(treatment) },
+                onRepeat = { interval ->
+                    plantsVm.updateProgramRepeat(treatment.plant, interval,
+                        onSaved = { actionError = null; TreatmentReminderScheduler.refreshNow(application) },
+                        onError = { actionError = it })
+                }, onReschedule = { reschedule(treatment, it) })
+        }
+    }
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(innerPadding),
+        modifier = modifier.fillMaxSize().padding(innerPadding),
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                ScreenHeader("Календарь", "Понятный план ухода", onBack)
+                ScreenHeader("Календарь", "Погода и план ухода", onBack)
                 PrimaryAction("Добавить работу", { navController.navigate(AppDestinations.plantAdd(selectedDate.toString())) }, Modifier.fillMaxWidth())
             }
         }
@@ -123,75 +184,88 @@ fun Calendar(innerPadding: PaddingValues, navController: NavController, onBack: 
                 GlassCard(Modifier.fillMaxWidth()) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(action.message, color = Cream, modifier = Modifier.weight(1f))
-                        Text(
-                            "Отменить",
-                            color = Leaf300,
-                            fontWeight = FontWeight.Bold,
+                        Text("Отменить", color = Leaf300, fontWeight = FontWeight.Bold,
                             modifier = Modifier.clickable {
                                 proceduresVm.undoChange(action.plantId, action.originalDate,
                                     onError = { actionError = it.message ?: "Не удалось отменить действие" },
-                                    onSaved = {
-                                        TreatmentReminderScheduler.refreshNow(application)
-                                        undoAction = null
-                                    })
-                            }
-                        )
+                                    onSaved = { TreatmentReminderScheduler.refreshNow(application); undoAction = null })
+                            })
                     }
                 }
             }
         }
         actionError?.let { message -> item { Text(message, color = Warning) } }
-        item {
-            MonthCalendar(
-                month = visibleMonth,
-                selectedDate = selectedDate,
-                datesWithTasks = markedDates,
-                onPreviousMonth = { visibleMonthText = visibleMonth.minusMonths(1).toString() },
-                onNextMonth = { visibleMonthText = visibleMonth.plusMonths(1).toString() },
-                onDateSelected = { selectedDateText = it.toString(); visibleMonthText = YearMonth.from(it).toString() }
-            )
+        item { WeatherWindowCard(weatherGarden, nearestTreatment, { onScreenSelected("Сады") }, ::reschedule) }
+        weatherGarden?.climateOrNull()?.let { climate ->
+            item {
+                SecondaryAction("Место и климат сада: ${climate.displayName()}", {
+                    navController.navigate(AppDestinations.gardenLocation(weatherGarden.id))
+                }, Modifier.fillMaxWidth())
+            }
         }
-
-        agendaDays.forEach { date ->
-            val treatments = scheduledTreatmentsOn(plants, procedures, date)
-            val gardenWork = gardenWorkEntries.filter { it.workDate == date.toString() }
-            item { SectionTitle(dateTitle(date, today)) }
-            if (gardenWork.isNotEmpty()) {
-                item {
-                    GlassCard(Modifier.fillMaxWidth()) {
-                        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                            Text("Садовая активность", color = Cream, style = MaterialTheme.typography.titleLarge)
-                            Text("Примерно ${gardenWork.sumOf { it.calories }.roundToInt()} ккал", color = Leaf300)
-                            gardenWork.forEach { Text("${it.activityName}: ${it.minutes} мин", color = Mist) }
-                        }
+        item { SectionTitle("Работы на сегодня, ${today.toRussianDate(false)}") }
+        if (todayTreatments.isEmpty()) item { EmptyGlassState("На сегодня всё", "Можно отдохнуть или добавить новое растение") }
+        else careItems(todayTreatments, "today")
+        if (gardenActivityEnabled) {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SectionTitle("Садовая активность")
+                    GardenWorkCaloriesCard(activityDate,
+                        gardenWorkEntries.filter { it.workDate == activityDate.toString() }, userWeightKg) { weight, work ->
+                        if (userViewModel != null) userViewModel.updateWeightKg(weight)
+                        else scope.launch { preferences.setUserWeightKg(weight) }
+                        gardenWorkVm.saveDay(activityDate, weight, work)
                     }
                 }
             }
-            if (treatments.isEmpty()) {
-                item { EmptyGlassState("Дел нет", "На этот день работы не запланированы") }
-            } else {
-                items(treatments, key = { "${date}:${it.plant.id}:${it.originalDate}" }) { treatment ->
-                    TreatmentCard(
-                        treatment = treatment,
-                        onOpen = { navController.navigate(AppDestinations.plantDetails(treatment.plant.id)) },
-                        onComplete = { completeWork(treatment) },
-                        onRepeat = { interval ->
-                            plantsVm.updateProgramRepeat(treatment.plant, interval,
-                                onSaved = { actionError = null; TreatmentReminderScheduler.refreshNow(application) },
-                                onError = { actionError = it })
-                        },
-                        onReschedule = { newDate ->
-                            proceduresVm.reschedule(treatment.plant.id, treatment.plant.taskName, treatment.originalDate, newDate) {
-                                TreatmentReminderScheduler.cancelTreatmentNotification(application, treatment.plant.id, treatment.originalDate.toString())
-                                TreatmentReminderScheduler.refreshNow(application)
-                            }
-                            undoAction = UndoAction("Работа перенесена на ${newDate.toRussianDate(false)}", treatment.plant.id, treatment.originalDate)
-                            selectedDateText = newDate.toString()
-                            visibleMonthText = YearMonth.from(newDate).toString()
-                        }
-                    )
+        }
+        item { SectionTitle("Следующие 7 дней") }
+        if (nextTreatments.isEmpty()) {
+            item { EmptyGlassState("Ближайших дел нет", "Новые работы появятся здесь автоматически") }
+            nearestTreatment?.takeIf { it.scheduledDate.isAfter(today.plusDays(7)) }?.let { next ->
+                item {
+                    SectionTitle("Ближайшая работа")
+                    UpcomingCareCard(next) { navController.navigate(AppDestinations.plantDetails(next.plant.id)) }
                 }
             }
+        } else items(nextTreatments, key = { "next:${it.scheduledDate}:${it.plant.id}:${it.originalDate}" }) { treatment ->
+            UpcomingCareCard(treatment) { navController.navigate(AppDestinations.plantDetails(treatment.plant.id)) }
+        }
+        item { SectionTitle("Календарь по дням") }
+        item {
+            MonthCalendar(month = visibleMonth, selectedDate = selectedDate, datesWithTasks = markedDates,
+                onPreviousMonth = { visibleMonthText = visibleMonth.minusMonths(1).toString() },
+                onNextMonth = { visibleMonthText = visibleMonth.plusMonths(1).toString() },
+                onDateSelected = { selectedDateText = it.toString(); visibleMonthText = YearMonth.from(it).toString() })
+        }
+        val treatments = scheduledTreatmentsOn(plants, procedures, selectedDate)
+        val gardenWork = gardenWorkEntries.filter { it.workDate == selectedDate.toString() }
+        if (selectedDate != today) {
+            item { SectionTitle(dateTitle(selectedDate, today)) }
+            if (treatments.isEmpty()) item { EmptyGlassState("Дел нет", "На этот день работы не запланированы") }
+            else careItems(treatments, "selected")
+        }
+        if (gardenWork.isNotEmpty()) {
+            item {
+                GlassCard(Modifier.fillMaxWidth()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text("Садовая активность за ${selectedDate.toRussianDate(false)}", color = Cream, style = MaterialTheme.typography.titleLarge)
+                        Text("Примерно ${gardenWork.sumOf { it.calories }.roundToInt()} ккал", color = Leaf300)
+                        gardenWork.forEach { Text("${it.activityName}: ${it.minutes} мин", color = Mist) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpcomingCareCard(treatment: ScheduledTreatment, onOpen: () -> Unit) {
+    GlassCard(Modifier.fillMaxWidth(), onClick = onOpen) {
+        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(treatment.scheduledDate.toRussianDate(false), color = Leaf300, fontWeight = FontWeight.SemiBold)
+            Text(treatment.plant.taskName, color = Cream, style = MaterialTheme.typography.titleMedium)
+            Text("${treatment.plant.plantName} · ${treatment.plant.gardenName}", color = Mist)
         }
     }
 }
@@ -277,6 +351,9 @@ internal fun MonthCalendar(
 @Composable
 private fun TreatmentCard(
     treatment: ScheduledTreatment,
+    variantSaving: Boolean,
+    completedYears: Map<String, List<Int>>,
+    onVariant: (String, String) -> Unit,
     onComplete: () -> Unit,
     onRepeat: (Int?) -> Unit,
     onReschedule: (LocalDate) -> Unit,
@@ -284,6 +361,7 @@ private fun TreatmentCard(
 ) {
     val context = LocalContext.current
     val completed = treatment.completed
+    val variants = ProgramVariants.isVariantWork(treatment.plant)
     GlassCard(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (treatment.rescheduled) Text("Перенесено с ${treatment.originalDate.toRussianDate(false)}", color = Warning)
@@ -296,6 +374,11 @@ private fun TreatmentCard(
             SecondaryAction("Подробнее", onOpen, Modifier.fillMaxWidth().semantics {
                 contentDescription = "Открыть работу: ${treatment.plant.taskName}"
             })
+            if (variants) {
+                ProgramVariantChooser(treatment.plant.programStepId, treatment.plant.selectedVariantId,
+                    treatment.plant.variantChoices, onVariant, enabled = !variantSaving,
+                    completed = completed, completedYears = completedYears, onComplete = onComplete)
+            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SecondaryAction(
                     "Перенести",
@@ -308,7 +391,7 @@ private fun TreatmentCard(
                     modifier = Modifier.weight(1f).height(52.dp),
                     enabled = !completed
                 )
-                Button(
+                if (!variants) Button(
                     onClick = onComplete,
                     enabled = !completed,
                     modifier = Modifier.weight(1f).height(52.dp).semantics {

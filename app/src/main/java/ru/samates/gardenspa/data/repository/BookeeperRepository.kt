@@ -14,6 +14,7 @@ import ru.samates.gardenspa.data.database.entity.TaskEntity
 import ru.samates.gardenspa.data.database.entity.ProcedureEntity
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
+import ru.samates.gardenspa.data.database.entity.ProgramInstallationEntity
 
 class BookeeperRepository(
     private val drugDao: DrugDAO,
@@ -74,7 +75,25 @@ class BookeeperRepository(
     }
 
     suspend fun updatePlant(plant: PlantEntity) {
-        plantDAO.updatePlant(plant)
+        plantDAO.updatePlant(plant.copy(userEdited = true))
+    }
+
+    suspend fun importProgram(installation: ProgramInstallationEntity, plants: List<PlantEntity>) =
+        plantDAO.importProgram(installation, plants)
+
+    suspend fun refreshInstalledPrograms(today: LocalDate = LocalDate.now()): Int = plantDAO.refreshInstalledPrograms(today)
+
+    suspend fun selectProgramVariant(plantId: Int, variantId: String, choices: String) =
+        plantDAO.selectProgramVariant(plantId, variantId, choices)
+
+    suspend fun updateProgramRepeat(plantId: Int, intervalDays: Int?) = plantDAO.updateProgramRepeat(plantId, intervalDays)
+
+    suspend fun replaceImportedProgramCard(expected: List<PlantEntity>, replacement: List<PlantEntity>) =
+        plantDAO.replaceImportedProgramCard(expected, replacement)
+
+    suspend fun updateCompletionComment(procedureId: Int, comment: String) {
+        require(comment.length <= 4000) { "Комментарий должен быть не длиннее 4000 символов" }
+        require(procedureDAO.updateCompletionComment(procedureId, comment.trim()) == 1) { "Выполненная работа уже удалена" }
     }
 
     suspend fun replaceUnusedProgramProduct(expected: PlantEntity, replacement: PlantEntity) =

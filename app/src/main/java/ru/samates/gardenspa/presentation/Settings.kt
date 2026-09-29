@@ -9,6 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,6 +27,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
@@ -38,9 +41,17 @@ import ru.samates.gardenspa.viewmodel.UserViewModel
 
 @Composable
 fun SettingsScreen(navController: NavController, userViewModel: UserViewModel) {
+    BotanicalBackground {
+        HelpScreen(userViewModel, onBack = { navController.popBackStack() })
+    }
+}
+
+@Composable
+fun HelpScreen(userViewModel: UserViewModel, innerPadding: PaddingValues = PaddingValues(), onBack: (() -> Unit)? = null) {
     val context = LocalContext.current
     val largeInterface by userViewModel.largeInterface.collectAsState()
     val highContrast by userViewModel.highContrast.collectAsState()
+    val gardenActivityEnabled by userViewModel.gardenActivityEnabled.collectAsState()
     var offerOpen by remember { mutableStateOf(false) }
     var calorieReminder by remember { mutableStateOf(GardenWorkReminderScheduler.isEnabled(context)) }
     var notificationAllowed by remember {
@@ -54,13 +65,20 @@ fun SettingsScreen(navController: NavController, userViewModel: UserViewModel) {
         if (granted) TreatmentReminderScheduler.refreshNow(context)
     }
 
-    BotanicalBackground {
-        Column(Modifier.fillMaxSize()) {
-            ScreenHeader("Настройки", "Сделайте приложение удобным для себя", onBack = { navController.popBackStack() })
+        Column(Modifier.fillMaxSize().padding(innerPadding)) {
+            ScreenHeader("Помощь", "Настройки и подсказки", onBack = onBack)
             LazyColumn(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(18.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                item {
+                    GlassCard(Modifier.fillMaxWidth()) {
+                        ExpandableInfo("Как пользоваться GardenSpa",
+                            "Добавьте сад и растения в разделе «Мой сад». В «Календаре» находятся погода, работы на сегодня и план по дням. " +
+                                "После выполнения работа сохраняется в архиве растения; её можно запланировать на следующий сезон. " +
+                                "Средства, удобрения и рецепты находятся в «Справочнике».")
+                    }
+                }
                 item {
                     SettingsToggleCard(
                         title = "Крупный интерфейс",
@@ -103,6 +121,14 @@ fun SettingsScreen(navController: NavController, userViewModel: UserViewModel) {
                 }
                 item {
                     SettingsToggleCard(
+                        title = "Садовая активность",
+                        description = "Показывать подсчёт активности и калорий в календаре под работами на сегодня. Сохранённые записи остаются в календаре при отключении.",
+                        checked = gardenActivityEnabled,
+                        onCheckedChange = userViewModel::setGardenActivityEnabled
+                    )
+                }
+                item {
+                    SettingsToggleCard(
                         title = "Вечерний подсчёт садовой активности",
                         description = "В 20:00 будет приходить напоминание посчитать потраченные в саду калории.",
                         checked = calorieReminder,
@@ -126,7 +152,6 @@ fun SettingsScreen(navController: NavController, userViewModel: UserViewModel) {
                 }
             }
         }
-    }
     if (offerOpen) OfferDialog(userViewModel.offer) { offerOpen = false }
 }
 
@@ -147,7 +172,8 @@ private fun SettingsToggleCard(
                 Text(title, color = Cream, style = MaterialTheme.typography.titleLarge)
                 Text(description, color = Mist)
             }
-            Switch(checked = checked, onCheckedChange = onCheckedChange)
+            Switch(checked = checked, onCheckedChange = onCheckedChange,
+                modifier = Modifier.semantics { contentDescription = title })
         }
     }
 }

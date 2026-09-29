@@ -22,6 +22,7 @@ import ru.samates.gardenspa.domain.PlantNameCatalog
 import ru.samates.gardenspa.domain.ProgramStartChoice
 import ru.samates.gardenspa.domain.ProgramStartPlanner
 import ru.samates.gardenspa.domain.RepeatType
+import ru.samates.gardenspa.domain.EradicationCare
 import ru.samates.gardenspa.domain.careTitleWithoutSeasonLabel
 import ru.samates.gardenspa.domain.normalizePlantName
 
@@ -257,10 +258,15 @@ class CareProgramTest {
     }
 
     @Test
-    fun workTitlesDoNotContainSeasonLabels() {
+    fun workTitlesKeepSeasonLabelsOnlyInTheExplicitlyNamedEradicationStages() {
         val forbidden = listOf("летняя", "осенняя", "весенняя", "предзимняя", "ранневесенняя", "позднезимняя")
         PlantCareCatalog.all().forEach { template ->
-            template.steps.forEach { step ->
+            template.steps.forEach stepLoop@ { step ->
+                if (EradicationCare.applies(template.id) && step.id in setOf(EradicationCare.EARLY_STEP, EradicationCare.AUTUMN_MIX_STEP)) {
+                    assertEquals(if (step.id == EradicationCare.EARLY_STEP) "Весенняя искореняющая обработка — выбрать вариант"
+                        else "Осенняя основная обработка — выбрать смесь", step.title)
+                    return@stepLoop
+                }
                 assertTrue(
                     "${template.canonicalName}: ${step.title}",
                     forbidden.none(step.title.lowercase()::contains)

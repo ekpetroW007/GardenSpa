@@ -8,8 +8,14 @@ import ru.samates.gardenspa.data.repository.BookeeperRepository
 import ru.samates.gardenspa.notifications.TreatmentReminderScheduler
 import ru.samates.gardenspa.notifications.GardenWorkReminderScheduler
 import ru.samates.gardenspa.notifications.WeatherReminderJobService
+import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class BookeeperApp : Application() {
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val database by lazy { AppDatabase.getInstance(this) }
 
     val repository by lazy {
@@ -29,6 +35,11 @@ class BookeeperApp : Application() {
         TreatmentReminderScheduler.refreshOnceToday(this)
         runCatching { WeatherReminderJobService.reschedule(this) }
         GardenWorkReminderScheduler.schedule(this)
+        applicationScope.launch {
+            runCatching { repository.refreshInstalledPrograms() }
+                .onSuccess { changed -> if (changed > 0) TreatmentReminderScheduler.refreshNow(this@BookeeperApp) }
+                .onFailure { Log.e("ProgramUpdates", "Не удалось обновить готовые программы", it) }
+        }
     }
 
     val climateService by lazy {

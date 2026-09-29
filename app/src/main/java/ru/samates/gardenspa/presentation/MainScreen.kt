@@ -1,11 +1,9 @@
 package ru.samates.gardenspa.presentation
 
-import androidx.compose.foundation.layout.padding
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -25,23 +23,15 @@ fun MainScreen(
     BotanicalBackground {
         Scaffold(
             containerColor = Color.Transparent,
-            topBar = {
-                if (selectedScreen == "Сегодня") {
-                    if (onBack == null) TopBar() else ScreenHeader("GardenSpa", onBack = onBack)
-                }
-            },
             bottomBar = {
                 AppButtonBar(selectedScreen = selectedScreen, onClick = viewModel::changeScreen)
             }
         ) { innerPadding ->
             screenState.SaveableStateProvider(selectedScreen) {
             when (selectedScreen) {
-                "Сегодня", "Главная", "Профиль" -> Profile(
-                    navController = navController,
-                    onScreenSelected = viewModel::changeScreen,
-                    modifier = Modifier.padding(innerPadding),
-                    userViewModel = userViewModel
-                )
+                "Сегодня", "Главная", "Профиль", "Календарь" -> Calendar(
+                    innerPadding, navController, onBack, userViewModel, viewModel::changeScreen)
+                "Помощь", "Настройки" -> HelpScreen(userViewModel, innerPadding, onBack)
                 "Справочник" -> ReferenceHub(innerPadding, onBack, viewModel::changeScreen)
                 "Мои средства" -> Drugs(navController, innerPadding, section = null, onBack = onBack)
                 "Препараты" -> Drugs(navController, innerPadding, onBack = onBack)
@@ -49,7 +39,6 @@ fun MainScreen(
                 "Рецепты" -> FolkRecipes(innerPadding, onBack = onBack)
                 "Баковые смеси" -> FolkRecipes(innerPadding, tankMixes = true, onBack = onBack)
                 "Сады", "Мои сады" -> MyGardens(navController, innerPadding, onBack)
-                "Календарь" -> Calendar(innerPadding, navController, onBack)
             }
             }
         }

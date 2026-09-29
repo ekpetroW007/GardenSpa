@@ -54,5 +54,14 @@ data class ProcedureEntity(
     val programStepId: String? = null,
 
     @ColumnInfo(name = "reminder_days_before", defaultValue = "1")
-    val reminderDaysBefore: Int = 1
+    val reminderDaysBefore: Int = 1,
+
+    @ColumnInfo(name = "selected_variant_id")
+    val selectedVariantId: String? = null,
+
+    @ColumnInfo(name = "variant_choices", defaultValue = "''")
+    val variantChoices: String = "",
+
+    @ColumnInfo(name = "comment", defaultValue = "''")
+    val comment: String = ""
 )

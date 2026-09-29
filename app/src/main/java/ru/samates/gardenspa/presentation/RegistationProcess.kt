@@ -57,6 +57,7 @@ class PreferencesManager(context: Context, private val dataStore: DataStore<Pref
         val CLIMATE_SOURCE_YEARS = stringPreferencesKey("climate_source_years")
         val LARGE_INTERFACE = booleanPreferencesKey("large_interface")
         val HIGH_CONTRAST = booleanPreferencesKey("high_contrast")
+        val GARDEN_ACTIVITY_ENABLED = booleanPreferencesKey("garden_activity_enabled")
         val OFFER_VERSION = stringPreferencesKey("offer_version")
         val OFFER_SHA256 = stringPreferencesKey("offer_sha256")
         val OFFER_ACCEPTED_AT = longPreferencesKey("offer_accepted_at")
@@ -113,6 +114,10 @@ class PreferencesManager(context: Context, private val dataStore: DataStore<Pref
         dataStore.edit { it[HIGH_CONTRAST] = enabled }
     }
 
+    suspend fun setGardenActivityEnabled(enabled: Boolean) {
+        dataStore.edit { it[GARDEN_ACTIVITY_ENABLED] = enabled }
+    }
+
     val registrationState: Flow<RegistrationState> = dataStore.data.map { preferences ->
         val name = preferences[USER_LOGIN].orEmpty()
         val accepted = OfferAcceptance(preferences[OFFER_VERSION].orEmpty(),
@@ -133,6 +138,12 @@ class PreferencesManager(context: Context, private val dataStore: DataStore<Pref
     val largeInterface: Flow<Boolean> = displayPreferences.map { it[LARGE_INTERFACE] ?: false }
 
     val highContrast: Flow<Boolean> = displayPreferences.map { it[HIGH_CONTRAST] ?: false }
+
+    // A saved weight is evidence that the old activity calculator was explicitly used.
+    val gardenActivityEnabled: Flow<Boolean> = displayPreferences.map {
+        it[GARDEN_ACTIVITY_ENABLED] ?: (it[USER_WEIGHT_KG] != null ||
+            ru.samates.gardenspa.notifications.GardenWorkReminderScheduler.isEnabled(context))
+    }
 
     val gardenLocation: Flow<GardenLocation?> = displayPreferences.map { preferences ->
         val latitude = preferences[GARDEN_LATITUDE]?.toDoubleOrNull() ?: return@map null

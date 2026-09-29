@@ -16,6 +16,56 @@ import ru.samates.gardenspa.data.database.AppDatabase
 
 @RunWith(AndroidJUnit4::class)
 class AppDatabaseMigrationInstrumentedTest {
+    @Test fun migratesVersion19WithoutLosingArchivedWorkOrUserEdits() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "migration19-${UUID.randomUUID()}.db"
+        Room.databaseBuilder(context, AppDatabase::class.java, name).build().let { current ->
+            current.openHelper.writableDatabase
+            current.close()
+        }
+        context.openOrCreateDatabase(name, Context.MODE_PRIVATE, null).use { db ->
+            db.execSQL("PRAGMA foreign_keys = OFF")
+            // Remove exactly the new columns so this fixture really has the version-19 tables.
+            mapOf("plants" to listOf("selected_variant_id", "variant_choices", "user_edited", "program_baseline"),
+                "procedure_history" to listOf("selected_variant_id", "variant_choices", "comment")).forEach { (table, columns) ->
+                val sql = db.rawQuery("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?", arrayOf(table)).use {
+                    it.moveToFirst(); it.getString(0)
+                }
+                val indexes = db.rawQuery("SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = ? AND sql IS NOT NULL", arrayOf(table)).use { cursor ->
+                    buildList { while (cursor.moveToNext()) add(cursor.getString(0)) }
+                }
+                val oldSql = columns.fold(sql) { value, column -> value.replace(Regex(",\\s*[`\"]?$column[`\"]?\\s+[^,)]*"), "") }
+                db.execSQL("DROP TABLE $table")
+                db.execSQL(oldSql)
+                indexes.forEach(db::execSQL)
+            }
+            db.execSQL("DROP TABLE program_installations")
+            db.execSQL("""INSERT INTO plants(id, name, task, wateringInterval, creationDate, drugNameInPlant,
+                gardenNameInPlant, plant_card_id, program_id, program_version, program_step_id, user_locked_date)
+                VALUES(1, 'Яблоня', 'Личная работа', 1, '2027-04-10', 'Моё средство', 'Сад', 'card19', 'apple', 10, 'my-work', 1)""")
+            db.execSQL("""INSERT INTO procedure_history(plant_id, procedure_name, scheduled_date, completed_date,
+                status, note, plant_card_id, drug_name, reminder_days_before)
+                VALUES(1, 'Выполненная работа', '2026-04-10', '2026-04-10', 'COMPLETED', 'Архивная норма', 'card19', 'Старое средство', 3)""")
+            db.version = 19
+        }
+        val migrated = Room.databaseBuilder(context, AppDatabase::class.java, name)
+            .addMigrations(*AppDatabase.configuredMigrations()).build()
+        try {
+            val plant = migrated.plantDao().getAllPlantsOnce().single()
+            val archive = migrated.procedureDao().getAllProceduresOnce().single()
+            assertEquals("Личная работа", plant.taskName)
+            assertTrue(plant.userEdited)
+            assertNull(plant.selectedVariantId)
+            assertNull(plant.programBaseline)
+            assertEquals("Архивная норма", archive.note)
+            assertEquals("Старое средство", archive.drugName)
+            assertEquals(3, archive.reminderDaysBefore)
+            assertEquals("", archive.comment)
+            assertEquals(1, migrated.procedureDao().updateCompletionComment(archive.id, "Дополненный архив"))
+            assertEquals("Дополненный архив", migrated.procedureDao().procedureById(archive.id)?.comment)
+        } finally { migrated.close(); context.deleteDatabase(name) }
+    }
+
     @Test fun migratesVersion18ArchiveAndCanRestoreNextSeasonWithOriginalInstructions() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val name = "migration18-${UUID.randomUUID()}.db"

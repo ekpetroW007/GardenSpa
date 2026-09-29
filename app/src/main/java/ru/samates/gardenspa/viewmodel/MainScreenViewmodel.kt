@@ -7,15 +7,21 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.SavedStateHandle
 
 class MainScreenViewmodel(private val savedState: SavedStateHandle = SavedStateHandle()) : ViewModel() {
-    private var history = savedState.get<ArrayList<String>>("screens") ?: arrayListOf("Сегодня")
+    private var history = ArrayList((savedState.get<ArrayList<String>>("screens") ?: arrayListOf("Календарь"))
+        .map(::currentRoute).fold(emptyList<String>()) { pages, page ->
+            if (pages.lastOrNull() == page) pages else pages + page
+        }.ifEmpty { listOf("Календарь") })
     var selectedScreen by mutableStateOf(history.last())
         private set
     val canGoBack: Boolean get() = history.size > 1
 
+    init { savedState["screens"] = history }
+
     fun changeScreen(newText: String) {
-        if (newText == selectedScreen) return
-        history = ArrayList(history + newText)
-        selectedScreen = newText
+        val route = currentRoute(newText)
+        if (route == selectedScreen) return
+        history = ArrayList(history + route)
+        selectedScreen = route
         savedState["screens"] = history
     }
 
@@ -24,5 +30,11 @@ class MainScreenViewmodel(private val savedState: SavedStateHandle = SavedStateH
         history = ArrayList(history.dropLast(1))
         selectedScreen = history.last()
         savedState["screens"] = history
+    }
+
+    private fun currentRoute(route: String): String = when (route) {
+        "Сегодня", "Главная", "Профиль" -> "Календарь"
+        "Настройки" -> "Помощь"
+        else -> route
     }
 }

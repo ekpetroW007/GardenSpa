@@ -17,9 +17,10 @@ import ru.samates.gardenspa.domain.careTitleWithoutSeasonLabel
         PlantEntity::class,
         TaskEntity::class,
         ProcedureEntity::class,
-        GardenWorkEntity::class
+        GardenWorkEntity::class,
+        ProgramInstallationEntity::class
     ],
-    version = 19,
+    version = 20,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -236,6 +237,31 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_19_20 = object : Migration(19, 20) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                listOf(
+                    Triple("plants", "selected_variant_id", "TEXT"),
+                    Triple("plants", "variant_choices", "TEXT NOT NULL DEFAULT ''"),
+                    Triple("plants", "user_edited", "INTEGER NOT NULL DEFAULT 0"),
+                    Triple("plants", "program_baseline", "TEXT"),
+                    Triple("procedure_history", "selected_variant_id", "TEXT"),
+                    Triple("procedure_history", "variant_choices", "TEXT NOT NULL DEFAULT ''"),
+                    Triple("procedure_history", "comment", "TEXT NOT NULL DEFAULT ''")
+                ).forEach { (table, column, definition) ->
+                    if (!hasColumn(database, table, column)) database.execSQL("ALTER TABLE $table ADD COLUMN $column $definition")
+                }
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS program_installations (
+                        plant_card_id TEXT NOT NULL PRIMARY KEY, template_id TEXT NOT NULL,
+                        applied_version INTEGER NOT NULL, start_date TEXT NOT NULL,
+                        cultivation_type TEXT NOT NULL, southern_region INTEGER NOT NULL,
+                        known_step_ids TEXT NOT NULL, inferred_context INTEGER NOT NULL DEFAULT 0
+                    )
+                """.trimIndent())
+                database.execSQL("UPDATE plants SET user_edited = 1 WHERE user_locked_date = 1 OR (program_id IS NOT NULL AND program_import_key IS NULL)")
+            }
+        }
+
         internal fun configuredMigrations(): Array<Migration> = arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
@@ -254,7 +280,8 @@ abstract class AppDatabase : RoomDatabase() {
             MIGRATION_15_17,
             MIGRATION_16_17,
             MIGRATION_17_18,
-            MIGRATION_18_19
+            MIGRATION_18_19,
+            MIGRATION_19_20
         )
 
         private fun legacyMigrationTo17(startVersion: Int) = object : Migration(startVersion, 17) {

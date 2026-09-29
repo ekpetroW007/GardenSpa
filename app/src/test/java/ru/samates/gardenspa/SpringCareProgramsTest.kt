@@ -20,14 +20,26 @@ class SpringCareProgramsTest {
             } else {
                 assertTrue(updated.version >= 10)
                 val early = updated.steps.single { it.id == SpringCarePrograms.EARLY_STEP }
-                val pests = updated.steps.single { it.id == SpringCarePrograms.PEST_STEP }
                 val green = updated.steps.single { it.id == SpringCarePrograms.GREEN_STEP }
-                assertEquals("Обработать от болезней до распускания почек", early.title)
-                assertEquals("Бордосская смесь", early.productDescription)
-                assertEquals(7, pests.offsetDays - early.offsetDays)
-                assertEquals(7, green.offsetDays - pests.offsetDays)
-                assertTrue(listOf(early, pests, green).all { it.note.contains("+3…+5") && it.recurrence == null })
-                assertEquals(CareAnchor.SAFE_AUTUMN_DATE, updated.steps.single { it.id.startsWith(SpringCarePrograms.AUTUMN_STEP) }.anchor)
+                if (EradicationCare.applies(original.id)) {
+                    assertTrue(updated.version >= EradicationCare.PROGRAM_VERSION)
+                    assertTrue(updated.steps.none { it.id == SpringCarePrograms.PEST_STEP })
+                    assertEquals("Выберите один из трёх вариантов", early.productDescription)
+                    assertEquals(CareAnchor.DORMANT_SPRING_DATE, early.anchor)
+                    assertEquals(early.anchor, green.anchor)
+                    assertEquals(14, green.offsetDays - early.offsetDays)
+                    assertTrue(listOf(early, green).all { it.note.contains("+3…+5") && it.recurrence == null })
+                    assertEquals(CareAnchor.SAFE_AUTUMN_DATE, updated.steps.single { it.id == EradicationCare.AUTUMN_MIX_STEP }.anchor)
+                    assertEquals(CareAnchor.SAFE_AUTUMN_DATE, updated.steps.single { it.id == EradicationCare.AUTUMN_IRON_STEP }.anchor)
+                } else {
+                    val pests = updated.steps.single { it.id == SpringCarePrograms.PEST_STEP }
+                    assertEquals("Обработать от болезней до распускания почек", early.title)
+                    assertEquals("Бордосская смесь", early.productDescription)
+                    assertEquals(7, pests.offsetDays - early.offsetDays)
+                    assertEquals(7, green.offsetDays - pests.offsetDays)
+                    assertTrue(listOf(early, pests, green).all { it.note.contains("+3…+5") && it.recurrence == null })
+                    assertEquals(CareAnchor.SAFE_AUTUMN_DATE, updated.steps.single { it.id.startsWith(SpringCarePrograms.AUTUMN_STEP) }.anchor)
+                }
                 retained.forEach { old ->
                     val new = updated.steps.single { it.id == old.id }
                     assertEquals(original.openGroundStartOffsetDays + old.offsetDays, updated.openGroundStartOffsetDays + new.offsetDays)
@@ -38,12 +50,13 @@ class SpringCareProgramsTest {
     }
 
     @Test fun replacementRetainsPhaseAndDoesNotCarryOldProductInstructions() {
-        val apple = PlantCareCatalog.find("яблоня")!!
-        assertEquals(SpringCarePrograms.diseaseIds, ProgramProductCatalog.alternatives("apple", SpringCarePrograms.EARLY_STEP).map { it.id }.toSet())
-        assertEquals(SpringCarePrograms.pestIds, ProgramProductCatalog.alternatives("apple", SpringCarePrograms.PEST_STEP).map { it.id }.toSet())
+        val rose = PlantCareCatalog.find("роза")!!
+        fun applicable(ids: Set<String>) = SpringCarePrograms.products.filter { it.id in ids && "rose" in it.crops }.map { it.id }.toSet()
+        assertEquals(applicable(SpringCarePrograms.diseaseIds), ProgramProductCatalog.alternatives("rose", SpringCarePrograms.EARLY_STEP).map { it.id }.toSet())
+        assertEquals(applicable(SpringCarePrograms.pestIds), ProgramProductCatalog.alternatives("rose", SpringCarePrograms.PEST_STEP).map { it.id }.toSet())
         assertTrue(ProgramProductCatalog.alternatives("tomato", SpringCarePrograms.EARLY_STEP).isEmpty())
         val start = LocalDate.of(2026, 3, 1)
-        val program = CareProgramGenerator().generate(apple, CareProgramContext(start, CultivationType.OPEN_GROUND, climate))
+        val program = CareProgramGenerator().generate(rose, CareProgramContext(start, CultivationType.OPEN_GROUND, climate))
         val pestIndex = program.steps.indexOfFirst { it.templateStepId == SpringCarePrograms.PEST_STEP }
         val changed = program.withProduct(pestIndex, "spring_profilaktin_bio", start.plusDays(7))
         assertEquals(program.steps[pestIndex].title, changed.steps[pestIndex].title)
@@ -51,7 +64,7 @@ class SpringCareProgramsTest {
         assertFalse(changed.steps[pestIndex].note.contains("500 мл на 10 л"))
         assertEquals(program.steps.filterIndexed { index, _ -> index != pestIndex }, changed.steps.filterIndexed { index, _ -> index != pestIndex })
         assertThrows(NoSuchElementException::class.java) { program.withProduct(0, "spring_30_plus", start) }
-        val resumed = CareProgramGenerator().generate(apple, CareProgramContext(LocalDate.of(2026, 6, 1), CultivationType.OPEN_GROUND, climate))
+        val resumed = CareProgramGenerator().generate(rose, CareProgramContext(LocalDate.of(2026, 6, 1), CultivationType.OPEN_GROUND, climate))
         val moved = resumed.steps.filter { ProgramProductCatalog.baseStepId(it.templateStepId) in
             setOf(SpringCarePrograms.EARLY_STEP, SpringCarePrograms.PEST_STEP, SpringCarePrograms.GREEN_STEP) }
         assertEquals(3, moved.size)

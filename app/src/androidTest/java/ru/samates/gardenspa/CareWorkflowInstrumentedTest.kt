@@ -83,7 +83,7 @@ class CareWorkflowInstrumentedTest {
             if (index % 2 == 0) compose.onNodeWithContentDescription("Назад").performClick()
             else androidx.test.espresso.Espresso.pressBack()
         }
-        compose.runOnIdle { assertEquals("Сегодня", main.selectedScreen); assertFalse(main.canGoBack) }
+        compose.runOnIdle { assertEquals("Календарь", main.selectedScreen); assertFalse(main.canGoBack) }
         for (route in listOf("plant", "edit", "add", "all", "garden", "location", "drug", "drug-info", "settings")) {
             compose.runOnIdle { nav.navigate(route) }
             if (route == "add") {
@@ -123,8 +123,9 @@ class CareWorkflowInstrumentedTest {
         assertTrue(mixture.programNote.contains("Лепидоцид, жидкий препарат — 20 мл"))
         assertNotNull(mixture.drugId)
         compose.onNodeWithContentDescription("Календарь работ").performClick()
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasContentDescription("Следующий месяц"))
         if (plannedDate.month != LocalDate.now().month) compose.onNodeWithContentDescription("Следующий месяц").performClick()
-        compose.onNode(hasContentDescription(plannedDate.toRussianDate(), substring = true)).performClick()
+        compose.onNodeWithContentDescription("${plannedDate.toRussianDate()}, есть запланированные работы").performClick()
         val task = compose.onNode(hasScrollToNodeAction())
         task.performScrollToNode(hasContentDescription("Выполнить работу: ${mixture.taskName}"))
         compose.onNodeWithContentDescription("Выполнить работу: ${mixture.taskName}").performClick()

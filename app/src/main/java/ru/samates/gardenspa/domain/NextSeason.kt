@@ -24,6 +24,8 @@ fun ProcedureEntity.nextSeasonScheduledDate(
         val moved = procedures.firstOrNull { it.plantId == copy.id && it.scheduledDate == copy.creationDate }
         return LocalDate.parse(moved?.rescheduledDate ?: copy.creationDate)
     }
+    // A selected recipe is not the next season's open choice, even when it repeats indefinitely.
+    if (selectedVariantId != null) return null
     val target = nextSeasonDate(today)
     // An unlimited repeat may already contain this occurrence. Do not duplicate it, but
     // changing its product or instructions must not silently replace the archived recipe.

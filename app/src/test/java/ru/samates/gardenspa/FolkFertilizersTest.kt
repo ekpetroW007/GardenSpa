@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import ru.samates.gardenspa.domain.FolkFertilizers
+import ru.samates.gardenspa.domain.EradicationCare
 
 class FolkFertilizersTest {
     @Test
@@ -12,7 +13,7 @@ class FolkFertilizersTest {
             setOf("milk_iodine_late_blight", "ash_spray_rust", "ash_soap_aphids",
                 "mustard_caterpillars", "mustard_apple_scab", "ash_feed_fruit_set",
                 "magic_plant_drink_tank_mix", FolkFertilizers.GREEN_CONE_ID, "pharmacy_cocktail", "yeast_tincture",
-                "alirin_gamair_tank_mix", "fitolavin_tank_mix", "biological_pests_tank_mix", "btu_protection_tank_mix", "fitosporin_stock_tank_mix"),
+                "alirin_gamair_tank_mix", "fitolavin_tank_mix", "biological_pests_tank_mix", "btu_protection_tank_mix", "fitosporin_stock_tank_mix", EradicationCare.AUTUMN_RECIPE_ID),
             (FolkFertilizers.recipes + FolkFertilizers.tankMixes).map { it.id }.toSet()
         )
         val allowedHosts = setOf("old.rosselhoscenter.ru", "rosselhoscenter.ru", "lenta.ru")

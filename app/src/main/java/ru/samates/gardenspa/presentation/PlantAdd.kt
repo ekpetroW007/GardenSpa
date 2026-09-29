@@ -80,6 +80,9 @@ import ru.samates.gardenspa.domain.ProgramStartChoice
 import ru.samates.gardenspa.domain.ProgramStartPlanner
 import ru.samates.gardenspa.domain.ProgramStartProposal
 import ru.samates.gardenspa.domain.ProgramProductCatalog
+import ru.samates.gardenspa.domain.ProgramVariants
+import ru.samates.gardenspa.domain.EradicationCare
+import ru.samates.gardenspa.domain.withProgramVariant
 import ru.samates.gardenspa.domain.withProduct
 import ru.samates.gardenspa.domain.withProgramProduct
 import ru.samates.gardenspa.domain.problemTreatment
@@ -191,6 +194,7 @@ fun PlantAdd(
     var reminderDaysBefore by remember { mutableStateOf(1) }
     var fieldsInitialized by remember(plantId) { mutableStateOf(false) }
     var programRowsDraft by remember(plantId) { mutableStateOf<List<PlantEntity>>(emptyList()) }
+    var originalProgramRows by remember(plantId) { mutableStateOf<List<PlantEntity>>(emptyList()) }
     var editProductIndex by remember { mutableStateOf<Int?>(null) }
     var editAfterInspection by remember { mutableStateOf(false) }
     var programSaving by remember { mutableStateOf(false) }
@@ -264,6 +268,7 @@ fun PlantAdd(
     LaunchedEffect(editingPlant, editingRows, drugs, gardens, fieldsInitialized) {
         if (editingPlant != null && !fieldsInitialized) {
             programRowsDraft = editingRows
+            originalProgramRows = editingRows
             plantName = editingPlant.plantName
             taskDrafts = editingRows.map { row ->
                 PlantTaskDraft(
@@ -636,7 +641,9 @@ fun PlantAdd(
                                         Text(row.drugName.toDrugDisplayName(), color = Leaf300)
                                         if (row.programNote.isNotBlank()) ExpandableInfo("Инструкция и ограничения", row.programNote)
                                         val hasHistory = row.id > 0 && procedureHistory.any { it.plantId == row.id }
-                                        if (hasHistory) {
+                                        if (ProgramVariants.isVariantWork(row)) {
+                                            Text("Вариант обработки и состав смеси можно выбрать в карточке растения или в календаре.", color = Mist)
+                                        } else if (hasHistory) {
                                             Text("У работы есть история. Другую обработку добавьте отдельно после осмотра.", color = Mist)
                                         } else {
                                             if (ProgramProductCatalog.alternatives(row.programId, row.programStepId).isNotEmpty()) {
@@ -806,6 +813,7 @@ fun PlantAdd(
                                 plantsVm.updateImportedProgramCard(
                                     plantName = plantName,
                                     existingRows = programRowsDraft,
+                                    originalRows = originalProgramRows,
                                     taskNames = normalizedTaskNames,
                                     taskDates = taskDrafts.map { it.startDate },
                                     gardenId = selectedGarden?.id,
@@ -1115,10 +1123,19 @@ internal fun CareProgramPreviewDialog(
                 )
                 program.warning?.let { Text(it, color = Danger) }
                 program.steps.forEachIndexed { index, step ->
+                    val hasVariants = EradicationCare.applies(program.templateId) && EradicationCare.isVariantStep(step.templateStepId)
                     GlassCard(Modifier.fillMaxWidth()) {
                         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                             Text(step.title, color = Cream, style = MaterialTheme.typography.titleMedium)
                             Text(step.scheduledDate.toRussianDate(), color = Leaf300)
+                            if (hasVariants) {
+                                ProgramVariantChooser(step.templateStepId, step.selectedVariantId, step.variantChoices,
+                                    onSelect = { variant, choices ->
+                                        onProgramChange(program.copy(steps = program.steps.toMutableList().also {
+                                            it[index] = step.withProgramVariant(variant, choices)
+                                        }))
+                                    }, enabled = !importing)
+                            }
                             ProgramRepeatSelector(
                                 description = step.programRepeatDescription(),
                                 onSelected = { days ->
@@ -1142,7 +1159,7 @@ internal fun CareProgramPreviewDialog(
                             if (step.needsWeatherConfirmation) {
                                 Text("Проверьте погоду перед выполнением", color = Danger)
                             }
-                            if (ProgramProductCatalog.alternatives(program.templateId, step.templateStepId).isNotEmpty()) {
+                            if (!hasVariants && ProgramProductCatalog.alternatives(program.templateId, step.templateStepId).isNotEmpty()) {
                                 SecondaryAction("Выбрать препарат-аналог", { productStepIndex = index },
                                     Modifier.fillMaxWidth(), enabled = !importing)
                                 if (index < originalSteps.size && step != originalSteps[index]) {

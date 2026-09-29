@@ -15,7 +15,8 @@ enum class CultivationType(val displayName: String) {
 enum class CareAnchor {
     START_DATE,
     SAFE_SPRING_DATE,
-    SAFE_AUTUMN_DATE
+    SAFE_AUTUMN_DATE,
+    DORMANT_SPRING_DATE
 }
 
 data class WeatherLimits(
@@ -76,7 +77,10 @@ data class GeneratedCareStep(
     val explanation: String,
     val productDescription: String?,
     val note: String,
-    val reminderDaysBefore: Int? = null
+    val reminderDaysBefore: Int? = null,
+    val selectedVariantId: String? = null,
+    val variantChoices: String = "",
+    val userEdited: Boolean = false
 )
 
 data class GeneratedCareProgram(
@@ -89,7 +93,8 @@ data class GeneratedCareProgram(
     val chosenStartDate: LocalDate,
     val climateSummary: String,
     val warning: String?,
-    val steps: List<GeneratedCareStep>
+    val steps: List<GeneratedCareStep>,
+    val isSouthernRegion: Boolean = false
 )
 
 enum class ProgramStartChoice {
@@ -150,7 +155,7 @@ fun recommendedStartDate(
 }
 
 object PlantCareCatalog {
-    private val templates = (listOf(
+    private val previousTemplates = (listOf(
         PlantCareTemplate(
             id = "tomato",
             canonicalName = "Томат",
@@ -362,6 +367,11 @@ object PlantCareCatalog {
         clean.copy(steps = steps, version = clean.version + if (steps.size != clean.steps.size) 1 else 0)
     }
 
+    private val templates = previousTemplates.map(EradicationCare::apply)
+
+    /** Previous shipped defaults let updates recognize unchanged installations. */
+    fun previousAll(): List<PlantCareTemplate> = previousTemplates
+
     private fun standardTreatmentSteps(cropLabel: String): List<CareStepTemplate> = listOf(
         CareStepTemplate(
             id = "preventive_disease_treatment",
@@ -454,6 +464,7 @@ class CareProgramGenerator {
                 CareAnchor.START_DATE -> if (continuesStartedSeason) recommendedStart else context.startDate
                 CareAnchor.SAFE_SPRING_DATE -> recommendedStart
                 CareAnchor.SAFE_AUTUMN_DATE -> context.climate.safeAutumnDate(context.startDate.year)
+                CareAnchor.DORMANT_SPRING_DATE -> context.climate.safeSpringDate(context.startDate.year).minusDays(21)
             }
             val initialDate = anchorDate.plusDays(step.offsetDays.toLong())
             val windowStart = initialDate.minusDays(step.windowBeforeDays.toLong())
@@ -532,7 +543,8 @@ class CareProgramGenerator {
             chosenStartDate = context.startDate,
             climateSummary = context.climate.displayName(),
             warning = warning,
-            steps = generatedSteps.sortedBy { it.scheduledDate }
+            steps = generatedSteps.sortedBy { it.scheduledDate },
+            isSouthernRegion = context.isSouthernRegion
         )
     }
 

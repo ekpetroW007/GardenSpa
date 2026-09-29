@@ -11,6 +11,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -27,6 +30,8 @@ import ru.samates.gardenspa.BookeeperApp
 import ru.samates.gardenspa.data.database.entity.resolvedCardId
 import ru.samates.gardenspa.data.database.entity.PlantEntity
 import ru.samates.gardenspa.domain.ProgramProductCatalog
+import ru.samates.gardenspa.domain.ProgramVariants
+import ru.samates.gardenspa.domain.ScheduledTreatment
 import ru.samates.gardenspa.domain.nextSeasonScheduledDate
 import java.time.LocalDate
 import ru.samates.gardenspa.domain.recurrenceDescription
@@ -72,6 +77,10 @@ fun PlantDetails(navController: NavController, plantId: Int) {
     var nextSeasonId by rememberSaveable { mutableStateOf<Int?>(null) }
     var nextSeasonSaving by remember { mutableStateOf(false) }
     var nextSeasonError by remember { mutableStateOf<String?>(null) }
+    var variantSaving by remember { mutableStateOf(false) }
+    var commentId by rememberSaveable { mutableStateOf<Int?>(null) }
+    var commentDraft by rememberSaveable { mutableStateOf("") }
+    val completeWork = rememberCompleteWorkAction(proceduresVm)
 
     BotanicalBackground {
         Column(Modifier.fillMaxSize()) {
@@ -143,6 +152,23 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                                 Text(procedure.taskName, color = Cream, style = MaterialTheme.typography.titleMedium)
                                 Text(procedure.drugName.toDrugDisplayName(), color = Leaf300)
                                 Text("Дата: ${procedure.creationDate.toRussianDateOrSelf()}", color = Mist)
+                                if (ProgramVariants.isVariantWork(procedure)) {
+                                    val recorded = procedures.firstOrNull { it.plantId == procedure.id && it.scheduledDate == procedure.creationDate }
+                                    ProgramVariantChooser(procedure.programStepId, procedure.selectedVariantId, procedure.variantChoices,
+                                        onSelect = { variant, choices ->
+                                            variantSaving = true
+                                            plantsVm.selectProgramVariant(procedure.id, variant, choices,
+                                                onSaved = { variantSaving = false; repeatError = null; TreatmentReminderScheduler.refreshNow(app) },
+                                                onError = { variantSaving = false; repeatError = it.message ?: "Не удалось выбрать вариант" })
+                                        }, enabled = !variantSaving,
+                                        completed = recorded?.status == "COMPLETED",
+                                        completedYears = ProgramVariants.completedYears(procedure, history),
+                                        onComplete = {
+                                            completeWork(ScheduledTreatment(procedure, LocalDate.parse(procedure.creationDate),
+                                                LocalDate.parse(recorded?.rescheduledDate ?: procedure.creationDate), false,
+                                                recorded?.rescheduledDate != null))
+                                        })
+                                }
                                 if (procedure.programId != null) {
                                     ProgramRepeatSelector(procedure.recurrenceDescription(), onSelected = { interval ->
                                         repeatSaving = true
@@ -155,7 +181,7 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                                 if (procedure.programNote.isNotBlank()) {
                                     ExpandableInfo("Инструкция и ограничения", procedure.programNote)
                                 }
-                                if (ProgramProductCatalog.alternatives(procedure.programId, procedure.programStepId).isNotEmpty()) {
+                                if (!ProgramVariants.isVariantWork(procedure) && ProgramProductCatalog.alternatives(procedure.programId, procedure.programStepId).isNotEmpty()) {
                                     val hasHistory = procedures.any { it.plantId == procedure.id }
                                     if (hasHistory) {
                                         Text("У работы есть история. Для другого средства добавьте отдельную обработку после осмотра.", color = Mist)
@@ -185,6 +211,10 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                                 Text("Запланировано: ${procedure.scheduledDate.toRussianDateOrSelf()}", color = Mist)
                                 Text("Выполнено: ${procedure.completedDate?.toRussianDateOrSelf() ?: "—"}", color = Mist)
                                 Text(if (procedure.drugName.isBlank()) "Препарат не указан" else procedure.drugName.toDrugDisplayText(), color = Leaf300)
+                                if (procedure.comment.isNotBlank()) Text("Комментарий: ${procedure.comment}", color = Cream)
+                                SecondaryAction(if (procedure.comment.isBlank()) "Добавить комментарий" else "Изменить комментарий", {
+                                    commentDraft = procedure.comment; commentId = procedure.id
+                                }, Modifier.fillMaxWidth())
                                 if (procedure.note.isNotBlank()) {
                                     ExpandableInfo("Инструкция на момент выполнения", procedure.note)
                                 }
@@ -207,10 +237,16 @@ fun PlantDetails(navController: NavController, plantId: Int) {
 
     history.firstOrNull { it.id == nextSeasonId }?.let { archived ->
         NextSeasonDialog(archived, nextSeasonSaving, nextSeasonError,
-            onDismiss = { nextSeasonId = null; nextSeasonError = null },
-            onConfirm = {
+            onDismiss = { comment ->
+                nextSeasonSaving = true
+                proceduresVm.updateCompletionComment(archived.id, comment,
+                    onSaved = { nextSeasonSaving = false; nextSeasonId = null; nextSeasonError = null },
+                    onError = { nextSeasonSaving = false; nextSeasonError = it.message })
+            },
+            onConfirm = { comment ->
                 nextSeasonSaving = true
                 nextSeasonError = null
+                proceduresVm.updateCompletionComment(archived.id, comment, onSaved = {
                 proceduresVm.scheduleNextSeason(archived.id,
                     onSaved = {
                         nextSeasonSaving = false
@@ -218,7 +254,26 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                         TreatmentReminderScheduler.refreshNow(app)
                     },
                     onError = { nextSeasonSaving = false; nextSeasonError = it.message ?: "Не удалось сохранить работу" })
+                }, onError = { nextSeasonSaving = false; nextSeasonError = it.message })
             })
+    }
+
+    commentId?.let { id ->
+        AlertDialog(onDismissRequest = { if (!nextSeasonSaving) commentId = null },
+            containerColor = ru.samates.gardenspa.ui.theme.Forest900,
+            title = { Text("Комментарий к выполненной работе", color = Cream) },
+            text = { Column {
+                OutlinedTextField(commentDraft, { commentDraft = it.take(2000) }, minLines = 3, maxLines = 6,
+                    colors = glassTextFieldColors(), enabled = !nextSeasonSaving)
+                nextSeasonError?.let { Text(it, color = Danger) }
+            } },
+            confirmButton = { TextButton(enabled = !nextSeasonSaving, onClick = {
+                nextSeasonSaving = true
+                proceduresVm.updateCompletionComment(id, commentDraft,
+                    onSaved = { nextSeasonSaving = false; commentId = null; nextSeasonError = null },
+                    onError = { nextSeasonSaving = false; nextSeasonError = it.message })
+            }) { Text("Сохранить", color = Leaf300) } },
+            dismissButton = { TextButton(enabled = !nextSeasonSaving, onClick = { commentId = null }) { Text("Отмена", color = Mist) } })
     }
 
     productWork?.let { work ->

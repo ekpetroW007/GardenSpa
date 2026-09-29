@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Update
 import ru.samates.gardenspa.data.database.entity.PlantEntity
 import ru.samates.gardenspa.data.database.entity.resolvedCardId
 import ru.samates.gardenspa.data.database.entity.ProcedureEntity
@@ -13,6 +14,9 @@ import ru.samates.gardenspa.domain.nextSeasonDate
 import ru.samates.gardenspa.domain.nextSeasonImportKey
 import ru.samates.gardenspa.domain.nextSeasonScheduledDate
 import java.time.LocalDate
+import ru.samates.gardenspa.domain.resetProgramVariantForNextSeason
+import ru.samates.gardenspa.domain.ProgramVariants
+import ru.samates.gardenspa.domain.variantFollowupDateUpdates
 
 @Dao
 interface ProcedureDAO {
@@ -31,20 +35,38 @@ interface ProcedureDAO {
         procedureForSchedule(procedure.plantId, procedure.scheduledDate)?.takeIf { it.status == "COMPLETED" }
             ?.let { return it }
         val plant = requireNotNull(plantForHistory(procedure.plantId)) { "Растение уже удалено" }
+        require(procedure.status != "COMPLETED" || !ProgramVariants.isVariantWork(plant) || plant.selectedVariantId != null) {
+            "Сначала выберите вариант обработки и средства"
+        }
         val snapshot = procedure.copy(
+            procedureName = plant.taskName,
             plantCardId = plant.resolvedCardId,
             drugName = plant.drugName,
             note = procedure.note.ifBlank { plant.programNote },
             programId = plant.programId,
             programVersion = plant.programVersion,
             programStepId = plant.programStepId,
-            reminderDaysBefore = plant.reminderDaysBefore
+            reminderDaysBefore = plant.reminderDaysBefore,
+            selectedVariantId = plant.selectedVariantId,
+            variantChoices = plant.variantChoices,
+            comment = procedure.comment.trim()
         )
-        return snapshot.copy(id = insertProcedure(snapshot).toInt())
+        val saved = snapshot.copy(id = insertProcedure(snapshot).toInt())
+        if (saved.status == "PLANNED" && saved.scheduledDate == plant.creationDate) {
+            variantFollowupDateUpdates(plant, plantsForNextSeason(), getAllProceduresOnce(),
+                LocalDate.parse(saved.rescheduledDate ?: saved.scheduledDate)).forEach { updateFollowup(it) }
+        }
+        return saved
     }
+
+    @Update
+    suspend fun updateFollowup(plant: PlantEntity)
 
     @Query("SELECT * FROM procedure_history WHERE id = :id")
     suspend fun procedureById(id: Int): ProcedureEntity?
+
+    @Query("UPDATE procedure_history SET comment = :comment WHERE id = :id AND status = 'COMPLETED'")
+    suspend fun updateCompletionComment(id: Int, comment: String): Int
 
     @Query("SELECT * FROM plants")
     suspend fun plantsForNextSeason(): List<PlantEntity>
@@ -71,7 +93,7 @@ interface ProcedureDAO {
             "Растение уже удалено. Сохранить работу на следующий сезон нельзя."
         }
         val date = archive.nextSeasonDate(today)
-        insertNextSeasonWork(current.copy(
+        val next = current.copy(
             id = 0, taskName = archive.procedureName, creationDate = date.toString(),
             drugId = null, drugName = archive.drugName, programNote = archive.note,
             plantCardId = archive.plantCardId,
@@ -80,8 +102,10 @@ interface ProcedureDAO {
             reminderDaysBefore = archive.reminderDaysBefore,
             programId = archive.programId, programVersion = archive.programVersion,
             programStepId = archive.programStepId, programImportKey = archive.nextSeasonImportKey,
-            userLockedDate = true
-        ))
+            userLockedDate = true, userEdited = true, programBaseline = null,
+            selectedVariantId = archive.selectedVariantId, variantChoices = archive.variantChoices
+        )
+        insertNextSeasonWork(if (archive.selectedVariantId != null) next.resetProgramVariantForNextSeason() else next)
         return LocalDate.parse(requireNotNull(nextSeasonWork(archive.nextSeasonImportKey)).creationDate)
     }
 
@@ -96,6 +120,10 @@ interface ProcedureDAO {
             }
         }
         deleteForSchedule(plantId, scheduledDate)
+        plantForHistory(plantId)?.takeIf { it.creationDate == scheduledDate }?.let { parent ->
+            variantFollowupDateUpdates(parent, plantsForNextSeason(), getAllProceduresOnce(), LocalDate.parse(parent.creationDate))
+                .forEach { updateFollowup(it) }
+        }
     }
 
     @Query("SELECT * FROM procedure_history ORDER BY scheduled_date DESC")

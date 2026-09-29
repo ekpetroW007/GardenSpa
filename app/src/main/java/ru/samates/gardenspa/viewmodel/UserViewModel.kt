@@ -55,6 +55,9 @@ class UserViewModel(
     private val _highContrast = MutableStateFlow(false)
     val highContrast: StateFlow<Boolean> = _highContrast
 
+    private val _gardenActivityEnabled = MutableStateFlow(false)
+    val gardenActivityEnabled: StateFlow<Boolean> = _gardenActivityEnabled
+
     init {
         reloadRegistration()
 
@@ -88,6 +91,9 @@ class UserViewModel(
 
         viewModelScope.launch {
             preferencesManager.highContrast.collect { _highContrast.value = it }
+        }
+        viewModelScope.launch {
+            preferencesManager.gardenActivityEnabled.collect { _gardenActivityEnabled.value = it }
         }
     }
 
@@ -136,6 +142,10 @@ class UserViewModel(
     fun setHighContrast(enabled: Boolean) {
         _highContrast.value = enabled
         viewModelScope.launch { preferencesManager.setHighContrast(enabled) }
+    }
+
+    fun setGardenActivityEnabled(enabled: Boolean) {
+        viewModelScope.launch { preferencesManager.setGardenActivityEnabled(enabled) }
     }
 
     fun updateWeightKg(weightKg: Double) {

@@ -197,7 +197,7 @@ object ProgramProductCatalog {
             product.copy(retailUrl = "https://ulyanovsk.lemanapro.ru/catalogue/zashchita-rasteniy-ot-bolezney/")
         else product
     }.let { it + SpringCarePrograms.products + SpringCarePrograms.mixtureProducts + MineralProgramProducts.products +
-        LemanaProgramProducts.products + ExpandedProgramProducts.products + ExpandedDiseaseProducts.products })
+        LemanaProgramProducts.products + ExpandedProgramProducts.products + ExpandedDiseaseProducts.products + EradicationCare.referenceProducts })
         .map(ExpandedProgramProducts::includePlantVariants)
 
     fun baseStepId(stepId: String): String = stepId.substringBefore("~").substringBefore(":remaining:")

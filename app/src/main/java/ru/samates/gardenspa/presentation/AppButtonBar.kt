@@ -35,17 +35,18 @@ private data class NavigationEntry(
 )
 
 @Composable
-fun AppButtonBar(selectedScreen: String = "Сегодня", onClick: (String) -> Unit) {
+fun AppButtonBar(selectedScreen: String = "Календарь", onClick: (String) -> Unit) {
     val entries = listOf(
-        NavigationEntry("Сегодня", "Сегодня", "⌂", "Дела на сегодня"),
-        NavigationEntry("Сады", "Мой сад", "♧", "Мои сады и растения"),
         NavigationEntry("Календарь", "Календарь", "▦", "Календарь работ"),
-        NavigationEntry("Справочник", "Справочник", "☷", "Средства и народные рецепты")
+        NavigationEntry("Сады", "Мой сад", "♧", "Мои сады и растения"),
+        NavigationEntry("Справочник", "Справочник", "☷", "Средства и народные рецепты"),
+        NavigationEntry("Помощь", "Помощь", "?", "Помощь и настройки")
     )
     val normalizedSelection = when (selectedScreen) {
         "Препараты", "Рецепты", "Удобрения", "Баковые смеси", "Мои средства" -> "Справочник"
         "Мои сады" -> "Сады"
-        "Главная", "Профиль" -> "Сегодня"
+        "Сегодня", "Главная", "Профиль" -> "Календарь"
+        "Настройки" -> "Помощь"
         else -> selectedScreen
     }
 

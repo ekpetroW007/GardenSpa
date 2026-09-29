@@ -108,13 +108,13 @@ class OfferInstrumentedTest {
         try {
             compose.setContent { MyApplicationTheme { AppNavigation(vm) } }
             compose.waitUntil(10_000) { vm.registrationState.value != null }
-            compose.onNodeWithText("Сегодня", useUnmergedTree = true).assertDoesNotExist()
+            compose.onNodeWithContentDescription("Календарь работ").assertDoesNotExist()
             compose.onNodeWithText("Я принимаю Договор оферты").performScrollTo().performClick()
             compose.onNodeWithText("Продолжить").performScrollTo().performClick()
             compose.waitUntil(10_000) { vm.registrationError.value != null }
             compose.onNodeWithText("Не удалось сохранить принятие условий. Повторите попытку.").assertExists()
             compose.runOnIdle { assertFalse(vm.registrationState.value!!.canEnter) }
-            compose.onNodeWithText("Сегодня", useUnmergedTree = true).assertDoesNotExist()
+            compose.onNodeWithContentDescription("Календарь работ").assertDoesNotExist()
         } finally { compose.runOnIdle { holder.clear() } }
     }
 
@@ -142,7 +142,7 @@ class OfferInstrumentedTest {
         try {
             compose.setContent { MyApplicationTheme { AppNavigation(vm) } }
             compose.waitUntil(10_000) { vm.registrationError.value != null }
-            compose.onNodeWithText("Сегодня", useUnmergedTree = true).assertDoesNotExist()
+            compose.onNodeWithContentDescription("Календарь работ").assertDoesNotExist()
             compose.onNodeWithText("Не удалось прочитать настройки. Повторите попытку.").assertExists()
             compose.runOnIdle { failRead = false }
             compose.onNodeWithText("Повторить").performClick()
@@ -169,13 +169,12 @@ class OfferInstrumentedTest {
             compose.waitUntil(10_000) { vm.registrationState.value?.canEnter == true || vm.registrationError.value != null }
             compose.runOnIdle { assertNull(vm.registrationError.value); assertTrue(vm.registrationState.value!!.canEnter) }
             compose.onNodeWithText("Я принимаю Договор оферты").assertDoesNotExist()
-            compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("Настройки и помощь"))
-            compose.onNodeWithText("Настройки и помощь").performClick()
+            compose.onNodeWithContentDescription("Помощь и настройки").performClick()
             compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("Договор оферты"))
             compose.onNodeWithText("Договор оферты").performClick()
             compose.onNodeWithText("ДОГОВОР ОФЕРТЫ GARDENSPA", substring = true).assertExists()
             compose.onNodeWithText("Закрыть документ").performClick()
-            compose.onNodeWithText("Настройки").assertExists()
+            compose.onNodeWithText("Настройки и подсказки").assertExists()
         } finally {
             compose.runOnIdle { holder.clear() }
             runBlocking { scope.coroutineContext[Job]!!.cancelAndJoin() }

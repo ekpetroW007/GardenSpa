@@ -16,7 +16,10 @@ import ru.samates.gardenspa.domain.withProgramProduct
 import ru.samates.gardenspa.domain.problemTreatment
 import ru.samates.gardenspa.domain.FolkFertilizerRecipe
 import ru.samates.gardenspa.domain.withPersonalProduct
-import ru.samates.gardenspa.domain.withProgramRepeat
+import ru.samates.gardenspa.domain.installedRows
+import ru.samates.gardenspa.domain.installation
+import ru.samates.gardenspa.domain.EradicationCare
+import ru.samates.gardenspa.domain.PlantCareCatalog
 import ru.samates.gardenspa.data.database.entity.DrugEntity
 import kotlinx.coroutines.CancellationException
 import java.time.LocalDate
@@ -78,7 +81,8 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                         },
                         repeatEndType = "NEVER",
                         repeatEndDate = null,
-                        repeatCount = null
+                        repeatCount = null,
+                        userEdited = true
                     )
                 }
                 repository.replacePlantCard(plant.resolvedCardId, updatedRows)
@@ -192,7 +196,11 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                         programImportKey = previous?.programImportKey,
                         programNote = drugNote ?: previous?.programNote.orEmpty(),
                         userLockedDate = previous?.programId != null || previous?.userLockedDate == true,
-                        photoUri = photoUri ?: previous?.photoUri
+                        photoUri = photoUri ?: previous?.photoUri,
+                        selectedVariantId = previous?.selectedVariantId,
+                        variantChoices = previous?.variantChoices.orEmpty(),
+                        userEdited = true,
+                        programBaseline = previous?.programBaseline
                     )
                 }
 
@@ -216,42 +224,8 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
         viewModelScope.launch {
             try {
                 require(program.steps.isNotEmpty()) { NO_REMAINING_CARE_MESSAGE }
-                val rows = program.steps.map { step ->
-                    val recurrence = step.recurrence
-                    PlantEntity(
-                        plantName = program.plantName,
-                        taskName = step.title,
-                        wateringInterval = recurrence?.interval ?: 1,
-                        creationDate = step.scheduledDate.toString(),
-                        drugId = null,
-                        gardenId = gardenId,
-                        drugName = step.productDescription ?: NO_DRUG_REQUIRED_LABEL,
-                        gardenName = gardenName,
-                        repeatType = recurrence?.type?.name ?: RepeatType.NONE.name,
-                        repeatInterval = recurrence?.interval ?: 1,
-                        repeatDaysOfWeek = if (recurrence?.type == RepeatType.WEEKLY) {
-                            step.scheduledDate.dayOfWeek.value.toString()
-                        } else {
-                            ""
-                        },
-                        repeatEndType = if (recurrence?.count == null) "NEVER" else "COUNT",
-                        repeatCount = recurrence?.count,
-                        reminderDaysBefore = step.reminderDaysBefore ?: reminderDaysBefore,
-                        plantCardId = program.instanceId,
-                        programId = program.templateId,
-                        programVersion = program.templateVersion,
-                        programStepId = step.templateStepId,
-                        programImportKey = "${program.instanceId}:${program.templateId}:v${program.templateVersion}:${step.templateStepId}",
-                        programNote = listOfNotNull(
-                            step.productDescription?.let { "Категория средства: $it" },
-                            step.note,
-                            step.explanation
-                        ).filter(String::isNotBlank).joinToString("\n"),
-                        userLockedDate = false,
-                        photoUri = photoUri
-                    )
-                }
-                repository.replacePlantCard(program.instanceId, rows)
+                val rows = program.installedRows(gardenId, gardenName, reminderDaysBefore, photoUri)
+                repository.importProgram(program.installation(), rows)
                 onSaved(rows.map { it.taskName })
             } catch (e: Exception) {
                 Log.d("importCareProgram", e.toString())
@@ -268,14 +242,31 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
     ) {
         viewModelScope.launch {
             try {
-                val current = repository.getAllPlantsOnce().firstOrNull { it.id == plant.id }
-                require(current != null && current.programId != null) { "Работа изменилась или удалена. Откройте карточку заново." }
-                repository.updatePlant(current.withProgramRepeat(intervalDays))
+                repository.updateProgramRepeat(plant.id, intervalDays)
                 onSaved()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (e: Exception) {
                 onError(e.message ?: "Не удалось изменить повтор. Повторите попытку.")
+            }
+        }
+    }
+
+    fun selectProgramVariant(
+        plantId: Int,
+        variantId: String,
+        choices: String,
+        onSaved: () -> Unit = {},
+        onError: (Throwable) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            try {
+                repository.selectProgramVariant(plantId, variantId, choices)
+                onSaved()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                onError(error)
             }
         }
     }
@@ -289,12 +280,13 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
         gardenName: String,
         reminderDaysBefore: Int? = null,
         photoUri: String? = null,
+        originalRows: List<PlantEntity> = existingRows,
         onSaved: () -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
         viewModelScope.launch {
             try {
-                val first = existingRows.firstOrNull() ?: return@launch
+                if (existingRows.isEmpty()) return@launch
                 require(taskNames.size == existingRows.size && taskDates.size == existingRows.size) { "Список работ изменился. Откройте карточку заново." }
                 val updated = existingRows.mapIndexed { index, row ->
                     row.copy(
@@ -310,10 +302,11 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                         } else {
                             row.repeatDaysOfWeek
                         },
-                        userLockedDate = true
+                        userLockedDate = true,
+                        userEdited = true
                     )
                 }
-                repository.replacePlantCard(first.resolvedCardId, updated)
+                repository.replaceImportedProgramCard(originalRows, updated)
                 onSaved()
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -353,15 +346,20 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                 require(!date.isBefore(LocalDate.now())) { "Выберите сегодняшнюю или будущую дату" }
                 val savedDrug = repository.saveToMyProducts(DrugEntity(name = recipe.name,
                     purpose = recipe.purposeForDrug(), consumptionRate = recipe.consumptionRate, applicationMethod = "TREATMENT"))
+                val crop = plant.programId ?: PlantCareCatalog.find(plant.plantName)?.id
+                val autumnVariant = recipe.id == EradicationCare.AUTUMN_RECIPE_ID && EradicationCare.applies(crop.orEmpty())
                 repository.addProgramTreatment(plant, plant.copy(
                     id = 0, plantCardId = plant.resolvedCardId,
                     taskName = "Использовать: ${recipe.name}",
                     creationDate = date.toString(), drugId = savedDrug.id, drugName = recipe.name,
-                    programStepId = "tank_mix:${recipe.id}", programImportKey = null,
+                    programId = if (autumnVariant) crop else plant.programId,
+                    programVersion = if (autumnVariant) EradicationCare.PROGRAM_VERSION else plant.programVersion,
+                    programStepId = if (autumnVariant) EradicationCare.AUTUMN_MIX_STEP else "tank_mix:${recipe.id}", programImportKey = null,
                     programNote = recipe.purposeForDrug() + "\n" + recipe.consumptionRate,
                     repeatType = "NONE", repeatInterval = 1, wateringInterval = 1,
                     repeatDaysOfWeek = "", repeatEndType = "NEVER", repeatEndDate = null,
-                    repeatCount = null, userLockedDate = true
+                    repeatCount = null, userLockedDate = true, userEdited = true, programBaseline = null,
+                    selectedVariantId = null, variantChoices = ""
                 ))
                 onSaved()
             } catch (cancelled: CancellationException) {

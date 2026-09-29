@@ -27,6 +27,7 @@ class ProceduresViewmodel(private val repository: BookeeperRepository) : ViewMod
         procedureName: String,
         originalDate: LocalDate,
         scheduledDate: LocalDate,
+        comment: String = "",
         onCompleted: (ProcedureEntity) -> Unit = {},
         onError: (Throwable) -> Unit = {},
         onSaved: () -> Unit = {}
@@ -40,7 +41,8 @@ class ProceduresViewmodel(private val repository: BookeeperRepository) : ViewMod
                         scheduledDate = originalDate.toString(),
                         rescheduledDate = scheduledDate.toString().takeIf { scheduledDate != originalDate },
                         completedDate = LocalDate.now().toString(),
-                        status = "COMPLETED"
+                        status = "COMPLETED",
+                        comment = comment.trim()
                     )
                 )
                 onCompleted(completed)
@@ -62,6 +64,24 @@ class ProceduresViewmodel(private val repository: BookeeperRepository) : ViewMod
                 onSaved(repository.scheduleNextSeason(procedureId))
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
+                onError(error)
+            }
+        }
+    }
+
+    fun updateCompletionComment(
+        procedureId: Int,
+        comment: String,
+        onSaved: () -> Unit = {},
+        onError: (Throwable) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            try {
+                repository.updateCompletionComment(procedureId, comment)
+                onSaved()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
                 onError(error)
             }
         }
