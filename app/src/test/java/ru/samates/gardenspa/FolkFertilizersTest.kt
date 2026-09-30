@@ -13,7 +13,8 @@ class FolkFertilizersTest {
             setOf("milk_iodine_late_blight", "ash_spray_rust", "ash_soap_aphids",
                 "mustard_caterpillars", "mustard_apple_scab", "ash_feed_fruit_set",
                 "magic_plant_drink_tank_mix", FolkFertilizers.GREEN_CONE_ID, "pharmacy_cocktail", "yeast_tincture",
-                "alirin_gamair_tank_mix", "fitolavin_tank_mix", "biological_pests_tank_mix", "btu_protection_tank_mix", "fitosporin_stock_tank_mix", EradicationCare.AUTUMN_RECIPE_ID),
+                "alirin_gamair_tank_mix", "fitolavin_tank_mix", "biological_pests_tank_mix", "btu_protection_tank_mix", "fitosporin_stock_tank_mix",
+                EradicationCare.AUTUMN_RECIPE_ID, EradicationCare.IRON_RECIPE_ID),
             (FolkFertilizers.recipes + FolkFertilizers.tankMixes).map { it.id }.toSet()
         )
         val allowedHosts = setOf("old.rosselhoscenter.ru", "rosselhoscenter.ru", "lenta.ru")
@@ -49,6 +50,16 @@ class FolkFertilizersTest {
         }
         assertTrue(recipe.sourceUrl.isEmpty())
         assertTrue(recipe.warning.contains("совместимость полного состава отдельно не подтверждена"))
+        assertTrue(FolkFertilizers.recipes.none { it.id == recipe.id })
+    }
+
+    @Test fun eradicationMixtureReusesTheAgreedIronRecipeAndPreservesItInMyProducts() {
+        val recipe = FolkFertilizers.tankMixes.single { it.id == EradicationCare.IRON_RECIPE_ID }
+        assertEquals("Баковая смесь «Искореняющая»", recipe.name)
+        assertEquals("На 10 л воды: железный купорос — 300 г.", recipe.ingredients)
+        assertEquals(EradicationCare.IRON_NOTE, recipe.preparation)
+        assertTrue(recipe.purposeForDrug().contains(EradicationCare.IRON_NOTE))
+        assertTrue(recipe.warning.contains(FolkFertilizers.POLLINATION_NOTICE))
         assertTrue(FolkFertilizers.recipes.none { it.id == recipe.id })
     }
 }

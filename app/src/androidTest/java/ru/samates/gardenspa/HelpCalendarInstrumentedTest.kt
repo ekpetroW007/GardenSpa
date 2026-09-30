@@ -3,6 +3,7 @@ package ru.samates.gardenspa
 import android.graphics.Bitmap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelStore
@@ -64,8 +65,15 @@ class HelpCalendarInstrumentedTest {
         assertEquals(positions.sorted(), positions)
         compose.onNodeWithContentDescription("Календарь работ").assertIsSelected()
         compose.onNodeWithText("Сегодня", useUnmergedTree = true).assertDoesNotExist()
-        compose.onNodeWithText("Погодное окно").assertExists()
+        compose.onNodeWithContentDescription("Логотип GardenSpa").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Назад").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Следующий месяц").assertIsDisplayed()
+        val monthTop = compose.onNodeWithContentDescription("Следующий месяц").fetchSemanticsNode().boundsInRoot.top
+        val addTop = compose.onNodeWithText("Добавить работу").fetchSemanticsNode().boundsInRoot.top
+        assertTrue(monthTop < addTop)
         capture("calendar-default")
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Погодное окно"))
+        compose.onNodeWithText("Погодное окно").assertIsDisplayed()
         compose.onNodeWithContentDescription("Помощь и настройки").performClick()
         compose.onNodeWithText("Настройки и подсказки").assertExists()
         compose.onNodeWithContentDescription("Назад").performClick()
@@ -107,16 +115,36 @@ class HelpCalendarInstrumentedTest {
             assertEquals(originalReminder, GardenWorkReminderScheduler.isEnabled(app))
             capture("help-activity-enabled")
             compose.onNodeWithContentDescription("Календарь работ").performClick()
+            compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Садовая активность"))
+            compose.onNodeWithText("Садовая активность")
+                .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Свёрнуто"))
+            compose.onNodeWithText("Сколько энергии вы потратили?").assertDoesNotExist()
+            capture("calendar-activity-collapsed")
+            compose.onNodeWithText("Садовая активность").performClick()
             compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Сколько энергии вы потратили?"))
             compose.onNodeWithText("Сколько энергии вы потратили?").assertIsDisplayed()
             capture("calendar-activity-enabled")
+            compose.onNodeWithText("Ваш вес, кг").performTextReplacement("76")
+            compose.onNodeWithText("Минут").performScrollTo().performTextReplacement("42")
+            androidx.test.espresso.Espresso.closeSoftKeyboard()
+            compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Садовая активность"))
+            compose.onNodeWithText("Садовая активность").performClick()
+            compose.onNodeWithText("Сколько энергии вы потратили?").assertDoesNotExist()
+            compose.onNodeWithText("Садовая активность").performClick()
+            compose.onNodeWithText("Ваш вес, кг").assertTextContains("76")
+            compose.onNodeWithText("Минут").assertTextContains("42")
+            compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Садовая активность"))
+            compose.onNodeWithText("Садовая активность").performClick()
+            compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Следующие 7 дней"))
+            compose.onNodeWithText("Следующие 7 дней").assertIsDisplayed()
             compose.onNodeWithContentDescription("Помощь и настройки").performClick()
             compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasContentDescription("Садовая активность"))
             compose.onNodeWithContentDescription("Садовая активность").assertIsOn().performClick()
             compose.waitUntil(10_000) { !user.gardenActivityEnabled.value }
             assertFalse(runBlocking { preferences.gardenActivityEnabled.first() })
             compose.onNodeWithContentDescription("Календарь работ").performClick()
-            compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Календарь по дням"))
+            compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Следующие 7 дней"))
+            compose.onNodeWithText("Садовая активность").assertDoesNotExist()
             compose.onNodeWithText("Сколько энергии вы потратили?").assertDoesNotExist()
             val retained = runBlocking { app.repository.getGardenWorkForDate(activityDate) }
             assertEquals(1, retained.size)

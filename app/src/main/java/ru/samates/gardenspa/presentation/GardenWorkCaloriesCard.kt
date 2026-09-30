@@ -19,6 +19,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
@@ -40,6 +42,11 @@ private data class GardenWorkInput(
     val minutes: String
 )
 
+private val GardenWorkInputSaver = listSaver<List<GardenWorkInput>, Any>(
+    save = { rows -> rows.flatMap { listOf(it.key, it.activityCode, it.minutes) } },
+    restore = { values -> values.chunked(3).map { GardenWorkInput(it[0] as Long, it[1] as String, it[2] as String) } }
+)
+
 @Composable
 fun GardenWorkCaloriesCard(
     date: LocalDate,
@@ -47,10 +54,10 @@ fun GardenWorkCaloriesCard(
     savedWeightKg: Double,
     onSave: (Double, List<GardenWorkDraft>) -> Unit
 ) {
-    var editingOverride by remember(date) { mutableStateOf<Boolean?>(null) }
+    var editingOverride by rememberSaveable(date) { mutableStateOf<Boolean?>(null) }
     val editing = editingOverride ?: entries.isEmpty()
-    var weightText by remember(date) { mutableStateOf(formatWeight(savedWeightKg)) }
-    var rows by remember(date) {
+    var weightText by rememberSaveable(date) { mutableStateOf(formatWeight(savedWeightKg)) }
+    var rows by rememberSaveable(date, stateSaver = GardenWorkInputSaver) {
         mutableStateOf(listOf(GardenWorkInput(1L, GardenActivities.popular.first().code, "30")))
     }
 

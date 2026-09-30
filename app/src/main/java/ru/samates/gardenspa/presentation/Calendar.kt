@@ -38,6 +38,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,6 +49,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -97,10 +99,9 @@ private data class UndoAction(val message: String, val plantId: Int, val origina
 fun Calendar(
     innerPadding: PaddingValues,
     navController: NavController,
-    onBack: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
     userViewModel: UserViewModel? = null,
-    onScreenSelected: (String) -> Unit = {},
-    modifier: Modifier = Modifier
+    onScreenSelected: (String) -> Unit = {}
 ) {
     val application = LocalContext.current.applicationContext as BookeeperApp
     val preferences = remember(application) { PreferencesManager(application) }
@@ -114,6 +115,8 @@ fun Calendar(
     val procedures by proceduresVm.procedures.collectAsState()
     val gardenWorkEntries by gardenWorkVm.entries.collectAsState()
     val gardenActivityEnabled by (userViewModel?.gardenActivityEnabled ?: preferences.gardenActivityEnabled).collectAsState(false)
+    var activityExpanded by rememberSaveable(gardenActivityEnabled) { mutableStateOf(false) }
+    val activityState = rememberSaveableStateHolder()
     val userWeightKg by (userViewModel?.userWeightKg ?: preferences.userWeightKg).collectAsState(70.0)
     var today by remember { mutableStateOf(LocalDate.now()) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { today = LocalDate.now() }
@@ -132,7 +135,7 @@ fun Calendar(
         scheduledTreatmentsOn(plants, procedures, today.plusDays(offset))
     }.take(3)
     val nearestTreatment = remember(plants, procedures, today) { nearestIncompleteTreatment(plants, procedures, today) }
-    val weatherGarden = selectWeatherGarden(gardens, listOfNotNull(nearestTreatment?.plant?.gardenId))
+    val weatherGarden = selectWeatherGarden(gardens, nearestTreatment)
     val activityDate = gardenWorkDate()
     val datesWithGardenWork = gardenWorkEntries.mapNotNull { runCatching { LocalDate.parse(it.workDate) }.getOrNull() }.toSet()
     val markedDates = (1..visibleMonth.lengthOfMonth()).mapNotNull { day ->
@@ -173,12 +176,14 @@ fun Calendar(
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        item { TopBar() }
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                ScreenHeader("Календарь", "Погода и план ухода", onBack)
-                PrimaryAction("Добавить работу", { navController.navigate(AppDestinations.plantAdd(selectedDate.toString())) }, Modifier.fillMaxWidth())
-            }
+            MonthCalendar(month = visibleMonth, selectedDate = selectedDate, datesWithTasks = markedDates,
+                onPreviousMonth = { visibleMonthText = visibleMonth.minusMonths(1).toString() },
+                onNextMonth = { visibleMonthText = visibleMonth.plusMonths(1).toString() },
+                onDateSelected = { selectedDateText = it.toString(); visibleMonthText = YearMonth.from(it).toString() })
         }
+        item { PrimaryAction("Добавить работу", { navController.navigate(AppDestinations.plantAdd(selectedDate.toString())) }, Modifier.fillMaxWidth()) }
         undoAction?.let { action ->
             item {
                 GlassCard(Modifier.fillMaxWidth()) {
@@ -196,12 +201,12 @@ fun Calendar(
         }
         actionError?.let { message -> item { Text(message, color = Warning) } }
         item { WeatherWindowCard(weatherGarden, nearestTreatment, { onScreenSelected("Сады") }, ::reschedule) }
-        weatherGarden?.climateOrNull()?.let { climate ->
-            item {
-                SecondaryAction("Место и климат сада: ${climate.displayName()}", {
-                    navController.navigate(AppDestinations.gardenLocation(weatherGarden.id))
-                }, Modifier.fillMaxWidth())
-            }
+        item {
+            val place = weatherGarden?.climateOrNull()?.displayName() ?: weatherGarden?.name
+            SecondaryAction("Место и климат${place?.let { ": $it" }.orEmpty()}", {
+                if (weatherGarden != null) navController.navigate(AppDestinations.gardenLocation(weatherGarden.id))
+                else onScreenSelected("Сады")
+            }, Modifier.fillMaxWidth())
         }
         item { SectionTitle("Работы на сегодня, ${today.toRussianDate(false)}") }
         if (todayTreatments.isEmpty()) item { EmptyGlassState("На сегодня всё", "Можно отдохнуть или добавить новое растение") }
@@ -209,12 +214,24 @@ fun Calendar(
         if (gardenActivityEnabled) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SectionTitle("Садовая активность")
-                    GardenWorkCaloriesCard(activityDate,
-                        gardenWorkEntries.filter { it.workDate == activityDate.toString() }, userWeightKg) { weight, work ->
-                        if (userViewModel != null) userViewModel.updateWeightKg(weight)
-                        else scope.launch { preferences.setUserWeightKg(weight) }
-                        gardenWorkVm.saveDay(activityDate, weight, work)
+                    GlassCard(Modifier.fillMaxWidth().semantics {
+                        stateDescription = if (activityExpanded) "Развёрнуто" else "Свёрнуто"
+                    }, onClick = { activityExpanded = !activityExpanded }) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text("Садовая активность", color = Cream, style = MaterialTheme.typography.titleLarge,
+                                modifier = Modifier.weight(1f))
+                            Text(if (activityExpanded) "▴" else "▾", color = Leaf300)
+                        }
+                    }
+                    AnimatedVisibility(activityExpanded) {
+                        activityState.SaveableStateProvider(activityDate.toString()) {
+                            GardenWorkCaloriesCard(activityDate,
+                                gardenWorkEntries.filter { it.workDate == activityDate.toString() }, userWeightKg) { weight, work ->
+                                if (userViewModel != null) userViewModel.updateWeightKg(weight)
+                                else scope.launch { preferences.setUserWeightKg(weight) }
+                                gardenWorkVm.saveDay(activityDate, weight, work)
+                            }
+                        }
                     }
                 }
             }
@@ -230,13 +247,6 @@ fun Calendar(
             }
         } else items(nextTreatments, key = { "next:${it.scheduledDate}:${it.plant.id}:${it.originalDate}" }) { treatment ->
             UpcomingCareCard(treatment) { navController.navigate(AppDestinations.plantDetails(treatment.plant.id)) }
-        }
-        item { SectionTitle("Календарь по дням") }
-        item {
-            MonthCalendar(month = visibleMonth, selectedDate = selectedDate, datesWithTasks = markedDates,
-                onPreviousMonth = { visibleMonthText = visibleMonth.minusMonths(1).toString() },
-                onNextMonth = { visibleMonthText = visibleMonth.plusMonths(1).toString() },
-                onDateSelected = { selectedDateText = it.toString(); visibleMonthText = YearMonth.from(it).toString() })
         }
         val treatments = scheduledTreatmentsOn(plants, procedures, selectedDate)
         val gardenWork = gardenWorkEntries.filter { it.workDate == selectedDate.toString() }

@@ -58,7 +58,9 @@ object SpringCarePrograms {
     val diseaseIds = setOf("spring_bordeaux", "spring_bordeaux_avgust", "spring_bordeaux_fasko", "spring_iron")
     val pestIds = setOf("spring_30_plus", "spring_profilaktin", "spring_profilaktin_light", "spring_profilaktin_bio")
 
-    val mixtureProducts: List<ProgramProduct> get() = FolkFertilizers.tankMixes.filterNot { it.id == EradicationCare.AUTUMN_RECIPE_ID }.map { mixture ->
+    val mixtureProducts: List<ProgramProduct> get() = FolkFertilizers.tankMixes.filterNot {
+        it.id in setOf(EradicationCare.AUTUMN_RECIPE_ID, EradicationCare.IRON_RECIPE_ID)
+    }.map { mixture ->
         ProgramProduct("mix_${mixture.id}", mixture.name, "Рецепт пользователя", "Обработать баковой смесью",
             mixture.purpose, "${mixture.ingredients}\n${mixture.preparation}\n${mixture.consumptionRate}\n${mixture.warning}",
             "", crops = woodyCrops)

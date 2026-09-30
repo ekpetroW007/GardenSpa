@@ -96,6 +96,8 @@ class VariantWorkflowInstrumentedTest {
                     model.importCareProgram(program, null, "Проверка вариантов", onError = { error = it })
                 })
             } }
+            compose.onNodeWithText(EradicationCare.AUTUMN_FIXED_INGREDIENTS).performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText(EradicationCare.AUTUMN_ADJUVANT_NOTICE).performScrollTo().assertIsDisplayed()
             chooseComponent(EradicationCare.autumnComponents.single { it.id == "insecticide" }, "coragen")
             chooseComponent(EradicationCare.autumnComponents.single { it.id == "fungicide" }, "raek")
             compose.onNodeWithTag("choose-variant:autumn_main").performScrollTo().performClick()
@@ -107,6 +109,8 @@ class VariantWorkflowInstrumentedTest {
             assertEquals(mapOf("insecticide" to "coragen", "fungicide" to "raek"), ProgramVariants.choices(saved.variantChoices))
             assertTrue(saved.drugName.contains("Кораген"))
             assertTrue(saved.drugName.contains("Раёк"))
+            assertTrue(saved.drugName.contains("Эпин, 1 мл"))
+            assertTrue(saved.drugName.contains("прилипатель, 10 мл"))
             assertFalse(saved.drugName.contains("Актара"))
             assertFalse(saved.drugName.contains("Скор"))
             assertFalse(saved.drugName.contains("Топаз"))

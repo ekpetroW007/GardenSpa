@@ -162,7 +162,8 @@ object FolkFertilizers {
         mixture("fitosporin_stock_tank_mix", "Фитоспорин-М — маточный раствор", "Для профилактики заболеваний.",
             "10 мл маточного раствора Фитоспорина-М.",
             "Маточный раствор: пакет пасты Фитоспорин-М 200 г развести в 400 мл воды. Для рабочего раствора взять 10 мл маточного раствора на 10 л воды. Не заменять пасту порошком или жидкой формой с другой концентрацией."),
-        EradicationCare.autumnRecipe
+        EradicationCare.autumnRecipe,
+        EradicationCare.ironRecipe
     ).map { if (it.isTankMix) it.copy(warning = listOf(it.warning, POLLINATION_NOTICE).filter(String::isNotBlank).joinToString("\n")) else it }
 
     val recipes = allRecipes.filterNot { it.isTankMix }

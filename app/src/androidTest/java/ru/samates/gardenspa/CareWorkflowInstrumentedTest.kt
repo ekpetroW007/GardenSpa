@@ -11,6 +11,7 @@ import java.io.File
 import java.time.LocalDate
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -80,7 +81,10 @@ class CareWorkflowInstrumentedTest {
         }
         screens.asReversed().forEachIndexed { index, page ->
             compose.runOnIdle { assertEquals(page, main.selectedScreen) }
-            if (index % 2 == 0) compose.onNodeWithContentDescription("Назад").performClick()
+            if (page == "Календарь") {
+                compose.onNodeWithContentDescription("Назад").assertDoesNotExist()
+                androidx.test.espresso.Espresso.pressBack()
+            } else if (index % 2 == 0) compose.onNodeWithContentDescription("Назад").performClick()
             else androidx.test.espresso.Espresso.pressBack()
         }
         compose.runOnIdle { assertEquals("Календарь", main.selectedScreen); assertFalse(main.canGoBack) }
@@ -94,6 +98,55 @@ class CareWorkflowInstrumentedTest {
             }
             compose.onNodeWithContentDescription("Назад").assertIsDisplayed().performClick()
             compose.runOnIdle { assertEquals("main", nav.currentDestination?.route) }
+        }
+    }
+
+    @Test fun eradicationRecipeSearchSchedulesSelectedPlantAndDateAndSavesToMyProducts() = withPlant("apple", "Яблоня для искореняющей смеси") { plant ->
+        val recipe = EradicationCare.ironRecipe
+        val plannedDate = LocalDate.now().plusDays(2)
+        val previousProductIds = runBlocking { app.repository.allDrugs.first().map { it.id }.toSet() }
+        var addedProductId: Int? = null
+        try {
+            val preferences = PreferencesManager(app)
+            runBlocking { preferences.completeRegistration("Тест", true) }
+            val user = UserViewModel(preferences, app.climateService)
+            compose.setContent { MyApplicationTheme { AppNavigation(user) } }
+            compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("Средства и народные рецепты").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithContentDescription("Средства и народные рецепты").performClick()
+            compose.onNodeWithText("Баковые смеси").performScrollTo().performClick()
+            compose.onNode(hasSetTextAction()).performTextInput("Искореняющая")
+            androidx.test.espresso.Espresso.closeSoftKeyboard()
+            compose.onNodeWithText(recipe.name).assertExists()
+            compose.onNodeWithText("Показать рецепт").performScrollTo().performClick()
+            compose.onNodeWithText("На 10 л воды: железный купорос — 300 г.").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText("Использовать").performScrollTo().performClick()
+            compose.onNode(hasContentDescription("Растение. Сейчас:", substring = true)).performClick()
+            compose.onNode(hasText("${plant.plantName} · Проверка функций") and hasAnyAncestor(isPopup())).performClick()
+            compose.onNodeWithText("Дата: ${LocalDate.now().toRussianDate()}").performClick()
+            if (plannedDate.month != LocalDate.now().month) compose.onNodeWithContentDescription("Следующий месяц").performClick()
+            compose.onNodeWithContentDescription(plannedDate.toRussianDate()).performClick()
+            compose.onNodeWithText("Выбрать дату").performClick()
+            compose.onNodeWithText("Добавить в календарь").performClick()
+            compose.waitUntil(10_000) { rows(plant.plantCardId).size == 2 }
+            val saved = rows(plant.plantCardId).single { it.id != plant.id }
+            assertEquals(plant.plantCardId, saved.plantCardId)
+            assertEquals(plannedDate.toString(), saved.creationDate)
+            assertEquals("NONE", saved.repeatType)
+            assertEquals(recipe.name, saved.drugName)
+            assertTrue(saved.programNote.contains("На 10 л воды: железный купорос — 300 г."))
+            val product = runBlocking { app.repository.allDrugs.first().single { it.id == saved.drugId } }
+            addedProductId = product.id.takeIf { it !in previousProductIds }
+            assertEquals(recipe.name, product.name)
+            assertEquals("TREATMENT", product.applicationMethod)
+            assertTrue(product.purpose.contains("На 10 л воды: железный купорос — 300 г."))
+            compose.onNodeWithContentDescription("Средства и народные рецепты").performClick()
+            compose.onNodeWithText("Мои средства").performScrollTo().performClick()
+            compose.onNode(hasSetTextAction()).performTextInput("Искореняющая")
+            androidx.test.espresso.Espresso.closeSoftKeyboard()
+            compose.onNodeWithText(recipe.name).performScrollTo().assertIsDisplayed()
+            screenshot("eradication-mixture-my-products")
+        } finally {
+            addedProductId?.let { id -> runBlocking { app.repository.deleteDrug(id) } }
         }
     }
 

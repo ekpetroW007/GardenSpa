@@ -52,11 +52,12 @@ import ru.samates.gardenspa.ui.theme.Mist
 
 internal fun selectWeatherGarden(
     gardens: List<GardenEntity>,
-    preferredGardenIds: List<Int>
+    nearestTreatment: ScheduledTreatment?
 ): GardenEntity? {
-    val gardensById = gardens.associateBy { it.id }
-    return preferredGardenIds.firstNotNullOfOrNull(gardensById::get)
-        ?: gardens.filter { it.latitude != null && it.longitude != null }.minByOrNull { it.id }
+    if (nearestTreatment != null) {
+        return gardens.firstOrNull { it.id == nearestTreatment.plant.gardenId }
+    }
+    return gardens.filter { it.latitude != null && it.longitude != null }.minByOrNull { it.id }
 }
 
 @Composable
@@ -72,14 +73,17 @@ fun WeatherWindowCard(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Погодное окно", color = Cream, style = MaterialTheme.typography.titleLarge)
                 Text(
-                    if (garden == null) {
+                    if (garden == null && treatment != null) {
+                        "У ближайшей работы «${treatment.plant.taskName}» не указан сад. Выберите сад в карточке растения, чтобы прогноз относился к месту выполнения."
+                    } else if (garden == null) {
                         "Добавьте сад и его местоположение, чтобы получать погодные рекомендации."
                     } else {
                         "Укажите местоположение сада «${garden.name}» — именно в нём запланирована ближайшая работа."
                     },
                     color = Mist
                 )
-                SecondaryAction("Указать место сада", onOpenGardens, Modifier.fillMaxWidth())
+                SecondaryAction(if (garden == null && treatment != null) "Открыть мой сад" else "Указать место сада",
+                    onOpenGardens, Modifier.fillMaxWidth())
             }
         }
         return

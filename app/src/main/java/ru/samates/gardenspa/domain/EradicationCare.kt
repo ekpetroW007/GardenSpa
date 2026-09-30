@@ -22,6 +22,7 @@ object EradicationCare {
     const val AUTUMN_MIX_STEP = "autumn_before_leaf_fall_mix"
     const val AUTUMN_IRON_STEP = "after_leaf_fall"
     const val AUTUMN_RECIPE_ID = "autumn_eradication_tank_mix"
+    const val IRON_RECIPE_ID = "iron_eradication_tank_mix"
     val cropIds = setOf("apple", "pear", "cherry", "plum", "currant", "raspberry", "blackberry", "blueberry")
 
     const val SPRING_CONDITIONS = "До распускания почек, при устойчивой температуре +3…+5 °C и выше. " +
@@ -107,9 +108,11 @@ object EradicationCare {
 
     const val AUTUMN_CONDITIONS = "После полного сбора урожая, до листопада, при температуре не ниже +15 °C. " +
         "Ориентир исходной схемы — 10 сентября; в программе дата сдвигается по климату сада. Если урожай ещё не собран или условия не подходят, перенесите работу."
+    const val AUTUMN_FIXED_INGREDIENTS = "На 10 л воды: Эпин-Экстра — 1 мл; прилипатель — 10 мл."
+    const val AUTUMN_ADJUVANT_NOTICE = "Название прилипателя не указано: 10 мл не является универсальной нормой, сверяйте инструкцию выбранного средства."
     const val AUTUMN_ADDITIONS = "К выбранным компонентам исходной схемы: Эпин-Экстра — 1 мл; прилипатель — 10 мл; водой довести до 10 л. " +
         "Осенняя норма Эпина-Экстра 1 мл/10 л подтверждена НЭСТ-М: https://nest-m.ru/epin-extra/. " +
-        "Название прилипателя не указано: 10 мл не является универсальной нормой, сверяйте инструкцию выбранного средства."
+        AUTUMN_ADJUVANT_NOTICE
     const val MIX_COMPATIBILITY = "Совместимость полного состава отдельно не подтверждена. Выбирайте по одному инсектициду и фунгициду, " +
         "проверяйте разрешённую культуру, форму препарата, норму и совместимость всех компонентов. Не смешивайте одновременно оба инсектицида или все три фунгицида."
     const val IRON_NOTE = "Осенняя схема пользователя против грибковых болезней, мхов и лишайников. " +
@@ -139,6 +142,15 @@ object EradicationCare {
         "Общий объём смеси — 10 л. Норма рабочего раствора на растение, кратность и сроки ожидания — по этикеткам выбранных средств.",
         MIX_COMPATIBILITY,
         "Схема пользователя от 29.09.2026; Кораген — по этикетке культуры", "", isTankMix = true
+    )
+
+    val ironRecipe: FolkFertilizerRecipe get() = FolkFertilizerRecipe(
+        IRON_RECIPE_ID, "Баковая смесь «Искореняющая»",
+        "Осенняя схема пользователя против грибковых болезней, мхов и лишайников после полного листопада.",
+        "На 10 л воды: железный купорос — 300 г.",
+        IRON_NOTE,
+        "Общий объём раствора — 10 л. Расход на растение — по этикетке выбранного средства.",
+        "", "Рецепт пользователя, подтверждён 30.09.2026", "", isTankMix = true
     )
 
     /** Reference-only recipe records. They do not claim a verified generic pest/disease prescription. */

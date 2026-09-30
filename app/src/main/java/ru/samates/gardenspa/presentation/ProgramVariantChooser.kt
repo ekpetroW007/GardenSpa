@@ -72,6 +72,10 @@ internal fun ProgramVariantChooser(
                             } else Text("${group.title}: ${chosen.product}", color = Leaf300)
                             ExpandableInfo("Применение выбранного средства", chosen.note)
                         }
+                        if (variant.kind == "autumn_mix") {
+                            Text(EradicationCare.AUTUMN_FIXED_INGREDIENTS, color = Leaf300)
+                            Text(EradicationCare.AUTUMN_ADJUVANT_NOTICE, color = Mist)
+                        }
                         if (selected && completed) {
                             Row { TwigCheckMark(); Text("Выполнено", color = Leaf300) }
                         } else if (selected && onComplete != null) {

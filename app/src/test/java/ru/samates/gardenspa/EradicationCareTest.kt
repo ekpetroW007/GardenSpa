@@ -96,5 +96,6 @@ class EradicationCareTest {
         assertEquals("Баковая смесь «Осенняя основная»", FolkFertilizers.tankMixes.single { it.id == EradicationCare.AUTUMN_RECIPE_ID }.name)
         assertTrue(EradicationCare.referenceProducts.all { product -> ProgramReferenceCatalog.allEntries().any { it.id == product.id } })
         assertTrue(SpringCarePrograms.mixtureProducts.none { it.id == "mix_${EradicationCare.AUTUMN_RECIPE_ID}" })
+        assertTrue(SpringCarePrograms.mixtureProducts.none { it.id == "mix_${EradicationCare.IRON_RECIPE_ID}" })
     }
 }

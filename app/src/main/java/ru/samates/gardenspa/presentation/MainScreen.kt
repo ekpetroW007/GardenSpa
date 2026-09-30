@@ -30,7 +30,7 @@ fun MainScreen(
             screenState.SaveableStateProvider(selectedScreen) {
             when (selectedScreen) {
                 "Сегодня", "Главная", "Профиль", "Календарь" -> Calendar(
-                    innerPadding, navController, onBack, userViewModel, viewModel::changeScreen)
+                    innerPadding, navController, userViewModel = userViewModel, onScreenSelected = viewModel::changeScreen)
                 "Помощь", "Настройки" -> HelpScreen(userViewModel, innerPadding, onBack)
                 "Справочник" -> ReferenceHub(innerPadding, onBack, viewModel::changeScreen)
                 "Мои средства" -> Drugs(navController, innerPadding, section = null, onBack = onBack)

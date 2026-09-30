@@ -74,9 +74,9 @@ class ExpandedCareProgramsTest {
     }
 
     @Test fun newRecipesKeepAmountsChoiceAndPollinationNotice() {
-        assertEquals(8, FolkFertilizers.tankMixes.size)
+        assertEquals(9, FolkFertilizers.tankMixes.size)
         FolkFertilizers.tankMixes.forEach { assertTrue(it.warning.contains(FolkFertilizers.POLLINATION_NOTICE)) }
-        val mixes = FolkFertilizers.tankMixes.filter { it.id !in setOf(FolkFertilizers.GREEN_CONE_ID, "magic_plant_drink_tank_mix", EradicationCare.AUTUMN_RECIPE_ID) }
+        val mixes = FolkFertilizers.tankMixes.filter { it.id !in setOf(FolkFertilizers.GREEN_CONE_ID, "magic_plant_drink_tank_mix", EradicationCare.AUTUMN_RECIPE_ID, EradicationCare.IRON_RECIPE_ID) }
         assertEquals(5, mixes.size)
         assertTrue(mixes.all { it.ingredients.startsWith("На 10 л воды") })
         assertTrue(mixes.single { it.id == "biological_pests_tank_mix" }.ingredients.contains("Лепидоцид, жидкий — 20 мл"))

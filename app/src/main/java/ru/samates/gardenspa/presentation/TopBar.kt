@@ -22,25 +22,27 @@ import androidx.compose.ui.unit.dp
 import ru.samates.gardenspa.R
 import ru.samates.gardenspa.ui.theme.Cream
 import ru.samates.gardenspa.ui.theme.Forest900
+import ru.samates.gardenspa.ui.theme.Mist
 
 @Composable
 fun TopBar() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 14.dp),
+            .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
             Text(
                 text = "GardenSpa",
-                style = MaterialTheme.typography.headlineLarge,
-                color = Cream
+                style = MaterialTheme.typography.titleMedium,
+                color = Mist
             )
+            Text("Календарь", style = MaterialTheme.typography.headlineLarge, color = Cream)
         }
         Box(
             modifier = Modifier
-                .size(44.dp)
+                .size(52.dp)
                 .clip(RoundedCornerShape(13.dp))
                 .background(Forest900),
             contentAlignment = Alignment.Center
