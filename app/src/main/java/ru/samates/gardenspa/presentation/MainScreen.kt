@@ -36,8 +36,8 @@ fun MainScreen(
                 "Мои средства" -> Drugs(navController, innerPadding, section = null, onBack = onBack)
                 "Препараты" -> Drugs(navController, innerPadding, onBack = onBack)
                 "Удобрения" -> Drugs(navController, innerPadding, ru.samates.gardenspa.domain.ProductSection.FERTILIZER, onBack)
-                "Рецепты" -> FolkRecipes(innerPadding, onBack = onBack)
-                "Баковые смеси" -> FolkRecipes(innerPadding, tankMixes = true, onBack = onBack)
+                "Рецепты" -> FolkRecipes(innerPadding, onBack = onBack, navController = navController)
+                "Баковые смеси" -> FolkRecipes(innerPadding, tankMixes = true, onBack = onBack, navController = navController)
                 "Сады", "Мои сады" -> MyGardens(navController, innerPadding, onBack)
             }
             }

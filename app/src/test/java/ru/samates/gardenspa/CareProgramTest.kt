@@ -262,9 +262,14 @@ class CareProgramTest {
         val forbidden = listOf("летняя", "осенняя", "весенняя", "предзимняя", "ранневесенняя", "позднезимняя")
         PlantCareCatalog.all().forEach { template ->
             template.steps.forEach stepLoop@ { step ->
-                if (EradicationCare.applies(template.id) && step.id in setOf(EradicationCare.EARLY_STEP, EradicationCare.AUTUMN_MIX_STEP)) {
-                    assertEquals(if (step.id == EradicationCare.EARLY_STEP) "Весенняя искореняющая обработка — выбрать вариант"
-                        else "Осенняя основная обработка — выбрать смесь", step.title)
+                val eradicationTitles = mapOf(
+                    EradicationCare.EARLY_STEP to "Весенняя искореняющая обработка от болезней",
+                    EradicationCare.PEST_STEP to "Весенняя искореняющая обработка от зимующих вредителей",
+                    EradicationCare.AUTUMN_MIX_STEP to "Осенняя основная обработка — выбрать смесь",
+                    EradicationCare.AUTUMN_IRON_STEP to "Осенняя искореняющая обработка")
+                val expectedTitle = eradicationTitles[step.id.substringBefore("~")]
+                if (EradicationCare.applies(template.id) && expectedTitle != null) {
+                    assertEquals(expectedTitle, step.title)
                     return@stepLoop
                 }
                 assertTrue(

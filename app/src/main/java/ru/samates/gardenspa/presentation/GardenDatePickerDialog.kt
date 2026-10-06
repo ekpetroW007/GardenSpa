@@ -33,7 +33,8 @@ internal fun GardenDatePickerDialog(
     title: String,
     initialDate: LocalDate,
     onDateSelected: (LocalDate) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    confirmText: String = "Выбрать дату"
 ) {
     var selectedDate by remember(initialDate) { mutableStateOf(initialDate) }
     var month by remember(initialDate) { mutableStateOf(YearMonth.from(initialDate)) }
@@ -61,7 +62,7 @@ internal fun GardenDatePickerDialog(
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SecondaryAction("Отмена", onDismiss, Modifier.weight(1f))
-                    PrimaryAction("Выбрать дату", { onDateSelected(selectedDate) }, Modifier.weight(1f))
+                    PrimaryAction(confirmText, { onDateSelected(selectedDate) }, Modifier.weight(1f))
                 }
             }
         }

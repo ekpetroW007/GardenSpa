@@ -61,4 +61,62 @@ class ProgramUpdatesTest {
         assertTrue(plan.updates.isEmpty())
         assertTrue(plan.additions.isEmpty())
     }
+
+    @Test fun newWhitewashUsesThePreservedIronDateIncludingARecordedPostponement() {
+        val source = PlantCareTemplate("apple", "Яблоня", emptySet(), 20, setOf(CultivationType.OPEN_GROUND),
+            steps = listOf(CareStepTemplate(EradicationCare.AUTUMN_IRON_STEP, "Осенняя обработка",
+                CareAnchor.SAFE_AUTUMN_DATE, 15, note = "Старая инструкция")))
+        val next = source.copy(version = 21, steps = source.steps + CareStepTemplate(
+            "${EradicationCare.WHITEWASH_STEP}~eradication_whitewash_doctor", "Побелка деревьев",
+            CareAnchor.AUTUMN_ERADICATION_DATE, 14, note = "Через две недели после обработки"))
+        val metadata = ProgramInstallationEntity("iron-card", "apple", 20, today.toString(), "OPEN_GROUND", false,
+            EradicationCare.AUTUMN_IRON_STEP)
+        for (postponed in listOf(false, true)) {
+            val actualDate = LocalDate.of(2026, 11, if (postponed) 19 else 2)
+            val parent = PlantEntity(id = 55, plantName = "Яблоня", taskName = "Осенняя обработка", wateringInterval = 1,
+                creationDate = if (postponed) "2026-10-25" else actualDate.toString(), drugId = null,
+                gardenId = garden.id, drugName = "Железный купорос", gardenName = garden.name,
+                plantCardId = metadata.plantCardId, programId = "apple", programVersion = 20,
+                programStepId = EradicationCare.AUTUMN_IRON_STEP,
+                programImportKey = "iron-card:apple:v20:${EradicationCare.AUTUMN_IRON_STEP}",
+                userEdited = !postponed, userLockedDate = !postponed)
+            val records = if (postponed) listOf(ProcedureEntity(id = 101, plantId = parent.id,
+                procedureName = parent.taskName, scheduledDate = parent.creationDate,
+                rescheduledDate = actualDate.toString(), status = "PLANNED")) else emptyList()
+            val plan = requireNotNull(ProgramUpdates.plan(listOf(parent), records, garden, metadata, today,
+                listOf(next), listOf(source)))
+            val added = plan.additions.single()
+            assertEquals(EradicationCare.WHITEWASH_STEP, programBaseStep(added.programStepId))
+            assertEquals("postponed=$postponed", actualDate.plusDays(14).toString(), added.creationDate)
+            assertEquals(added.programFingerprint(), added.programBaseline)
+            assertTrue(plan.updates.isEmpty())
+            assertTrue(plan.removals.isEmpty())
+        }
+    }
+
+    @Test fun newStandalonePestWorkFollowsAnAlreadyChosenMatureUreaDate() {
+        val source = PlantCareTemplate("apple", "Яблоня", emptySet(), 20, setOf(CultivationType.OPEN_GROUND),
+            steps = listOf(CareStepTemplate(EradicationCare.EARLY_STEP, "Весенняя обработка",
+                CareAnchor.DORMANT_SPRING_DATE, 0, note = "Старая инструкция")))
+        val next = source.copy(version = 21, steps = source.steps + CareStepTemplate(
+            "${EradicationCare.PEST_STEP}~spring_profilaktin", "От зимующих вредителей",
+            CareAnchor.DORMANT_SPRING_DATE, 7, note = "Через неделю после обработки"))
+        val metadata = ProgramInstallationEntity("spring-card", "apple", 20, today.toString(), "OPEN_GROUND", false,
+            EradicationCare.EARLY_STEP)
+        val actualDate = LocalDate.of(2026, 4, 12)
+        val parent = PlantEntity(id = 56, plantName = "Яблоня", taskName = "Мочевина — взрослые растения",
+            wateringInterval = 1, creationDate = actualDate.toString(), drugId = null, gardenId = garden.id,
+            drugName = "Мочевина — 500–700 г", gardenName = garden.name, plantCardId = metadata.plantCardId,
+            programId = "apple", programVersion = 20, programStepId = EradicationCare.EARLY_STEP,
+            programImportKey = "spring-card:apple:v20:${EradicationCare.EARLY_STEP}",
+            selectedVariantId = "urea_mature", userEdited = true)
+        val plan = requireNotNull(ProgramUpdates.plan(listOf(parent), emptyList(), garden, metadata, today,
+            listOf(next), listOf(source)))
+        val added = plan.additions.single()
+        assertEquals(EradicationCare.PEST_STEP, programBaseStep(added.programStepId))
+        assertEquals(actualDate.plusDays(7).toString(), added.creationDate)
+        assertEquals(added.programFingerprint(), added.programBaseline)
+        assertTrue(plan.updates.isEmpty())
+        assertTrue(plan.removals.isEmpty())
+    }
 }

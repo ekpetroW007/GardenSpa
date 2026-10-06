@@ -18,6 +18,96 @@ import java.util.UUID
 
 @RunWith(AndroidJUnit4::class)
 class ProgramVariantPersistenceInstrumentedTest {
+    @Test fun whitewashFollowsAutumnTreatmentAndKeepsManualChanges() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
+        try {
+            db.plantDao().insertPlant(source().copy(programStepId = EradicationCare.AUTUMN_IRON_STEP,
+                creationDate = "2027-10-25", taskName = "Осенняя искореняющая обработка",
+                programImportKey = "variant-card:apple:v21:after_leaf_fall"))
+            val parent = db.plantDao().getAllPlantsOnce().single()
+            val child = source().copy(programStepId = EradicationCare.WHITEWASH_STEP,
+                creationDate = "2027-11-08", taskName = "Побелка деревьев",
+                programImportKey = "variant-card:apple:v21:autumn_whitewash")
+            db.plantDao().insertPlant(child.copy(programBaseline = child.programFingerprint()))
+            suspend fun moveParent(date: String) = db.procedureDao().saveProcedureWithSnapshot(ProcedureEntity(
+                plantId = parent.id, procedureName = parent.taskName, scheduledDate = parent.creationDate,
+                rescheduledDate = date, status = "PLANNED"))
+            moveParent("2027-11-01")
+            val moved = db.plantDao().getAllPlantsOnce().single { it.id != parent.id }
+            assertEquals("2027-11-15", moved.creationDate)
+            moveParent("2027-12-25")
+            assertEquals("2028-01-08", db.plantDao().getPlantById(moved.id.toLong())?.creationDate)
+            moveParent("2028-01-03")
+            assertEquals("2028-01-17", db.plantDao().getPlantById(moved.id.toLong())?.creationDate)
+            db.procedureDao().undoChange(parent.id, parent.creationDate)
+            assertEquals(child.creationDate, db.plantDao().getPlantById(moved.id.toLong())?.creationDate)
+            var card = db.plantDao().getPlantsForCardOnce(parent.plantCardId)
+            db.plantDao().replaceImportedProgramCard(card, card.map {
+                if (it.id == parent.id) it.copy(creationDate = "2028-12-25") else it
+            })
+            assertEquals("2029-01-08", db.plantDao().getPlantById(moved.id.toLong())?.creationDate)
+            card = db.plantDao().getPlantsForCardOnce(parent.plantCardId)
+            db.plantDao().replaceImportedProgramCard(card, card.map {
+                if (it.id == parent.id) it.copy(creationDate = parent.creationDate) else it
+            })
+            assertEquals(child.creationDate, db.plantDao().getPlantById(moved.id.toLong())?.creationDate)
+            val manual = moved.copy(creationDate = "2027-11-20", userEdited = true, userLockedDate = true)
+            db.plantDao().updatePlant(manual)
+            moveParent("2027-11-02")
+            assertEquals(manual, db.plantDao().getPlantById(manual.id.toLong()))
+        } finally { db.close() }
+    }
+
+    @Test fun selectedVersion20ParentReusesNewStandalonePestAfterRefresh() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
+        try {
+            val gardenId = db.gardenDao().insertGarden(garden()).toInt()
+            val oldTemplate = PlantCareCatalog.all().first { it.id == "apple" }.let { current ->
+                current.copy(version = 20, steps = current.steps.filterNot {
+                    ProgramVariants.baseStep(it.id) in setOf(EradicationCare.PEST_STEP, EradicationCare.WHITEWASH_STEP)
+                })
+            }
+            val old = CareProgramGenerator().generate(oldTemplate, CareProgramContext(LocalDate.of(2027, 4, 4),
+                CultivationType.OPEN_GROUND, requireNotNull(garden().climateOrNull())), "selected-v20")
+            db.plantDao().importProgram(old.installation().copy(
+                knownStepIds = oldTemplate.steps.joinToString("\n") { ProgramVariants.baseStep(it.id) }),
+                old.installedRows(gardenId, "Сад"))
+            val parent = db.plantDao().getPlantsForCardOnce(old.instanceId).single {
+                ProgramVariants.baseStep(it.programStepId) == EradicationCare.EARLY_STEP
+            }
+            db.plantDao().selectProgramVariant(parent.id, "urea_mature", "")
+            val selected = requireNotNull(db.plantDao().getPlantById(parent.id.toLong()))
+            db.procedureDao().saveProcedureWithSnapshot(ProcedureEntity(plantId = parent.id,
+                procedureName = parent.taskName, scheduledDate = parent.creationDate,
+                rescheduledDate = "2027-04-09", status = "PLANNED"))
+            db.plantDao().refreshInstalledPrograms(LocalDate.of(2026, 10, 6))
+            assertEquals(selected, db.plantDao().getPlantById(parent.id.toLong()))
+            suspend fun pest() = db.plantDao().getPlantsForCardOnce(old.instanceId).single {
+                ProgramVariants.baseStep(it.programStepId) == EradicationCare.PEST_STEP
+            }
+            val standalone = pest()
+            assertEquals(21, standalone.programVersion)
+            assertEquals("2027-04-16", standalone.creationDate)
+            db.plantDao().selectProgramVariant(parent.id, "copper", "copper_source=copper_young")
+            assertEquals(standalone, pest())
+            db.plantDao().selectProgramVariant(parent.id, "urea_mature", "")
+            assertEquals(standalone, pest())
+            db.procedureDao().saveProcedureWithSnapshot(ProcedureEntity(plantId = parent.id,
+                procedureName = parent.taskName, scheduledDate = parent.creationDate,
+                rescheduledDate = "2028-01-03", status = "PLANNED"))
+            assertEquals("2028-01-10", pest().creationDate)
+            db.procedureDao().undoChange(parent.id, parent.creationDate)
+            assertEquals(LocalDate.parse(parent.creationDate).plusDays(7).toString(), pest().creationDate)
+            db.plantDao().deletePlant(standalone.id)
+            db.plantDao().selectProgramVariant(parent.id, "copper", "copper_source=copper_young")
+            assertFalse(db.plantDao().getPlantsForCardOnce(old.instanceId).any {
+                ProgramVariants.baseStep(it.programStepId) == EradicationCare.PEST_STEP
+            })
+        } finally { db.close() }
+    }
+
     @Test fun parentDateChangesKeepSevenDayGapAndPreserveManualOrCompletedFollowup() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
@@ -112,7 +202,7 @@ class ProgramVariantPersistenceInstrumentedTest {
             assertEquals(2, db.plantDao().getAllPlantsOnce().size)
             assertEquals("2027-04-11", db.plantDao().getAllPlantsOnce().single { it.id != id }.creationDate)
             db.plantDao().selectProgramVariant(id, "urea_mature", "")
-            assertEquals(1, db.plantDao().getAllPlantsOnce().size)
+            assertEquals(2, db.plantDao().getAllPlantsOnce().size)
             db.plantDao().selectProgramVariant(id, "copper", "copper_source=copper_young")
             val followup = db.plantDao().getAllPlantsOnce().single { it.id != id }
             val followupArchive = db.procedureDao().saveProcedureWithSnapshot(completion(followup))
@@ -183,8 +273,12 @@ class ProgramVariantPersistenceInstrumentedTest {
                 it.withProgramVariant("urea_young", "") else it })
             db.plantDao().importProgram(selected.installation(), selected.installedRows(gardenId, "Сад"))
             val imported = db.plantDao().getPlantsForCardOnce("new-program")
-            assertEquals(1, imported.count { it.programStepId == "before_bud_break_followup" })
+            assertEquals(1, imported.count { ProgramVariants.baseStep(it.programStepId) == EradicationCare.PEST_STEP })
             assertEquals("urea_young", imported.first { it.programStepId == EradicationCare.EARLY_STEP }.selectedVariantId)
+            db.plantDao().selectProgramVariant(imported.first { it.programStepId == EradicationCare.EARLY_STEP }.id, "urea_mature", "")
+            assertEquals(1, db.plantDao().getPlantsForCardOnce("new-program").count {
+                ProgramVariants.baseStep(it.programStepId) == EradicationCare.PEST_STEP
+            })
         } finally { db.close(); context.deleteDatabase(name) }
     }
 

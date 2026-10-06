@@ -55,11 +55,26 @@ class FolkFertilizersTest {
 
     @Test fun eradicationMixtureReusesTheAgreedIronRecipeAndPreservesItInMyProducts() {
         val recipe = FolkFertilizers.tankMixes.single { it.id == EradicationCare.IRON_RECIPE_ID }
-        assertEquals("Баковая смесь «Искореняющая»", recipe.name)
-        assertEquals("На 10 л воды: железный купорос — 300 г.", recipe.ingredients)
+        assertEquals("Баковая смесь «Осенняя искореняющая»", recipe.name)
+        assertEquals("", recipe.ingredients)
         assertEquals(EradicationCare.IRON_NOTE, recipe.preparation)
         assertTrue(recipe.purposeForDrug().contains(EradicationCare.IRON_NOTE))
-        assertTrue(recipe.warning.contains(FolkFertilizers.POLLINATION_NOTICE))
+        assertTrue(recipe.warning.isEmpty())
+        assertTrue(recipe.consumptionRate.isEmpty())
+        assertEquals(EradicationCare.IRON_PURPOSE + "\n\n" + EradicationCare.IRON_NOTE, recipe.purposeForDrug())
         assertTrue(FolkFertilizers.recipes.none { it.id == recipe.id })
+    }
+
+    @Test fun autumnRecipeKeepsOnlyTheAgreedTextAndCorrectHorusUnit() {
+        val recipe = FolkFertilizers.tankMixes.single { it.id == EradicationCare.AUTUMN_RECIPE_ID }
+        assertEquals("Проводится после сбора плодов, до листопада\n\nТемпература воздуха — +5…+10", recipe.purpose)
+        assertEquals("Баковая смесь «Осенняя основная»\nНа 10 литров воды:\nАктара 4 г\nХорус 2 г\nЭпин 1 мл\nПрилипатель 10 мл", recipe.ingredients)
+        assertTrue(listOf(recipe.preparation, recipe.warning, recipe.consumptionRate).all(String::isEmpty))
+        assertEquals(recipe.purpose + "\n\n" + recipe.ingredients, recipe.purposeForDrug())
+        FolkFertilizers.tankMixes.filter { it.id !in setOf(EradicationCare.AUTUMN_RECIPE_ID, EradicationCare.IRON_RECIPE_ID) }.forEach {
+            assertTrue(it.warning.contains(FolkFertilizers.POLLINATION_NOTICE))
+        }
+        val template = ru.samates.gardenspa.domain.PlantCareCatalog.all().single { it.id == "apple" }
+        assertEquals(EradicationCare.IRON_NOTE, template.steps.single { it.id == EradicationCare.AUTUMN_IRON_STEP }.note)
     }
 }

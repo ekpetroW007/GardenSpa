@@ -5,6 +5,7 @@ import ru.samates.gardenspa.data.database.entity.PlantEntity
 import ru.samates.gardenspa.data.database.entity.ProcedureEntity
 import ru.samates.gardenspa.data.database.entity.ProgramInstallationEntity
 import ru.samates.gardenspa.data.database.entity.climateOrNull
+import ru.samates.gardenspa.data.database.entity.locationOrNull
 import ru.samates.gardenspa.data.database.entity.resolvedCardId
 import java.security.MessageDigest
 import java.time.LocalDate
@@ -45,8 +46,10 @@ fun GeneratedCareProgram.installedRows(
             plantCardId = instanceId, programId = templateId, programVersion = templateVersion,
             programStepId = step.templateStepId,
             programImportKey = "$instanceId:$templateId:v$templateVersion:${step.templateStepId}",
-            programNote = listOfNotNull(step.productDescription?.let { "Категория средства: $it" }, step.note, step.explanation)
-                .filter(String::isNotBlank).joinToString("\n"),
+            programNote = if (step.selectedVariantId != null ||
+                templateId in EradicationCare.cropIds && programBaseStep(step.templateStepId) == EradicationCare.AUTUMN_IRON_STEP)
+                step.note else listOfNotNull(step.productDescription?.let { "Категория средства: $it" }, step.note, step.explanation)
+                    .filter(String::isNotBlank).joinToString("\n"),
             photoUri = photoUri, userEdited = customized || step.userEdited,
             selectedVariantId = step.selectedVariantId, variantChoices = step.variantChoices
         ).let { it.copy(programBaseline = it.programFingerprint()) }
@@ -87,7 +90,7 @@ object ProgramUpdates {
         val cultivation = runCatching { CultivationType.valueOf(context.cultivationType) }.getOrNull() ?: return null
         val generated = CareProgramGenerator().generate(template, CareProgramContext(
             startDate = LocalDate.parse(context.startDate), cultivationType = cultivation, climate = climate,
-            isSouthernRegion = context.southernRegion
+            isSouthernRegion = context.southernRegion, location = garden.locationOrNull()
         ), context.plantCardId)
         val candidates = generated.installedRows(representative.gardenId, representative.gardenName,
             representative.reminderDaysBefore, representative.photoUri).map { it.copy(plantName = representative.plantName) }
@@ -120,9 +123,13 @@ object ProgramUpdates {
         }
         val known = context.knownStepIds.lineSequence().filter(String::isNotBlank).toSet()
         val existing = rows.map { programBaseStep(it.programStepId) }.toSet()
+        val updatedById = updates.associateBy { it.id }
+        val retained = rows.filterNot { it.id in removals }.map { updatedById[it.id] ?: it }
         val additions = candidates.filter { programBaseStep(it.programStepId) !in known && programBaseStep(it.programStepId) !in existing }
             .map { row ->
-                val oldDate = LocalDate.parse(row.creationDate)
+                val parent = retained.singleOrNull { row.isVariantFollowupOf(it) }
+                val oldDate = parent?.let { it.effectiveVariantDate(history).plusDays(requireNotNull(it.variantFollowupRule()).second) }
+                    ?: LocalDate.parse(row.creationDate)
                 var date = oldDate.withYear(maxOf(oldDate.year, today.year))
                 if (date.isBefore(today)) date = oldDate.withYear(date.year + 1)
                 row.copy(creationDate = date.toString(), userEdited = false).let { it.copy(programBaseline = it.programFingerprint()) }
@@ -153,7 +160,8 @@ object ProgramUpdates {
             "Дата рассчитана относительно начала ухода.",
             "Дата рассчитана относительно безопасного начала сезона.",
             "В доступном прогнозе нет полностью подходящего дня; проверьте погоду перед выполнением.",
-            "Цепочка осмотров перенесена целиком с сохранением интервалов 5 дней.")
+            "Цепочка осмотров перенесена целиком с сохранением интервалов 5 дней.",
+            "Связанные работы перенесены целиком с сохранением интервалов.")
         val date = "\\d{4}-\\d{2}-\\d{2}"
         val datedExplanations = listOf(
             "Прогноз на $date соответствует условиям выполнения\\.",

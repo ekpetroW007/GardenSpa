@@ -79,7 +79,8 @@ class SeasonalProgramsTest {
         for (template in PlantCareCatalog.all().filter { ProgramProductCatalog.supports(it.id) }) {
             template.steps.mapNotNull { it.productDescription }.filterNot { it.startsWith("Средство ") }.forEach { description ->
                 val genericChoices = setOf("Бордосская смесь", "Железный купорос", "Лимонная кислота",
-                    "Феровит или Антихлорозин", "Сульфат магния или Маг-бор", "Препарат 30 Плюс или Профилактин — по регламенту культуры", "Выберите один из трёх вариантов")
+                    "Феровит или Антихлорозин", "Сульфат магния или Маг-бор", "Препарат 30 Плюс или Профилактин — по регламенту культуры",
+                    "Выберите один из трёх вариантов", "Выберите средство")
                 assertTrue("Missing reference: $description", description in genericChoices || reference.any { it.displayName == description || it.name == description } ||
                     FolkFertilizers.tankMixes.any { it.name == description })
             }

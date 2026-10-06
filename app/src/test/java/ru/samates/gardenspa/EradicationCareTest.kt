@@ -26,6 +26,9 @@ class EradicationCareTest {
             assertEquals(1, changed.steps.count { it.id == EradicationCare.EARLY_STEP })
             assertEquals(1, changed.steps.count { it.id == EradicationCare.AUTUMN_MIX_STEP })
             assertEquals(1, changed.steps.count { it.id == EradicationCare.AUTUMN_IRON_STEP })
+            assertEquals(1, changed.steps.count { ProgramProductCatalog.baseStepId(it.id) == EradicationCare.PEST_STEP })
+            assertEquals(if (id in EradicationCare.fruitTreeIds) 1 else 0,
+                changed.steps.count { ProgramProductCatalog.baseStepId(it.id) == EradicationCare.WHITEWASH_STEP })
             assertTrue(changed.steps.none { it.id.startsWith(SpringCarePrograms.PEST_STEP) || it.id.startsWith(SpringCarePrograms.AUTUMN_STEP) })
             assertEquals(source.steps.single { it.id == "nutrition" }, changed.steps.single { it.id == "nutrition" })
             assertEquals("Сохраняем состав", changed.steps.single { it.id == SpringCarePrograms.GREEN_STEP }.note)
@@ -37,7 +40,7 @@ class EradicationCareTest {
         assertFalse(EradicationCare.applies(null))
     }
 
-    @Test fun allThreeDatesShiftWithClimateAndGreenConeStaysAfterTheSpringStage() {
+    @Test fun springDatesShiftWithClimateAndAutumnUsesTheRegionalDay() {
         val template = EradicationCare.apply(original("apple"))
         fun dates(value: ClimateFingerprint) = CareProgramGenerator().generate(template,
             CareProgramContext(LocalDate.of(2026, 1, 1), CultivationType.OPEN_GROUND, value)).steps.associate { it.templateStepId to it.scheduledDate }
@@ -49,16 +52,16 @@ class EradicationCareTest {
         val cold = dates(climate.copy(safeSpringDay = MonthDay.of(5, 20), safeAutumnDay = MonthDay.of(9, 15)))
         assertEquals(LocalDate.of(2026, 4, 29), cold[EradicationCare.EARLY_STEP])
         assertEquals(LocalDate.of(2026, 8, 16), cold[EradicationCare.AUTUMN_MIX_STEP])
-        assertEquals(LocalDate.of(2026, 9, 30), cold[EradicationCare.AUTUMN_IRON_STEP])
+        assertEquals(LocalDate.of(2026, 9, 25), cold[EradicationCare.AUTUMN_IRON_STEP])
     }
 
-    @Test fun springChoiceDeterminesFollowupAndKeepsCopperAmountsInSeparateOptions() {
+    @Test fun eachSpringChoiceKeepsTheSeparatePestStageAndCopperAmountsStayIndependent() {
         assertEquals(3, EradicationCare.springVariants.size)
         val young = EradicationCare.springVariants.single { it.id == "urea_young" }
         val mature = EradicationCare.springVariants.single { it.id == "urea_mature" }
         val copper = EradicationCare.springVariants.single { it.id == "copper" }
         assertEquals(7, young.followupDays)
-        assertNull(mature.followupDays)
+        assertEquals(7, mature.followupDays)
         assertEquals(7, copper.followupDays)
         assertTrue(young.product.contains("300 г"))
         assertTrue(mature.product.contains("500–700 г"))
@@ -72,6 +75,15 @@ class EradicationCareTest {
         assertTrue(options.getValue("bordeaux_liquid").product.contains("250 мл"))
         assertTrue(options.getValue("bordeaux_liquid").note.contains("зелёного конуса"))
         assertEquals(EradicationCare.springVariants, EradicationCare.variantsFor("before_bud_break~saved-choice"))
+        (EradicationCare.springVariants + options.values).forEach { variant ->
+            assertFalse(variant.note.contains("этикет", true))
+            assertFalse(variant.note.contains("Профилактин", true))
+            assertFalse(variant.note.contains("деревянных конструкций"))
+            assertFalse(variant.note.contains("мочевин", true))
+            assertTrue(variant.note.contains("\n\n"))
+        }
+        assertEquals("Карбамид — молодые растения, грибковые болезни", young.title)
+        assertEquals("Карбамид — взрослые растения, грибковые болезни, вредители", mature.title)
     }
 
     @Test fun autumnComponentsKeepChoicesAndDoNotPresentTheOriginalCoragenGramsAsADose() {
@@ -79,23 +91,95 @@ class EradicationCareTest {
         assertEquals("autumn_main", variant.id)
         val groups = EradicationCare.componentsFor(variant.id)
         assertEquals(listOf("insecticide", "fungicide"), groups.map { it.id })
-        assertEquals(listOf(2, 3), groups.map { it.options.size })
+        assertEquals(listOf(2, 5), groups.map { it.options.size })
         val coragen = groups.flatMap { it.options }.single { it.id == "coragen" }
-        assertTrue(coragen.product.contains("по этикетке выбранной культуры"))
+        assertTrue(coragen.product.contains("норма зависит от культуры"))
         assertFalse(coragen.product.contains("4 г"))
         assertTrue(coragen.note.contains("жидкий концентрат"))
-        assertTrue(variant.note.contains("Эпин-Экстра — 1 мл"))
+        assertTrue(variant.note.contains("Эпин — 1 мл"))
         assertTrue(variant.note.contains("прилипатель — 10 мл"))
-        assertTrue(variant.note.contains("не ниже +15 °C"))
-        assertTrue(variant.note.contains("после периода цветения"))
-        assertTrue(EradicationCare.IRON_NOTE.contains("300 г"))
-        assertTrue(EradicationCare.IRON_NOTE.contains("в 1 л горячей воды"))
-        assertTrue(EradicationCare.IRON_NOTE.contains("общего объёма 10 л"))
-        assertTrue(EradicationCare.IRON_NOTE.contains("не подтверждённая схема лечения хлороза"))
+        assertTrue(variant.note.contains("+5…+10"))
+        val fungicides = groups.last().options.associateBy { it.id }
+        assertTrue(fungicides.getValue("horus").product.contains("2 г"))
+        assertTrue(fungicides.getValue("horus").note.contains("+5…+10 °C"))
+        assertTrue(fungicides.getValue("raek").note.contains("+14…+16 °C"))
+        assertNotNull(fungicides.getValue("tilt").unavailableReason)
+        assertTrue(EradicationCare.IRON_NOTE.contains("300 грамм"))
+        assertTrue(EradicationCare.IRON_NOTE.contains("в 1 литре горячей воды"))
+        assertTrue(EradicationCare.IRON_NOTE.contains("довести объем до 10 литров"))
         assertEquals(EradicationCare.AUTUMN_RECIPE_ID, EradicationCare.autumnRecipe.id)
         assertEquals("Баковая смесь «Осенняя основная»", FolkFertilizers.tankMixes.single { it.id == EradicationCare.AUTUMN_RECIPE_ID }.name)
-        assertTrue(EradicationCare.referenceProducts.all { product -> ProgramReferenceCatalog.allEntries().any { it.id == product.id } })
+        val entries = ProgramReferenceCatalog.allEntries()
+        EradicationCare.referenceProducts.forEach { product ->
+            assertTrue("Missing source product: ${product.id}", ProgramReferenceCatalog.products.any { it.id == product.id })
+            // Reference cards combine different program uses of the same named product.
+            assertTrue("Missing reference content: ${product.displayName}", entries.any {
+                it.displayName == product.displayName && it.instruction.contains(product.instruction) && it.crops.containsAll(product.crops)
+            })
+        }
+        assertEquals(1, entries.count { it.displayName == "Профилактин БИО, ВЭ — Август" })
         assertTrue(SpringCarePrograms.mixtureProducts.none { it.id == "mix_${EradicationCare.AUTUMN_RECIPE_ID}" })
         assertTrue(SpringCarePrograms.mixtureProducts.none { it.id == "mix_${EradicationCare.IRON_RECIPE_ID}" })
+    }
+
+    @Test fun coordinatesSelectSeptemberOctoberOrNovemberEvenWithTheSameClimateFixture() {
+        val template = EradicationCare.apply(original("apple"))
+        listOf(
+            Triple("Москва", 55.75 to 37.62, 10), Triple("Краснодар", 45.04 to 38.98, 11),
+            Triple("Новосибирск", 55.03 to 82.92, 9), Triple("Омск", 54.99 to 73.37, 9),
+            Triple("Владивосток", 43.12 to 131.89, 9), Triple("Мурманск", 68.97 to 33.07, 9)
+        ).forEach { (name, coordinates, month) ->
+            val context = CareProgramContext(LocalDate.of(2026, 1, 1), CultivationType.OPEN_GROUND, climate,
+                location = GardenLocation(coordinates.first, coordinates.second, localityName = name,
+                    source = LocationSource.PLACE_SEARCH, accuracyKm = 1.0))
+            val steps = CareProgramGenerator().generate(template, context).steps.associateBy { ProgramProductCatalog.baseStepId(it.templateStepId) }
+            val autumnDate = LocalDate.of(2026, month, 25)
+            assertEquals(name, autumnDate, steps.getValue(EradicationCare.AUTUMN_IRON_STEP).scheduledDate)
+            assertEquals(name, autumnDate.plusDays(14), steps.getValue(EradicationCare.WHITEWASH_STEP).scheduledDate)
+        }
+        assertEquals(LocalDate.of(2026, 11, 25), EradicationCare.autumnDate(
+            CareProgramContext(LocalDate.of(2026, 1, 1), CultivationType.OPEN_GROUND, climate, isSouthernRegion = true)))
+    }
+
+    @Test fun beginningBetweenStagesMovesTheWholeDependentChainToNextYear() {
+        val template = EradicationCare.apply(original("apple"))
+        fun steps(start: LocalDate) = CareProgramGenerator().generate(template,
+            CareProgramContext(start, CultivationType.OPEN_GROUND, climate)).steps.associateBy { ProgramProductCatalog.baseStepId(it.templateStepId) }
+        val spring = steps(LocalDate.of(2026, 4, 5))
+        val disease = spring.getValue(EradicationCare.EARLY_STEP).scheduledDate
+        assertEquals(LocalDate.of(2027, 4, 4), disease)
+        assertEquals(disease.plusDays(7), spring.getValue(EradicationCare.PEST_STEP).scheduledDate)
+        assertEquals(disease.plusDays(14), spring.getValue(SpringCarePrograms.GREEN_STEP).scheduledDate)
+        val autumn = steps(LocalDate.of(2026, 10, 26))
+        val iron = autumn.getValue(EradicationCare.AUTUMN_IRON_STEP).scheduledDate
+        assertEquals(LocalDate.of(2027, 10, 25), iron)
+        assertEquals(iron.plusDays(14), autumn.getValue(EradicationCare.WHITEWASH_STEP).scheduledDate)
+    }
+
+    @Test fun pestAlternativesShowEveryRequestedProductWithoutTreatingWrongPhasesAsEquivalent() {
+        val alternatives = ProgramProductCatalog.alternatives("apple", EradicationCare.PEST_STEP)
+        assertEquals(7, alternatives.size)
+        assertEquals(setOf("eradication_pest_profilaktin", "eradication_pest_30_plus", "eradication_pest_agrozelin"),
+            alternatives.filter { it.unavailableReason == null }.map { it.id }.toSet())
+        assertTrue(ProgramProductCatalog.alternatives("blueberry", EradicationCare.PEST_STEP).all { it.unavailableReason != null })
+        val template = PlantCareCatalog.all().single { it.id == "apple" }
+        val program = CareProgramGenerator().generate(template, CareProgramContext(LocalDate.of(2026, 1, 1), CultivationType.OPEN_GROUND, climate))
+        val index = program.steps.indexOfFirst { ProgramProductCatalog.baseStepId(it.templateStepId) == EradicationCare.PEST_STEP }
+        val selected = program.withProduct(index, "eradication_pest_agrozelin", program.steps[index].scheduledDate)
+        assertEquals("Весенняя искореняющая обработка от зимующих вредителей", selected.steps[index].title)
+        assertTrue(selected.steps[index].note.contains("500 мл на 10 л"))
+        assertFalse(selected.steps[index].note.contains("этикет", true))
+        assertThrows(NoSuchElementException::class.java) {
+            program.withProduct(index, "eradication_pest_alatar", program.steps[index].scheduledDate)
+        }
+    }
+
+    @Test fun whitewashHasTwoSeparateChoicesOnlyForFruitTrees() {
+        EradicationCare.cropIds.forEach { crop ->
+            val products = ProgramProductCatalog.alternatives(crop, EradicationCare.WHITEWASH_STEP)
+            assertEquals(if (crop in EradicationCare.fruitTreeIds) 2 else 0, products.size)
+        }
+        assertTrue(EradicationCare.whitewashProducts.last().instruction.contains("2,5 кг"))
+        assertTrue(EradicationCare.whitewashProducts.last().instruction.contains("300–500 г"))
     }
 }

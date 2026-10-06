@@ -118,27 +118,30 @@ class CareWorkflowInstrumentedTest {
             androidx.test.espresso.Espresso.closeSoftKeyboard()
             compose.onNodeWithText(recipe.name).assertExists()
             compose.onNodeWithText("Показать рецепт").performScrollTo().performClick()
-            compose.onNodeWithText("На 10 л воды: железный купорос — 300 г.").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText(EradicationCare.IRON_NOTE).performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText("Что понадобится").assertDoesNotExist()
+            compose.onNodeWithText("Как использовать").assertDoesNotExist()
+            compose.onNodeWithText("Меры осторожности").assertDoesNotExist()
             compose.onNodeWithText("Использовать").performScrollTo().performClick()
             compose.onNode(hasContentDescription("Растение. Сейчас:", substring = true)).performClick()
             compose.onNode(hasText("${plant.plantName} · Проверка функций") and hasAnyAncestor(isPopup())).performClick()
-            compose.onNodeWithText("Дата: ${LocalDate.now().toRussianDate()}").performClick()
+            compose.onNode(hasContentDescription("Дата. Сейчас:", substring = true)).performClick()
             if (plannedDate.month != LocalDate.now().month) compose.onNodeWithContentDescription("Следующий месяц").performClick()
             compose.onNodeWithContentDescription(plannedDate.toRussianDate()).performClick()
-            compose.onNodeWithText("Выбрать дату").performClick()
-            compose.onNodeWithText("Добавить в календарь").performClick()
+            compose.onNodeWithText("Подтвердить дату").performClick()
+            compose.onNodeWithText("Сохранить").performClick()
             compose.waitUntil(10_000) { rows(plant.plantCardId).size == 2 }
             val saved = rows(plant.plantCardId).single { it.id != plant.id }
             assertEquals(plant.plantCardId, saved.plantCardId)
             assertEquals(plannedDate.toString(), saved.creationDate)
             assertEquals("NONE", saved.repeatType)
             assertEquals(recipe.name, saved.drugName)
-            assertTrue(saved.programNote.contains("На 10 л воды: железный купорос — 300 г."))
+            assertEquals(EradicationCare.IRON_NOTE, saved.programNote)
             val product = runBlocking { app.repository.allDrugs.first().single { it.id == saved.drugId } }
             addedProductId = product.id.takeIf { it !in previousProductIds }
             assertEquals(recipe.name, product.name)
             assertEquals("TREATMENT", product.applicationMethod)
-            assertTrue(product.purpose.contains("На 10 л воды: железный купорос — 300 г."))
+            assertTrue(product.purpose.contains(EradicationCare.IRON_NOTE))
             compose.onNodeWithContentDescription("Средства и народные рецепты").performClick()
             compose.onNodeWithText("Мои средства").performScrollTo().performClick()
             compose.onNode(hasSetTextAction()).performTextInput("Искореняющая")
@@ -147,6 +150,84 @@ class CareWorkflowInstrumentedTest {
             screenshot("eradication-mixture-my-products")
         } finally {
             addedProductId?.let { id -> runBlocking { app.repository.deleteDrug(id) } }
+        }
+    }
+
+    @Test fun mixtureReturnsFromCreatingPlantWithItsChosenDateAndCancelCreatesNothing() = withPlant { existing ->
+        val recipe = EradicationCare.ironRecipe
+        val date = LocalDate.now().plusDays(3)
+        val newName = "Растение из смеси ${UUID.randomUUID().toString().take(6)}"
+        val previousDrugIds = runBlocking { app.repository.allDrugs.first().map { it.id }.toSet() }
+        fun createdRows() = runBlocking { app.repository.getAllPlantsOnce().filter { it.plantName == newName } }
+        try {
+            val preferences = PreferencesManager(app)
+            runBlocking { preferences.completeRegistration("Тест", true) }
+            val user = UserViewModel(preferences, app.climateService)
+            compose.setContent { MyApplicationTheme { AppNavigation(user) } }
+            compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("Средства и народные рецепты").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithContentDescription("Средства и народные рецепты").performClick()
+            compose.onNodeWithText("Баковые смеси").performScrollTo().performClick()
+            compose.onNode(hasSetTextAction()).performTextInput("Искореняющая")
+            androidx.test.espresso.Espresso.closeSoftKeyboard()
+            compose.onNodeWithText("Использовать").performScrollTo().performClick()
+            compose.onNodeWithText("Сохранить").assertIsNotEnabled()
+            compose.onNodeWithContentDescription("Дата. Сейчас: ").performClick()
+            compose.onNodeWithText("Подтвердить дату").assertExists()
+            if (date.month != LocalDate.now().month) compose.onNodeWithContentDescription("Следующий месяц").performClick()
+            compose.onNodeWithContentDescription(date.toRussianDate()).performClick()
+            compose.onNodeWithText("Подтвердить дату").performClick()
+            compose.onNodeWithText("Сохранить").assertIsNotEnabled()
+
+            fun openAddPlant() {
+                compose.onNode(hasContentDescription("Растение. Сейчас:", substring = true)).performClick()
+                val add = compose.onNode(hasText("+ Растение") and hasAnyAncestor(isPopup()))
+                val oldPlant = compose.onNode(hasText("${existing.plantName} · ${existing.gardenName}") and hasAnyAncestor(isPopup()))
+                assertTrue(add.fetchSemanticsNode().boundsInRoot.top < oldPlant.fetchSemanticsNode().boundsInRoot.top)
+                add.performClick()
+                compose.onNodeWithText("Популярные растения").performScrollTo().assertIsDisplayed()
+            }
+            openAddPlant()
+            compose.onNodeWithContentDescription("Назад").performClick()
+            compose.onNodeWithText("Использовать баковую смесь").assertExists()
+            compose.onNodeWithContentDescription("Дата. Сейчас: ${date.toRussianDate()}").assertExists()
+            compose.onNodeWithText("Сохранить").assertIsNotEnabled()
+            assertTrue(createdRows().isEmpty())
+
+            openAddPlant()
+            compose.onNodeWithTag("popular:Томат").performScrollTo().performClick().assertIsSelected()
+            compose.onNodeWithTag("popular:Огурец").performClick().assertIsSelected()
+            compose.onNodeWithTag("popular:Томат").assertIsNotSelected()
+            screenshot("popular-plant-highlight")
+            compose.onAllNodes(hasSetTextAction()).onFirst().performScrollTo().performTextReplacement(newName)
+            androidx.test.espresso.Espresso.closeSoftKeyboard()
+            compose.onNode(hasContentDescription("Сад. Сейчас:", substring = true)).performScrollTo().performClick()
+            compose.onNode(hasText(existing.gardenName) and hasAnyAncestor(isPopup())).performClick()
+            compose.onNodeWithText("Настроить уход самостоятельно").performScrollTo().performClick()
+            compose.onNodeWithText("Работа 1").performScrollTo().performTextInput("Полив")
+            androidx.test.espresso.Espresso.closeSoftKeyboard()
+            compose.onNodeWithText("Сохранить растение").performScrollTo().performClick()
+            compose.waitUntil(10_000) { createdRows().isNotEmpty() }
+            compose.waitUntil(10_000) {
+                compose.onAllNodesWithContentDescription("Растение. Сейчас: $newName · ${existing.gardenName}").fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.onNodeWithText("Использовать баковую смесь").assertExists()
+            compose.onNodeWithContentDescription("Растение. Сейчас: $newName · ${existing.gardenName}").assertExists()
+            compose.onNodeWithContentDescription("Дата. Сейчас: ${date.toRussianDate()}").assertExists()
+            compose.onNodeWithText("Сохранить").assertIsEnabled()
+            screenshot("mixture-new-plant-and-preserved-date")
+            compose.onNodeWithText("Сохранить").performClick()
+            compose.waitUntil(10_000) { createdRows().any { it.drugName == recipe.name } }
+            val created = createdRows()
+            assertEquals(2, created.size)
+            assertEquals(1, created.map { it.resolvedCardId }.distinct().size)
+            assertEquals(existing.gardenId, created.single { it.drugName == recipe.name }.gardenId)
+            assertEquals(date.toString(), created.single { it.drugName == recipe.name }.creationDate)
+        } finally {
+            runBlocking {
+                createdRows().map { it.resolvedCardId }.distinct().forEach { app.repository.deletePlantCard(it) }
+                app.repository.allDrugs.first().filter { it.name == recipe.name && it.id !in previousDrugIds }
+                    .forEach { app.repository.deleteDrug(it.id) }
+            }
         }
     }
 
@@ -163,12 +244,12 @@ class CareWorkflowInstrumentedTest {
         compose.onNodeWithText("Использовать").performScrollTo().performClick()
         compose.onNode(hasContentDescription("Растение. Сейчас:", substring = true)).performClick()
         compose.onNode(hasText("Яблоня для проверки · Проверка функций") and hasAnyAncestor(isPopup())).performClick()
-        compose.onNodeWithText("Дата: ${LocalDate.now().toRussianDate()}").performClick()
+        compose.onNode(hasContentDescription("Дата. Сейчас:", substring = true)).performClick()
         if (plannedDate.month != LocalDate.now().month) compose.onNodeWithContentDescription("Следующий месяц").performClick()
         compose.onNodeWithContentDescription(plannedDate.toRussianDate()).performClick()
-        compose.onNodeWithText("Выбрать дату").performClick()
+        compose.onNodeWithText("Подтвердить дату").performClick()
         screenshot("use-tank-mixture")
-        compose.onNodeWithText("Добавить в календарь").performClick()
+        compose.onNodeWithText("Сохранить").performClick()
         compose.waitUntil(10_000) { rows(plant.plantCardId).size == 2 }
         val mixture = rows(plant.plantCardId).single { it.programStepId?.startsWith("tank_mix:") == true }
         assertEquals(plannedDate.toString(), mixture.creationDate)

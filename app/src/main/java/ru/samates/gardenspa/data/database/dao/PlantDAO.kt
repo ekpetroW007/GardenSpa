@@ -20,6 +20,7 @@ import ru.samates.gardenspa.domain.programFingerprint
 import ru.samates.gardenspa.domain.effectiveVariantDate
 import ru.samates.gardenspa.domain.variantFollowupDateUpdates
 import ru.samates.gardenspa.domain.isUnchangedVariantFollowup
+import ru.samates.gardenspa.domain.isVariantFollowupOf
 import java.time.LocalDate
 
 @Dao
@@ -92,6 +93,20 @@ interface PlantDAO {
         updatePlant(selected)
         val prefix = "variant-followup:${plant.id}:"
         val history = programUpdateHistory()
+        if (ProgramVariants.baseStep(selected.programStepId) == "before_bud_break") {
+            val rows = getPlantsForCardOnce(plant.resolvedCardId)
+            val existingPest = rows.any { child -> child.isVariantFollowupOf(selected) &&
+                ((selected.programVersion ?: 0) >= 21 || (child.programVersion ?: 0) >= 21) }
+            if (existingPest) {
+                variantFollowupDateUpdates(selected, rows, history, selected.effectiveVariantDate(history)).forEach { updatePlant(it) }
+                return
+            }
+            // A removed program step stays removed; individually saved next-season works can create their own follow-up.
+            val installation = getProgramInstallation(plant.resolvedCardId)
+            if (selected.programImportKey?.startsWith("archive-next-season:") != true &&
+                ((selected.programVersion ?: 0) >= 21 || (installation?.appliedVersion ?: 0) >= 21) &&
+                installation?.knownStepIds?.lineSequence()?.any { it == "before_bud_break_followup" } == true) return
+        }
         val desired = ProgramVariants.followupFor(selected.copy(creationDate = selected.effectiveVariantDate(history).toString()))?.let {
             it.copy(id = 0, programImportKey = "$prefix$variantId:${it.creationDate}", userEdited = true,
                 programBaseline = null, selectedVariantId = null, variantChoices = "")

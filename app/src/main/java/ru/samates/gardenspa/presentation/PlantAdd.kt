@@ -51,9 +51,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -343,7 +345,8 @@ fun PlantAdd(
                         cultivationType = cultivationType,
                         climate = climate,
                         forecast = forecast,
-                        isSouthernRegion = southernRegion
+                        isSouthernRegion = southernRegion,
+                        location = location
                     )
                 )
             }.onSuccess {
@@ -455,13 +458,21 @@ fun PlantAdd(
                                 listOf("Томат", "Огурец", "Яблоня", "Груша", "Малина", "Смородина", "Газон", "Роза").chunked(2).forEach { names ->
                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         names.forEach { name ->
-                                            SecondaryAction(
-                                                name,
-                                                {
+                                            val chosen = plantName.trim().equals(name, ignoreCase = true)
+                                            FilterChip(
+                                                selected = chosen,
+                                                onClick = {
                                                     plantName = name
                                                     plantSuggestionsExpanded = false
                                                 },
-                                                Modifier.weight(1f)
+                                                label = { Text(name) },
+                                                colors = FilterChipDefaults.filterChipColors(
+                                                    containerColor = Forest700,
+                                                    labelColor = Cream,
+                                                    selectedContainerColor = Leaf300,
+                                                    selectedLabelColor = Forest900
+                                                ),
+                                                modifier = Modifier.weight(1f).testTag("popular:$name").semantics { selected = chosen }
                                             )
                                         }
                                         if (names.size == 1) Box(Modifier.weight(1f))
@@ -848,6 +859,10 @@ fun PlantAdd(
                                     .takeIf { repeatType != RepeatType.NONE && endType == RepeatEndType.COUNT },
                                 reminderDaysBefore = reminderDaysBefore,
                                 photoUri = photoUri,
+                                onCardSaved = { cardId ->
+                                    if (!editing) navController.previousBackStackEntry?.savedStateHandle
+                                        ?.set(AppDestinations.CREATED_PLANT_CARD_RESULT, cardId)
+                                },
                                 onSaved = {
                                     normalizedTaskNames.forEach(tasksVm::addTask)
                                     TreatmentReminderScheduler.refreshNow(app)
@@ -941,6 +956,8 @@ fun PlantAdd(
                         TreatmentReminderScheduler.refreshNow(app)
                         programImporting = false
                         generatedProgram = null
+                        navController.previousBackStackEntry?.savedStateHandle
+                            ?.set(AppDestinations.CREATED_PLANT_CARD_RESULT, program.instanceId)
                         navController.popBackStack()
                     },
                     onError = { message ->
@@ -1244,7 +1261,10 @@ internal fun <T> SelectionMenu(
     optionLabel: (T) -> String,
     onSelected: (T) -> Unit,
     addActionLabel: String? = null,
-    onAddAction: (() -> Unit)? = null
+    onAddAction: (() -> Unit)? = null,
+    addActionFirst: Boolean = false,
+    onOpen: (() -> Unit)? = null,
+    optionEnabled: (T) -> Boolean = { true }
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
@@ -1265,16 +1285,23 @@ internal fun <T> SelectionMenu(
         Box(
             Modifier.matchParentSize()
                 .semantics { contentDescription = "$label. Сейчас: $value" }
-                .clickable(role = Role.Button) { expanded = true }
+                .clickable(role = Role.Button) { if (onOpen != null) onOpen() else expanded = true }
         )
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            if (addActionFirst && addActionLabel != null && onAddAction != null) {
+                DropdownMenuItem(text = { Text(addActionLabel, color = Leaf300) }, onClick = {
+                    expanded = false
+                    onAddAction()
+                })
+            }
             if (options.isEmpty()) {
                 DropdownMenuItem(text = { Text("Список пока пуст") }, onClick = { expanded = false })
             }
             options.forEach { option ->
-                DropdownMenuItem(text = { Text(optionLabel(option)) }, onClick = { onSelected(option); expanded = false })
+                DropdownMenuItem(text = { Text(optionLabel(option)) }, enabled = optionEnabled(option),
+                    onClick = { onSelected(option); expanded = false })
             }
-            if (addActionLabel != null && onAddAction != null) {
+            if (!addActionFirst && addActionLabel != null && onAddAction != null) {
                 DropdownMenuItem(
                     text = { Text(addActionLabel, color = Leaf300) },
                     onClick = {

@@ -26,7 +26,8 @@ data class ProgramProduct(
     val retailUrl: String? = null
 ) {
     val displayName: String get() = "$name — $manufacturer"
-    val note: String get() = "$purpose\n$instruction\nИсточник: ${sourceUrl.ifBlank { "Рецепт пользователя" }}\n$PRODUCT_LABEL_NOTICE\n$SINGLE_PRODUCT_WORK_NOTICE"
+    val note: String get() = if (id.startsWith("eradication_")) "$purpose\n\n$instruction"
+        else "$purpose\n$instruction\nИсточник: ${sourceUrl.ifBlank { "Рецепт пользователя" }}\n$PRODUCT_LABEL_NOTICE\n$SINGLE_PRODUCT_WORK_NOTICE"
 }
 
 const val PRODUCT_LABEL_NOTICE = "Сверьте точную форму препарата, культуру, грунт, цель обработки, норму, срок ожидания и меры защиты с этикеткой. Не смешивайте выбранные альтернативы."
@@ -46,7 +47,7 @@ object ProgramProductCatalog {
     val allowedManufacturers = setOf("Август", "ЩёлковоАгрохим", "ФМРус", "BonaForte", "Фаско", "Гера",
         "Ортон", "Агрикола", "HB-101", "БашИнком", "Фармбиомед", "Syngenta", "Нэст-М", "Петрович",
         "Green Belt", "Био-комплекс", "Аминосил", "Органик Микс", "5сезонов",
-        "НПФ Собер", "Буйский химический завод", "Ваше хозяйство", "Fertika", "Агровит")
+        "НПФ Собер", "Буйский химический завод", "Ваше хозяйство", "Fertika", "Агровит", "Кеминова")
 
     fun supports(programId: String?): Boolean = programId in supportedCrops
 
@@ -211,7 +212,9 @@ object ProgramProductCatalog {
         if (!supports(programId) || stepId == null) return emptyList()
         val template = PlantCareCatalog.all().firstOrNull { it.id == programId } ?: return emptyList()
         if (template.steps.none { baseStepId(it.id) == baseStepId(stepId) }) return emptyList()
+        if (baseStepId(stepId) == EradicationCare.PEST_STEP) return EradicationCare.pestAlternatives(requireNotNull(programId))
         val ids = when (baseStepId(stepId)) {
+            EradicationCare.WHITEWASH_STEP -> EradicationCare.whitewashProducts.map { it.id }.toSet()
             SpringCarePrograms.EARLY_STEP -> SpringCarePrograms.diseaseIds
             SpringCarePrograms.PEST_STEP -> SpringCarePrograms.pestIds
             SpringCarePrograms.GREEN_STEP, SpringCarePrograms.AFTER_FLOWERING_STEP -> SpringCarePrograms.mixtureProducts.map { it.id }.toSet()
@@ -258,6 +261,7 @@ private fun preservedStage(programId: String?, stepId: String?): CareStepTemplat
     val base = stepId?.let(ProgramProductCatalog::baseStepId) ?: return null
     if (base !in setOf(SpringCarePrograms.EARLY_STEP, SpringCarePrograms.PEST_STEP, SpringCarePrograms.GREEN_STEP,
             SpringCarePrograms.AFTER_FLOWERING_STEP, SpringCarePrograms.AUTUMN_STEP,
+            EradicationCare.PEST_STEP, EradicationCare.WHITEWASH_STEP,
             "hydrangea_pale_acid", "hydrangea_pale_iron", "hydrangea_yellow_magnesium")) return null
     return PlantCareCatalog.all().firstOrNull { it.id == programId }?.steps?.firstOrNull { ProgramProductCatalog.baseStepId(it.id) == base }
 }
@@ -268,6 +272,8 @@ internal fun selectedProductTitle(programId: String?, stepId: String?, productTi
 internal fun selectedProductNote(programId: String?, stepId: String?, productNote: String): String {
     val stage = preservedStage(programId, stepId) ?: return productNote
     val condition = when (ProgramProductCatalog.baseStepId(stage.id)) {
+        EradicationCare.PEST_STEP -> EradicationCare.PEST_NOTE
+        EradicationCare.WHITEWASH_STEP -> "Через 14 дней после последней осенней обработки."
         "hydrangea_pale_acid", "hydrangea_pale_iron" -> "Только если после осмотра сохраняются бледные листья. Выберите одно средство; сначала оцените причину."
         "hydrangea_yellow_magnesium" -> "Только если после осмотра сохраняется пожелтение и подтверждена потребность в соответствующих элементах. Выберите одно средство."
         SpringCarePrograms.AUTUMN_STEP -> "Только после полного листопада, до морозов; не применять по вечнозелёной хвое."

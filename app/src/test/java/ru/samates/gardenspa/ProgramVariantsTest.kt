@@ -12,8 +12,8 @@ class ProgramVariantsTest {
         drugId = null, gardenId = null, drugName = "", gardenName = "Сад", plantCardId = "apple-card",
         programId = "apple", programVersion = EradicationCare.PROGRAM_VERSION, programStepId = step)
 
-    @Test fun springChoiceChangesFollowupAndPreservesOnlySelectedRecipe() {
-        val young = work().withProgramVariant("urea_young", "")
+    @Test fun legacySpringChoiceChangesFollowupAndPreservesOnlySelectedRecipe() {
+        val young = work().copy(programVersion = 20).withProgramVariant("urea_young", "")
         assertTrue(young.drugName.contains("300 г"))
         assertEquals("2027-04-11", ProgramVariants.followupFor(young)?.creationDate)
         val mature = young.withProgramVariant("urea_mature", "")
@@ -39,8 +39,64 @@ class ProgramVariantsTest {
         assertNull(next.selectedVariantId)
         assertEquals("", next.variantChoices)
         assertTrue(ProgramVariants.isVariantWork(next))
-        assertEquals(2, EradicationCare.autumnComponents.first().options.size)
-        assertEquals(3, EradicationCare.autumnComponents.last().options.size)
+        assertTrue(EradicationCare.autumnComponents.single { it.id == "insecticide" }.options.any { it.id == "coragen" })
+        assertTrue(EradicationCare.autumnComponents.single { it.id == "fungicide" }.options.any { it.id == "raek" })
+    }
+
+    @Test fun personalRecipeRoundTripsUnicodeNewlinesAndSeparatorsAndCanRestoreOriginal() {
+        val variant = EradicationCare.springVariants.single { it.id == "copper" }
+        val original = work().withProgramVariant(variant.id, "copper_source=bordeaux_liquid")
+        val product = "Бордоская жидкость — моя дозировка = 120 мл/10 л\nПометка | для яблони № 1"
+        val note = "Личная инструкция: объём = 10 л | только этот вариант.\nВторая строка: ёлка, йод, +5…+10 °C."
+        val encoded = ProgramVariants.editRecipe(variant.id, original.variantChoices, product, note)
+        val restored = original.withProgramVariant(variant.id, ProgramVariants.encode(ProgramVariants.choices(encoded)))
+
+        assertTrue(ProgramVariants.hasCustomRecipe(restored.variantChoices))
+        assertEquals("bordeaux_liquid", ProgramVariants.choices(restored.variantChoices)["copper_source"])
+        assertEquals(product, restored.drugName)
+        assertEquals(note, restored.programNote)
+        assertEquals(product, ProgramVariants.selectedProduct(variant, restored.variantChoices))
+        assertEquals(note, ProgramVariants.selectedNote(variant, restored.variantChoices))
+
+        val defaultChoices = ProgramVariants.originalRecipe(restored.variantChoices)
+        val reset = restored.withProgramVariant(variant.id, defaultChoices)
+        assertFalse(ProgramVariants.hasCustomRecipe(defaultChoices))
+        assertEquals(original.variantChoices, defaultChoices)
+        assertEquals(original.drugName, reset.drugName)
+        assertEquals(original.programNote, reset.programNote)
+    }
+
+    @Test fun nextSeasonClearsPersonalRecipeAndReopensCurrentCatalogVariants() {
+        val selected = work().copy(programVersion = 20).withProgramVariant("copper",
+            ProgramVariants.editRecipe("copper", "copper_source=bordeaux_liquid",
+                "Мой состав = 100 мл | вода\n10 л", "Моя инструкция\nСохранить = да | заметка"))
+        val next = selected.resetProgramVariantForNextSeason()
+        val template = PlantCareCatalog.all().single { it.id == "apple" }
+        val step = template.steps.single { it.id == EradicationCare.EARLY_STEP }
+
+        assertNull(next.selectedVariantId)
+        assertEquals("", next.variantChoices)
+        assertFalse(ProgramVariants.hasCustomRecipe(next.variantChoices))
+        assertTrue(ProgramVariants.isVariantWork(next))
+        assertEquals(template.version, next.programVersion)
+        assertEquals(step.productDescription.orEmpty(), next.drugName)
+        assertEquals(step.note, next.programNote)
+        assertTrue(ProgramVariants.hasCustomRecipe(selected.variantChoices))
+    }
+
+    @Test fun version20RowsStaySelectableAndVersion21KeepsSeparatePestWorkForEveryChoice() {
+        assertTrue(EradicationCare.PROGRAM_VERSION >= 21)
+        listOf(EradicationCare.EARLY_STEP, EradicationCare.AUTUMN_MIX_STEP).forEach { step ->
+            assertTrue(ProgramVariants.isVariantWork(work(step).copy(programVersion = 20)))
+        }
+        listOf("urea_young", "urea_mature", "copper").forEach { variantId ->
+            val selected = work().copy(programVersion = 21).withProgramVariant(variantId, "")
+            val followup = requireNotNull(ProgramVariants.followupFor(selected))
+            assertEquals("2027-04-11", followup.creationDate)
+            assertEquals(EradicationCare.PEST_STEP, ProgramVariants.baseStep(followup.programStepId))
+            assertNull(followup.selectedVariantId)
+            assertEquals("", followup.variantChoices)
+        }
     }
 
     @Test fun historyYearsAreScopedToPlantAndWork() {

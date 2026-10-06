@@ -13,6 +13,7 @@ object AppDestinations {
     const val DRUG_INFO = "drugInfoScreen"
 
     const val PLANT_ADD = "plantAddScreen/{selectedDate}?gardenId={gardenId}"
+    const val CREATED_PLANT_CARD_RESULT = "createdPlantCardId"
     const val PLANT_EDIT = "plantEditScreen/{plantId}"
     const val PLANT_DETAILS = "plantDetails/{plantId}"
     const val ALL_PLANTS = "allPlants"

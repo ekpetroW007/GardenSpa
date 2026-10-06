@@ -97,7 +97,6 @@ class VariantWorkflowInstrumentedTest {
                 })
             } }
             compose.onNodeWithText(EradicationCare.AUTUMN_FIXED_INGREDIENTS).performScrollTo().assertIsDisplayed()
-            compose.onNodeWithText(EradicationCare.AUTUMN_ADJUVANT_NOTICE).performScrollTo().assertIsDisplayed()
             chooseComponent(EradicationCare.autumnComponents.single { it.id == "insecticide" }, "coragen")
             chooseComponent(EradicationCare.autumnComponents.single { it.id == "fungicide" }, "raek")
             compose.onNodeWithTag("choose-variant:autumn_main").performScrollTo().performClick()
@@ -118,7 +117,7 @@ class VariantWorkflowInstrumentedTest {
         } finally { runBlocking { app.repository.deletePlantCard(card) } }
     }
 
-    @Test fun calendarArchivesCopperChoiceAndCommentThenReopensAllVariantsNextYear() {
+    @Test fun calendarArchivesPersonalRecipeAndCommentThenReopensAllVariantsNextYear() {
         val card = UUID.randomUUID().toString()
         val template = PlantCareCatalog.all().single { it.id == "apple" }
         val source = template.steps.single { it.id == EradicationCare.EARLY_STEP }
@@ -143,8 +142,35 @@ class VariantWorkflowInstrumentedTest {
             compose.waitUntil(10_000) {
                 rows(card).first { it.id == plant.id }.variantChoices.contains("bordeaux_liquid")
             }
+            assertTrue(rows(card).first { it.id == plant.id }.drugName.contains("Бордоская жидкость"))
+            val personalProduct = "Мой состав: бордоская жидкость = 120 мл/10 л\nПометка | яблоня № 1"
+            val personalNote = "Моя инструкция: объём = 10 л | рецепт сохранён.\nВторая строка: только для выбранной яблони."
+            compose.onNode(hasText("Изменить состав и инструкцию") and hasAnyAncestor(hasTestTag("variant:copper")))
+                .performScrollTo().performClick()
+            compose.onNode(hasText("Состав и дозировки") and hasSetTextAction())
+                .performScrollTo().performTextReplacement(personalProduct)
+            compose.onNode(hasText("Инструкция") and hasSetTextAction())
+                .performScrollTo().performTextReplacement(personalNote)
+            Espresso.closeSoftKeyboard()
+            compose.onNode(hasText("Сохранить") and hasAnyAncestor(isDialog())).performClick()
+            compose.waitUntil(10_000) {
+                rows(card).first { it.id == plant.id }.let { it.drugName == personalProduct && it.programNote == personalNote }
+            }
             val selected = rows(card).first { it.id == plant.id }
-            assertTrue(selected.drugName.contains("Бордоская жидкость"))
+            assertTrue(ProgramVariants.hasCustomRecipe(selected.variantChoices))
+            assertEquals("bordeaux_liquid", ProgramVariants.choices(selected.variantChoices)["copper_source"])
+
+            compose.runOnIdle { navigation.navigate("card") }
+            compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasTestTag("variant:copper"))
+            compose.onNode(hasText(personalProduct) and hasAnyAncestor(hasTestTag("variant:copper")))
+                .performScrollTo().assertIsDisplayed()
+            compose.onNode(hasText("Инструкция ▾") and hasAnyAncestor(hasTestTag("variant:copper")))
+                .performScrollTo().performClick()
+            compose.onNode(hasText(personalNote) and hasAnyAncestor(hasTestTag("variant:copper")))
+                .performScrollTo().assertIsDisplayed()
+            capture("personal-variant-card")
+            compose.runOnIdle { navigation.popBackStack() }
+            compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasTestTag("variant:copper"))
             compose.onNode(hasText("Выполнено") and hasAnyAncestor(hasTestTag("variant:copper")))
                 .performScrollTo().performClick()
             compose.waitUntil(10_000) {
@@ -161,11 +187,14 @@ class VariantWorkflowInstrumentedTest {
             val archived = history(card).single()
             assertEquals("copper", archived.selectedVariantId)
             assertEquals(selected.variantChoices, archived.variantChoices)
-            assertEquals(selected.drugName, archived.drugName)
+            assertEquals(personalProduct, archived.drugName)
+            assertEquals(personalNote, archived.note)
             val next = rows(card).single { it.programImportKey == archived.nextSeasonImportKey }
             assertEquals(archived.nextSeasonDate().toString(), next.creationDate)
             assertNull(next.selectedVariantId)
             assertEquals("", next.variantChoices)
+            assertNotEquals(personalProduct, next.drugName)
+            assertNotEquals(personalNote, next.programNote)
             compose.runOnIdle { navigation.navigate("card") }
             compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasTestTag("choose-variant:urea_young"))
             listOf("urea_young", "urea_mature", "copper").forEach {
@@ -174,6 +203,9 @@ class VariantWorkflowInstrumentedTest {
             capture("next-year-all-variants")
             compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Комментарий: $comment"))
             compose.onNodeWithText("Комментарий: $comment").assertIsDisplayed()
+            compose.onNodeWithText("Препарат: $personalProduct").assertExists()
+            compose.onNodeWithText("Инструкция на момент выполнения ▾").performScrollTo().performClick()
+            compose.onNodeWithText(personalNote).performScrollTo().assertIsDisplayed()
             capture("archived-variant-comment")
         } finally { runBlocking { app.repository.deletePlantCard(card) } }
     }

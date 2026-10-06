@@ -30,7 +30,10 @@ class SpringCareProgramsTest {
                     assertEquals(14, green.offsetDays - early.offsetDays)
                     assertTrue(listOf(early, green).all { it.note.contains("+3…+5") && it.recurrence == null })
                     assertEquals(CareAnchor.SAFE_AUTUMN_DATE, updated.steps.single { it.id == EradicationCare.AUTUMN_MIX_STEP }.anchor)
-                    assertEquals(CareAnchor.SAFE_AUTUMN_DATE, updated.steps.single { it.id == EradicationCare.AUTUMN_IRON_STEP }.anchor)
+                    assertEquals(CareAnchor.AUTUMN_ERADICATION_DATE, updated.steps.single { it.id == EradicationCare.AUTUMN_IRON_STEP }.anchor)
+                    val pests = updated.steps.single { ProgramProductCatalog.baseStepId(it.id) == EradicationCare.PEST_STEP }
+                    assertEquals(7, pests.offsetDays - early.offsetDays)
+                    assertEquals(early.anchor, pests.anchor)
                 } else {
                     val pests = updated.steps.single { it.id == SpringCarePrograms.PEST_STEP }
                     assertEquals("Обработать от болезней до распускания почек", early.title)

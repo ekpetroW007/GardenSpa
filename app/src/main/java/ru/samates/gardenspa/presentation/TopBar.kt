@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import ru.samates.gardenspa.R
 import ru.samates.gardenspa.ui.theme.Cream
@@ -32,14 +33,6 @@ fun TopBar() {
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = "GardenSpa",
-                style = MaterialTheme.typography.titleMedium,
-                color = Mist
-            )
-            Text("Календарь", style = MaterialTheme.typography.headlineLarge, color = Cream)
-        }
         Box(
             modifier = Modifier
                 .size(52.dp)
@@ -54,6 +47,14 @@ fun TopBar() {
                     .fillMaxSize()
                     .graphicsLayer(scaleX = 1.65f, scaleY = 1.65f)
             )
+        }
+        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+            Text(
+                text = "GardenSpa",
+                style = MaterialTheme.typography.headlineLarge.copy(fontFamily = FontFamily.SansSerif),
+                color = Cream
+            )
+            Text("Календарь", style = MaterialTheme.typography.bodyLarge, color = Mist)
         }
     }
 }

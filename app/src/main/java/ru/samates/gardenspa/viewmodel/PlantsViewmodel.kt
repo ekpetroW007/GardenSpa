@@ -155,7 +155,8 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
         reminderDaysBefore: Int = 1,
         photoUri: String? = null,
         drugNote: String? = null,
-        onSaved: () -> Unit = {}
+        onSaved: () -> Unit = {},
+        onCardSaved: (String) -> Unit = {}
     ) {
         viewModelScope.launch {
             try {
@@ -205,6 +206,7 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                 }
 
                 repository.replacePlantCard(cardId, cardRows)
+                onCardSaved(cardId)
                 onSaved()
             } catch (e: Exception) {
                 Log.d("savePlantCard", e.toString())
@@ -346,16 +348,16 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
                 require(!date.isBefore(LocalDate.now())) { "Выберите сегодняшнюю или будущую дату" }
                 val savedDrug = repository.saveToMyProducts(DrugEntity(name = recipe.name,
                     purpose = recipe.purposeForDrug(), consumptionRate = recipe.consumptionRate, applicationMethod = "TREATMENT"))
-                val crop = plant.programId ?: PlantCareCatalog.find(plant.plantName)?.id
-                val autumnVariant = recipe.id == EradicationCare.AUTUMN_RECIPE_ID && EradicationCare.applies(crop.orEmpty())
                 repository.addProgramTreatment(plant, plant.copy(
                     id = 0, plantCardId = plant.resolvedCardId,
                     taskName = "Использовать: ${recipe.name}",
                     creationDate = date.toString(), drugId = savedDrug.id, drugName = recipe.name,
-                    programId = if (autumnVariant) crop else plant.programId,
-                    programVersion = if (autumnVariant) EradicationCare.PROGRAM_VERSION else plant.programVersion,
-                    programStepId = if (autumnVariant) EradicationCare.AUTUMN_MIX_STEP else "tank_mix:${recipe.id}", programImportKey = null,
-                    programNote = recipe.purposeForDrug() + "\n" + recipe.consumptionRate,
+                    programStepId = "tank_mix:${recipe.id}", programImportKey = null,
+                    programNote = when (recipe.id) {
+                        EradicationCare.IRON_RECIPE_ID -> recipe.preparation
+                        EradicationCare.AUTUMN_RECIPE_ID -> "Осенняя основная обработка\n\n${recipe.purpose}\n\n${recipe.ingredients}"
+                        else -> recipe.purposeForDrug() + "\n" + recipe.consumptionRate
+                    },
                     repeatType = "NONE", repeatInterval = 1, wateringInterval = 1,
                     repeatDaysOfWeek = "", repeatEndType = "NEVER", repeatEndDate = null,
                     repeatCount = null, userLockedDate = true, userEdited = true, programBaseline = null,

@@ -16,7 +16,8 @@ enum class CareAnchor {
     START_DATE,
     SAFE_SPRING_DATE,
     SAFE_AUTUMN_DATE,
-    DORMANT_SPRING_DATE
+    DORMANT_SPRING_DATE,
+    AUTUMN_ERADICATION_DATE
 }
 
 data class WeatherLimits(
@@ -62,7 +63,8 @@ data class CareProgramContext(
     val cultivationType: CultivationType,
     val climate: ClimateFingerprint,
     val forecast: List<ForecastWeatherDay> = emptyList(),
-    val isSouthernRegion: Boolean = false
+    val isSouthernRegion: Boolean = false,
+    val location: GardenLocation? = null
 )
 
 data class GeneratedCareStep(
@@ -465,6 +467,7 @@ class CareProgramGenerator {
                 CareAnchor.SAFE_SPRING_DATE -> recommendedStart
                 CareAnchor.SAFE_AUTUMN_DATE -> context.climate.safeAutumnDate(context.startDate.year)
                 CareAnchor.DORMANT_SPRING_DATE -> context.climate.safeSpringDate(context.startDate.year).minusDays(21)
+                CareAnchor.AUTUMN_ERADICATION_DATE -> EradicationCare.autumnDate(context)
             }
             val initialDate = anchorDate.plusDays(step.offsetDays.toLong())
             val windowStart = initialDate.minusDays(step.windowBeforeDays.toLong())
@@ -512,16 +515,26 @@ class CareProgramGenerator {
             )
         }.let { steps ->
             if (continuesStartedSeason) {
-                // Keep the three dependent leaf checks together, including a start between checks.
-                val leafCheck = steps.firstOrNull { it.templateStepId.startsWith("hydrangea_pale_acid") }
-                val leafShift = leafCheck?.remainingFrom(context.startDate)?.firstOrNull()?.let {
-                    ChronoUnit.DAYS.between(leafCheck.scheduledDate, it.scheduledDate)
-                } ?: 0L
+                // Keep dependent work together when starting between linked stages.
+                val chains = listOf(
+                    listOf("hydrangea_pale_acid", "hydrangea_pale_iron", "hydrangea_yellow_magnesium"),
+                    listOf(EradicationCare.EARLY_STEP, EradicationCare.PEST_STEP, SpringCarePrograms.GREEN_STEP)
+                        .takeIf { EradicationCare.applies(template.id) }.orEmpty(),
+                    listOf(EradicationCare.AUTUMN_IRON_STEP, EradicationCare.WHITEWASH_STEP)
+                )
+                val shifts = chains.flatMap { chain ->
+                    val first = steps.firstOrNull { it.templateStepId.substringBefore("~") == chain.firstOrNull() }
+                    val shift = first?.remainingFrom(context.startDate)?.firstOrNull()?.let {
+                        ChronoUnit.DAYS.between(first.scheduledDate, it.scheduledDate)
+                    } ?: 0L
+                    chain.map { it to shift }
+                }.toMap()
                 steps.flatMap { step ->
-                    if (step.templateStepId.substringBefore("~") in setOf("hydrangea_pale_acid", "hydrangea_pale_iron", "hydrangea_yellow_magnesium"))
-                        listOf(step.copy(scheduledDate = step.scheduledDate.plusDays(leafShift),
-                            windowStart = step.windowStart.plusDays(leafShift), windowEnd = step.windowEnd.plusDays(leafShift),
-                            explanation = if (leafShift == 0L) step.explanation else "Цепочка осмотров перенесена целиком с сохранением интервалов 5 дней."))
+                    val shift = shifts[step.templateStepId.substringBefore("~")]
+                    if (shift != null)
+                        listOf(step.copy(scheduledDate = step.scheduledDate.plusDays(shift),
+                            windowStart = step.windowStart.plusDays(shift), windowEnd = step.windowEnd.plusDays(shift),
+                            explanation = if (shift == 0L) step.explanation else "Связанные работы перенесены целиком с сохранением интервалов."))
                     else step.remainingFrom(context.startDate)
                 }
             } else {

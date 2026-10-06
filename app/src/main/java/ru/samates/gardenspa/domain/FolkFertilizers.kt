@@ -13,6 +13,10 @@ data class FolkFertilizerRecipe(
     val isTankMix: Boolean = false
 ) {
     fun purposeForDrug(): String = buildString {
+        if (id in setOf(EradicationCare.AUTUMN_RECIPE_ID, EradicationCare.IRON_RECIPE_ID)) {
+            append(listOf(purpose, ingredients, preparation).filter(String::isNotBlank).joinToString("\n\n"))
+            return@buildString
+        }
         append(purpose)
         append(" Состав: ")
         append(ingredients)
@@ -164,7 +168,8 @@ object FolkFertilizers {
             "Маточный раствор: пакет пасты Фитоспорин-М 200 г развести в 400 мл воды. Для рабочего раствора взять 10 мл маточного раствора на 10 л воды. Не заменять пасту порошком или жидкой формой с другой концентрацией."),
         EradicationCare.autumnRecipe,
         EradicationCare.ironRecipe
-    ).map { if (it.isTankMix) it.copy(warning = listOf(it.warning, POLLINATION_NOTICE).filter(String::isNotBlank).joinToString("\n")) else it }
+    ).map { if (it.isTankMix && it.id !in setOf(EradicationCare.AUTUMN_RECIPE_ID, EradicationCare.IRON_RECIPE_ID))
+        it.copy(warning = listOf(it.warning, POLLINATION_NOTICE).filter(String::isNotBlank).joinToString("\n")) else it }
 
     val recipes = allRecipes.filterNot { it.isTankMix }
     val tankMixes = allRecipes.filter { it.isTankMix }
