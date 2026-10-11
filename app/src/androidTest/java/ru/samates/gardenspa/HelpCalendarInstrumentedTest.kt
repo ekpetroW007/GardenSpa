@@ -66,11 +66,18 @@ class HelpCalendarInstrumentedTest {
         compose.onNodeWithContentDescription("Календарь работ").assertIsSelected()
         compose.onNodeWithText("Сегодня", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithContentDescription("Логотип GardenSpa").assertIsDisplayed()
+        compose.onNodeWithText("Процедуры для растений").assertIsDisplayed()
+        compose.onNodeWithText("Процедуры").assertIsDisplayed()
         compose.onNodeWithContentDescription("Назад").assertDoesNotExist()
         compose.onNodeWithContentDescription("Следующий месяц").assertIsDisplayed()
         val monthTop = compose.onNodeWithContentDescription("Следующий месяц").fetchSemanticsNode().boundsInRoot.top
         val addTop = compose.onNodeWithText("Добавить работу").fetchSemanticsNode().boundsInRoot.top
         assertTrue(monthTop < addTop)
+        compose.onNodeWithContentDescription("Средства и народные рецепты").performClick()
+        compose.runOnIdle { assertEquals("Справочник", main.selectedScreen) }
+        compose.onNodeWithContentDescription("Средства и народные рецепты").assertIsSelected()
+        compose.onNodeWithContentDescription("Назад").performClick()
+        compose.runOnIdle { assertEquals("Календарь", main.selectedScreen) }
         capture("calendar-default")
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Погодное окно"))
         compose.onNodeWithText("Погодное окно").assertIsDisplayed()

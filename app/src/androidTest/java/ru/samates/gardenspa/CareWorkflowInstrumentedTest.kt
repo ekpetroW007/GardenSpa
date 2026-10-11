@@ -153,10 +153,15 @@ class CareWorkflowInstrumentedTest {
         }
     }
 
-    @Test fun mixtureReturnsFromCreatingPlantWithItsChosenDateAndCancelCreatesNothing() = withPlant { existing ->
-        val recipe = EradicationCare.ironRecipe
+    @Test fun mixtureReturnsFromCreatingPlantWithItsChosenDateAndCancelCreatesNothing() =
+        recipeReturnsFromCreatingPlantWithItsChosenDate(EradicationCare.ironRecipe)
+
+    @Test fun folkRecipeUsesTheSameFlowAndKeepsAnUnspecifiedApplicationMethod() =
+        recipeReturnsFromCreatingPlantWithItsChosenDate(FolkFertilizers.recipes.single { it.id == "yeast_tincture" })
+
+    private fun recipeReturnsFromCreatingPlantWithItsChosenDate(recipe: FolkFertilizerRecipe) = withPlant { existing ->
         val date = LocalDate.now().plusDays(3)
-        val newName = "Растение из смеси ${UUID.randomUUID().toString().take(6)}"
+        val newName = "Растение для рецепта ${UUID.randomUUID().toString().take(6)}"
         val previousDrugIds = runBlocking { app.repository.allDrugs.first().map { it.id }.toSet() }
         fun createdRows() = runBlocking { app.repository.getAllPlantsOnce().filter { it.plantName == newName } }
         try {
@@ -166,8 +171,10 @@ class CareWorkflowInstrumentedTest {
             compose.setContent { MyApplicationTheme { AppNavigation(user) } }
             compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("Средства и народные рецепты").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithContentDescription("Средства и народные рецепты").performClick()
-            compose.onNodeWithText("Баковые смеси").performScrollTo().performClick()
-            compose.onNode(hasSetTextAction()).performTextInput("Искореняющая")
+            val category = if (recipe.isTankMix) "Баковые смеси" else "Народные рецепты"
+            compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(category))
+            compose.onNodeWithText(category).performClick()
+            compose.onNode(hasSetTextAction()).performTextInput(recipe.name)
             androidx.test.espresso.Espresso.closeSoftKeyboard()
             compose.onNodeWithText("Использовать").performScrollTo().performClick()
             compose.onNodeWithText("Сохранить").assertIsNotEnabled()
@@ -188,7 +195,7 @@ class CareWorkflowInstrumentedTest {
             }
             openAddPlant()
             compose.onNodeWithContentDescription("Назад").performClick()
-            compose.onNodeWithText("Использовать баковую смесь").assertExists()
+            compose.onNodeWithText("Использовать средство").assertExists()
             compose.onNodeWithContentDescription("Дата. Сейчас: ${date.toRussianDate()}").assertExists()
             compose.onNodeWithText("Сохранить").assertIsNotEnabled()
             assertTrue(createdRows().isEmpty())
@@ -210,18 +217,26 @@ class CareWorkflowInstrumentedTest {
             compose.waitUntil(10_000) {
                 compose.onAllNodesWithContentDescription("Растение. Сейчас: $newName · ${existing.gardenName}").fetchSemanticsNodes().isNotEmpty()
             }
-            compose.onNodeWithText("Использовать баковую смесь").assertExists()
+            compose.onNodeWithText("Использовать средство").assertExists()
             compose.onNodeWithContentDescription("Растение. Сейчас: $newName · ${existing.gardenName}").assertExists()
             compose.onNodeWithContentDescription("Дата. Сейчас: ${date.toRussianDate()}").assertExists()
             compose.onNodeWithText("Сохранить").assertIsEnabled()
-            screenshot("mixture-new-plant-and-preserved-date")
+            screenshot("recipe-${recipe.id}-new-plant-and-preserved-date")
             compose.onNodeWithText("Сохранить").performClick()
             compose.waitUntil(10_000) { createdRows().any { it.drugName == recipe.name } }
             val created = createdRows()
             assertEquals(2, created.size)
             assertEquals(1, created.map { it.resolvedCardId }.distinct().size)
-            assertEquals(existing.gardenId, created.single { it.drugName == recipe.name }.gardenId)
-            assertEquals(date.toString(), created.single { it.drugName == recipe.name }.creationDate)
+            val procedure = created.single { it.drugName == recipe.name }
+            assertEquals(existing.gardenId, procedure.gardenId)
+            assertEquals(date.toString(), procedure.creationDate)
+            assertEquals("NONE", procedure.repeatType)
+            assertEquals("${if (recipe.isTankMix) "tank_mix" else "folk_recipe"}:${recipe.id}", procedure.programStepId)
+            assertTrue(procedure.programNote.contains(recipe.preparation))
+            val product = runBlocking { app.repository.allDrugs.first().single { it.id == procedure.drugId } }
+            assertEquals(if (recipe.isTankMix) "TREATMENT" else "UNSPECIFIED", product.applicationMethod)
+            assertEquals(recipe.purposeForDrug(), product.purpose)
+            assertEquals(recipe.consumptionRate, product.consumptionRate)
         } finally {
             runBlocking {
                 createdRows().map { it.resolvedCardId }.distinct().forEach { app.repository.deletePlantCard(it) }

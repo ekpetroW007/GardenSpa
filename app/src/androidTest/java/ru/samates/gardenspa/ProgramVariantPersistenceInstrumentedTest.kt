@@ -88,7 +88,7 @@ class ProgramVariantPersistenceInstrumentedTest {
                 ProgramVariants.baseStep(it.programStepId) == EradicationCare.PEST_STEP
             }
             val standalone = pest()
-            assertEquals(21, standalone.programVersion)
+            assertEquals(EradicationCare.PROGRAM_VERSION, standalone.programVersion)
             assertEquals("2027-04-16", standalone.creationDate)
             db.plantDao().selectProgramVariant(parent.id, "copper", "copper_source=copper_young")
             assertEquals(standalone, pest())
@@ -280,6 +280,53 @@ class ProgramVariantPersistenceInstrumentedTest {
                 ProgramVariants.baseStep(it.programStepId) == EradicationCare.PEST_STEP
             })
         } finally { db.close(); context.deleteDatabase(name) }
+    }
+
+    @Test fun version22RefreshRenamesRecipesKeepsPersonalDataAndOrdersWhitewashAfterActualTreatment() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
+        try {
+            val gardenId = db.gardenDao().insertGarden(garden()).toInt()
+            val oldTemplate = PlantCareCatalog.all().first { it.id == "apple" }.let { current ->
+                current.copy(version = 21, steps = current.steps.map { step -> when (programBaseStep(step.id)) {
+                    EradicationCare.AUTUMN_IRON_STEP -> step.copy(title = "Осенняя искореняющая обработка",
+                        productDescription = "Железный купорос — 300 г на 10 л воды")
+                    EradicationCare.AUTUMN_MIX_STEP -> step.copy(title = "Осенняя основная обработка — выбрать смесь")
+                    else -> step
+                } })
+            }
+            val generated = CareProgramGenerator().generate(oldTemplate,
+                CareProgramContext(LocalDate.of(2027, 4, 4), CultivationType.OPEN_GROUND,
+                    requireNotNull(garden().climateOrNull())), "rename-v21")
+            db.plantDao().importProgram(generated.installation(),
+                generated.installedRows(gardenId, "Сад").map { it.copy(userEdited = false) })
+            val original = db.plantDao().getPlantsForCardOnce(generated.instanceId)
+            val iron = original.single { programBaseStep(it.programStepId) == EradicationCare.AUTUMN_IRON_STEP }
+                .copy(creationDate = "2027-12-25", userEdited = true, userLockedDate = true)
+            db.plantDao().updatePlant(iron)
+            val mixture = original.single { programBaseStep(it.programStepId) == EradicationCare.AUTUMN_MIX_STEP }
+            val choices = ProgramVariants.editRecipe("autumn_main", "", "Мой состав: 7 мл = 10 л", "Моя инструкция\nБез изменений")
+            val personal = mixture.copy(taskName = "Осенняя основная обработка — выбрать смесь · Осенняя основная обработка",
+                drugName = "Мой состав: 7 мл = 10 л", programNote = "Моя инструкция\nБез изменений", selectedVariantId = "autumn_main",
+                variantChoices = choices, userEdited = true, repeatType = "CUSTOM", repeatInterval = 14)
+            db.plantDao().updatePlant(personal)
+            val deleted = original.single { programBaseStep(it.programStepId) == EradicationCare.PEST_STEP }
+            db.plantDao().deletePlant(deleted.id)
+            val done = original.first { !ProgramVariants.isVariantWork(it) && it.id != iron.id && it.id != deleted.id &&
+                programBaseStep(it.programStepId) != EradicationCare.WHITEWASH_STEP }
+            val archive = db.procedureDao().saveProcedureWithSnapshot(ProcedureEntity(plantId = done.id,
+                procedureName = done.taskName, scheduledDate = done.creationDate, completedDate = done.creationDate, status = "COMPLETED"))
+            assertTrue(db.plantDao().refreshInstalledPrograms(LocalDate.of(2026, 10, 11)) > 0)
+            val refreshed = db.plantDao().getPlantsForCardOnce(generated.instanceId)
+            assertEquals(personal.copy(taskName = EradicationCare.autumnRecipe.name), refreshed.single { it.id == personal.id })
+            assertEquals(iron.copy(taskName = EradicationCare.ironRecipe.name, drugName = EradicationCare.ironRecipe.name),
+                refreshed.single { it.id == iron.id })
+            assertEquals("2028-01-08", refreshed.single { programBaseStep(it.programStepId) == EradicationCare.WHITEWASH_STEP }.creationDate)
+            assertFalse(refreshed.any { it.id == deleted.id || programBaseStep(it.programStepId) == EradicationCare.PEST_STEP })
+            assertEquals(done, refreshed.single { it.id == done.id })
+            assertEquals(archive, db.procedureDao().procedureById(archive.id))
+            assertEquals(0, db.plantDao().refreshInstalledPrograms(LocalDate.of(2026, 10, 11)))
+        } finally { db.close() }
     }
 
     private fun source() = PlantEntity(plantName = "Яблоня", taskName = "Выбрать весеннюю обработку", wateringInterval = 1,

@@ -39,7 +39,7 @@ fun AppButtonBar(selectedScreen: String = "Календарь", onClick: (String
     val entries = listOf(
         NavigationEntry("Календарь", "Календарь", "▦", "Календарь работ"),
         NavigationEntry("Сады", "Мой сад", "♧", "Мои сады и растения"),
-        NavigationEntry("Справочник", "Справочник", "☷", "Средства и народные рецепты"),
+        NavigationEntry("Справочник", "Процедуры", "☷", "Средства и народные рецепты"),
         NavigationEntry("Помощь", "Помощь", "?", "Помощь и настройки")
     )
     val normalizedSelection = when (selectedScreen) {

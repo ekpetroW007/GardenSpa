@@ -265,8 +265,8 @@ class CareProgramTest {
                 val eradicationTitles = mapOf(
                     EradicationCare.EARLY_STEP to "Весенняя искореняющая обработка от болезней",
                     EradicationCare.PEST_STEP to "Весенняя искореняющая обработка от зимующих вредителей",
-                    EradicationCare.AUTUMN_MIX_STEP to "Осенняя основная обработка — выбрать смесь",
-                    EradicationCare.AUTUMN_IRON_STEP to "Осенняя искореняющая обработка")
+                    EradicationCare.AUTUMN_MIX_STEP to EradicationCare.autumnRecipe.name,
+                    EradicationCare.AUTUMN_IRON_STEP to EradicationCare.ironRecipe.name)
                 val expectedTitle = eradicationTitles[step.id.substringBefore("~")]
                 if (EradicationCare.applies(template.id) && expectedTitle != null) {
                     assertEquals(expectedTitle, step.title)

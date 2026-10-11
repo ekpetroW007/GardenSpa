@@ -96,7 +96,7 @@ fun Drugs(navController: NavController, innerPadding: PaddingValues, section: Pr
                         LinkifiedText(product.instruction, color = Cream)
                         product.unavailableReason?.let { Text(it, color = Danger) }
                         Text("Сверяйте культуру, форму средства и регламент с вашей упаковкой. Альтернативы не смешивают.", color = Mist)
-                        Text("Справочник программ · сентябрь 2026", color = Mist)
+                        Text("Процедуры GardenSpa · сентябрь 2026", color = Mist)
                     }
                 }
             }

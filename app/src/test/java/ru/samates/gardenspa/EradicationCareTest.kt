@@ -91,7 +91,7 @@ class EradicationCareTest {
         assertEquals("autumn_main", variant.id)
         val groups = EradicationCare.componentsFor(variant.id)
         assertEquals(listOf("insecticide", "fungicide"), groups.map { it.id })
-        assertEquals(listOf(2, 5), groups.map { it.options.size })
+        assertEquals(listOf(2, 4), groups.map { it.options.size })
         val coragen = groups.flatMap { it.options }.single { it.id == "coragen" }
         assertTrue(coragen.product.contains("норма зависит от культуры"))
         assertFalse(coragen.product.contains("4 г"))
@@ -103,7 +103,7 @@ class EradicationCareTest {
         assertTrue(fungicides.getValue("horus").product.contains("2 г"))
         assertTrue(fungicides.getValue("horus").note.contains("+5…+10 °C"))
         assertTrue(fungicides.getValue("raek").note.contains("+14…+16 °C"))
-        assertNotNull(fungicides.getValue("tilt").unavailableReason)
+        assertEquals(setOf("horus", "skor", "raek", "topaz"), fungicides.keys)
         assertTrue(EradicationCare.IRON_NOTE.contains("300 грамм"))
         assertTrue(EradicationCare.IRON_NOTE.contains("в 1 литре горячей воды"))
         assertTrue(EradicationCare.IRON_NOTE.contains("довести объем до 10 литров"))

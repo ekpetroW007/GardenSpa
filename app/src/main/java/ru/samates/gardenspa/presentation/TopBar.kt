@@ -54,7 +54,7 @@ fun TopBar() {
                 style = MaterialTheme.typography.headlineLarge.copy(fontFamily = FontFamily.SansSerif),
                 color = Cream
             )
-            Text("Календарь", style = MaterialTheme.typography.bodyLarge, color = Mist)
+            Text("Процедуры для растений", style = MaterialTheme.typography.bodyLarge, color = Mist)
         }
     }
 }

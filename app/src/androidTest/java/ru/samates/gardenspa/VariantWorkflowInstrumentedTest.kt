@@ -96,9 +96,13 @@ class VariantWorkflowInstrumentedTest {
                     model.importCareProgram(program, null, "Проверка вариантов", onError = { error = it })
                 })
             } }
-            compose.onNodeWithText(EradicationCare.AUTUMN_FIXED_INGREDIENTS).performScrollTo().assertIsDisplayed()
+            compose.onNodeWithTag("recipe-composition").performScrollTo().assertIsDisplayed()
+                .assertTextEquals(ProgramRecipes.composition(EradicationCare.autumnRecipe))
             chooseComponent(EradicationCare.autumnComponents.single { it.id == "insecticide" }, "coragen")
             chooseComponent(EradicationCare.autumnComponents.single { it.id == "fungicide" }, "raek")
+            compose.onNodeWithTag("recipe-composition")
+                .assertTextContains("Эпин — 1 мл", substring = true)
+                .assertTextContains("Прилипатель — 10 мл", substring = true)
             compose.onNodeWithTag("choose-variant:autumn_main").performScrollTo().performClick()
             compose.onNodeWithText("Добавить растение и работы").performClick()
             compose.waitUntil(10_000) { rows(card).isNotEmpty() || error != null }

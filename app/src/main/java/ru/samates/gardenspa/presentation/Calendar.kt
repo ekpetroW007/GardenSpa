@@ -377,7 +377,8 @@ private fun TreatmentCard(
             if (treatment.rescheduled) Text("Перенесено с ${treatment.originalDate.toRussianDate(false)}", color = Warning)
             Text(treatment.plant.taskName, style = MaterialTheme.typography.titleLarge, color = Cream)
             Text("${treatment.plant.plantName} · ${treatment.plant.gardenName}", color = Leaf300)
-            Text(treatment.plant.drugName.toDrugDisplayName(), color = Mist)
+            if (!variants) ProgramProductSummary(treatment.plant.programStepId, treatment.plant.drugName,
+                treatment.plant.programNote, treatment.plant.taskName, personal = treatment.plant.drugId != null)
             if (treatment.plant.programId != null) {
                 ProgramRepeatSelector(treatment.plant.recurrenceDescription(), onRepeat)
             } else Text(treatment.plant.recurrenceDescription(), color = Mist)

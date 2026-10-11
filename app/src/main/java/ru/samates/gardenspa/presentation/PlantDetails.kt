@@ -146,12 +146,21 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                     }
                     item { SectionTitle("План ухода") }
                     repeatError?.let { message -> item { Text(message, color = Danger) } }
-                    items(cardRows, key = { "card-procedure:${it.id}" }) { procedure ->
+                    items(cardRows.sortedBy { row ->
+                        procedures.firstOrNull { it.plantId == row.id && it.scheduledDate == row.creationDate }
+                            ?.rescheduledDate ?: row.creationDate
+                    }, key = { "card-procedure:${it.id}" }) { procedure ->
+                        val plannedDate = procedures.firstOrNull {
+                            it.plantId == procedure.id && it.scheduledDate == procedure.creationDate
+                        }?.rescheduledDate ?: procedure.creationDate
                         GlassCard(Modifier.fillMaxWidth()) {
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(procedure.taskName, color = Cream, style = MaterialTheme.typography.titleMedium)
-                                Text(procedure.drugName.toDrugDisplayName(), color = Leaf300)
-                                Text("Дата: ${procedure.creationDate.toRussianDateOrSelf()}", color = Mist)
+                                if (!ProgramVariants.isVariantWork(procedure)) {
+                                    ProgramProductSummary(procedure.programStepId, procedure.drugName,
+                                        procedure.programNote, procedure.taskName, personal = procedure.drugId != null)
+                                }
+                                Text("Дата: ${plannedDate.toRussianDateOrSelf()}", color = Mist)
                                 if (ProgramVariants.isVariantWork(procedure)) {
                                     val recorded = procedures.firstOrNull { it.plantId == procedure.id && it.scheduledDate == procedure.creationDate }
                                     ProgramVariantChooser(procedure.programStepId, procedure.selectedVariantId, procedure.variantChoices,

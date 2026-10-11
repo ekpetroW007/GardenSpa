@@ -119,4 +119,141 @@ class ProgramUpdatesTest {
         assertTrue(plan.updates.isEmpty())
         assertTrue(plan.removals.isEmpty())
     }
+
+    @Test fun catalogRenamesRefreshOverdueAndPostponedWorkWithoutMovingDatesOrChangingArchives() {
+        val rows = originalRows()
+        val postponed = rows.first { it.programStepId == "normal" }
+        val completed = rows.first { it.programStepId == "done" }
+        val records = listOf(
+            ProcedureEntity(id = 201, plantId = postponed.id, procedureName = postponed.taskName,
+                scheduledDate = postponed.creationDate, rescheduledDate = "2026-06-15", status = "PLANNED"),
+            ProcedureEntity(id = 202, plantId = completed.id, procedureName = completed.taskName,
+                scheduledDate = completed.creationDate, completedDate = completed.creationDate,
+                drugName = completed.drugName, note = completed.programNote, status = "COMPLETED")
+        )
+        val renamed = current.copy(steps = current.steps.map {
+            it.copy(title = "Новое имя работы", productDescription = "Новое имя средства")
+        })
+        val plan = requireNotNull(ProgramUpdates.plan(rows, records, garden, installation(),
+            LocalDate.of(2026, 5, 1), listOf(renamed), listOf(old)))
+        val updated = plan.updates.first { it.id == postponed.id }
+        assertEquals("Новое имя средства", updated.drugName)
+        assertEquals("Новое имя работы", updated.taskName)
+        assertEquals(postponed.creationDate, updated.creationDate)
+        val scheduled = scheduledTreatmentsOn(listOf(updated), records, LocalDate.of(2026, 6, 15)).single()
+        assertEquals("Новое имя средства", scheduled.plant.drugName)
+        assertTrue(scheduled.rescheduled)
+        assertEquals(rows.first { it.programStepId == "changed" }.creationDate,
+            plan.updates.first { it.programStepId == "changed" }.creationDate)
+        assertFalse(plan.updates.any { it.id == completed.id })
+        assertFalse(completed.id in plan.removals)
+    }
+
+    @Test fun existingWhitewashRefreshKeepsTheActualParentDateAndRespectsManualChildChanges() {
+        val source = PlantCareTemplate("apple", "Яблоня", emptySet(), 21, setOf(CultivationType.OPEN_GROUND), steps = listOf(
+            CareStepTemplate(EradicationCare.AUTUMN_IRON_STEP, "Осенняя искореняющая обработка",
+                CareAnchor.AUTUMN_ERADICATION_DATE, 0, productDescription = "Железный купорос — 300 г на 10 л воды", note = "Старая инструкция"),
+            CareStepTemplate(EradicationCare.WHITEWASH_STEP, "Побелка деревьев", CareAnchor.AUTUMN_ERADICATION_DATE, 14,
+                productDescription = "Побелка", note = "Старая инструкция")))
+        val next = source.copy(version = 22, steps = source.steps.map { it.copy(note = "Новая инструкция") })
+        val metadata = ProgramInstallationEntity("whitewash-card", "apple", 21, today.toString(), "OPEN_GROUND", false,
+            source.steps.joinToString("\n") { it.id })
+        val original = CareProgramGenerator().generate(source,
+            CareProgramContext(today, CultivationType.OPEN_GROUND, requireNotNull(garden.climateOrNull())), metadata.plantCardId)
+            .installedRows(garden.id, garden.name).mapIndexed { index, row -> row.copy(id = index + 1, userEdited = false) }
+        val parent = original.first().copy(creationDate = "2026-12-25", userEdited = true, userLockedDate = true)
+        val child = original.last()
+        val plan = requireNotNull(ProgramUpdates.plan(listOf(parent, child), emptyList(), garden, metadata, today,
+            listOf(next), listOf(source)))
+        val updatedChild = plan.updates.single { it.id == child.id }
+        assertEquals("2027-01-08", updatedChild.creationDate)
+        assertTrue(updatedChild.programNote.contains("Новая инструкция"))
+        val updatedParent = plan.updates.single { it.id == parent.id }
+        assertEquals(EradicationCare.ironRecipe.name, updatedParent.taskName)
+        assertEquals(EradicationCare.ironRecipe.name, updatedParent.drugName)
+        assertEquals(parent.creationDate, updatedParent.creationDate)
+        assertEquals(parent.programNote, updatedParent.programNote)
+        assertTrue(updatedParent.userEdited)
+
+        val manualChild = child.copy(creationDate = "2026-12-31", programNote = "Мой состав", userEdited = true)
+        val manual = requireNotNull(ProgramUpdates.plan(listOf(parent, manualChild), emptyList(), garden, metadata, today,
+            listOf(next), listOf(source)))
+        assertFalse(manual.updates.any { it.id == child.id })
+        assertTrue(manual.additions.isEmpty())
+    }
+
+    @Test fun knownAutumnLabelIsDeduplicatedWithoutReplacingTheChosenPersonalRecipe() {
+        val source = PlantCareTemplate("apple", "Яблоня", emptySet(), 21, setOf(CultivationType.OPEN_GROUND), steps = listOf(
+            CareStepTemplate(EradicationCare.AUTUMN_MIX_STEP, "Осенняя основная обработка — выбрать смесь",
+                offsetDays = 0, productDescription = "Смесь", note = "Инструкция")))
+        val next = source.copy(version = 22)
+        val metadata = ProgramInstallationEntity("personal-card", "apple", 21, today.toString(), "OPEN_GROUND", false,
+            EradicationCare.AUTUMN_MIX_STEP)
+        val choices = ProgramVariants.editRecipe("autumn_main", "", "Мой состав = 7 мл | 10 л", "Моя инструкция\nВторая строка")
+        val row = PlantEntity(id = 57, plantName = "Яблоня", taskName =
+            "Осенняя основная обработка — выбрать смесь · Осенняя основная обработка", wateringInterval = 14,
+            creationDate = "2026-09-10", drugId = null, gardenId = garden.id, drugName = "Мой состав = 7 мл | 10 л",
+            gardenName = garden.name, plantCardId = metadata.plantCardId, programId = "apple", programVersion = 21,
+            programStepId = EradicationCare.AUTUMN_MIX_STEP, programImportKey = "personal-card:apple:v21:${EradicationCare.AUTUMN_MIX_STEP}",
+            selectedVariantId = "autumn_main", variantChoices = choices, userEdited = true, userLockedDate = true,
+            programNote = "Моя инструкция\nВторая строка", repeatType = "CUSTOM", repeatInterval = 14)
+        val plan = requireNotNull(ProgramUpdates.plan(listOf(row), emptyList(), garden, metadata, today, listOf(next), listOf(source)))
+        assertEquals(listOf(row.copy(taskName = EradicationCare.autumnRecipe.name)), plan.updates)
+        assertTrue(plan.additions.isEmpty())
+        assertTrue(plan.removals.isEmpty())
+        val ownTitle = row.copy(taskName = "Моя осенняя процедура")
+        assertTrue(requireNotNull(ProgramUpdates.plan(listOf(ownTitle), emptyList(), garden, metadata, today,
+            listOf(next), listOf(source))).updates.isEmpty())
+        val archived = ProcedureEntity(id = 203, plantId = row.id, procedureName = row.taskName, scheduledDate = row.creationDate,
+            completedDate = row.creationDate, drugName = row.drugName, note = row.programNote, status = "COMPLETED")
+        assertTrue(requireNotNull(ProgramUpdates.plan(listOf(row), listOf(archived), garden, metadata, today,
+            listOf(next), listOf(source))).updates.isEmpty())
+    }
+
+    @Test fun namesRefreshWithoutGardenAndFullUpdateWaitsForClimate() {
+        val row = originalRows().first()
+        val renamedTemplate = current.copy(steps = current.steps.map {
+            if (it.id == row.programStepId) it.copy(title = "Новое название работы", productDescription = "Новое название средства") else it
+        })
+        val names = requireNotNull(ProgramUpdates.plan(listOf(row), emptyList(), null, installation(), today,
+            listOf(renamedTemplate), listOf(old)))
+        val renamed = names.updates.single()
+        assertEquals("Новое название работы", renamed.taskName)
+        assertEquals("Новое название средства", renamed.drugName)
+        assertEquals(row.creationDate, renamed.creationDate)
+        assertEquals(row.programNote, renamed.programNote)
+        assertEquals(row.programVersion, renamed.programVersion)
+        assertEquals(installation(), names.installation)
+        assertTrue(names.additions.isEmpty())
+        assertTrue(names.removals.isEmpty())
+        assertNull(ProgramUpdates.plan(listOf(renamed), emptyList(), null, names.installation, today,
+            listOf(renamedTemplate), listOf(old)))
+        val complete = requireNotNull(ProgramUpdates.plan(listOf(renamed), emptyList(), garden, names.installation, today,
+            listOf(renamedTemplate), listOf(old)))
+        assertEquals(renamedTemplate.version, complete.installation.appliedVersion)
+        assertTrue(complete.updates.single().programNote.contains("Новая инструкция"))
+        assertEquals(listOf("new-step"), complete.additions.map { it.programStepId })
+    }
+
+    @Test fun personalProductMatchingAnOldCatalogNameIsNeverRenamedWithOrWithoutClimate() {
+        val source = PlantCareTemplate("apple", "Яблоня", emptySet(), 21, setOf(CultivationType.OPEN_GROUND), steps = listOf(
+            CareStepTemplate(EradicationCare.AUTUMN_IRON_STEP, "Осенняя искореняющая обработка", offsetDays = 0,
+                productDescription = "Железный купорос — 300 г на 10 л воды", note = "Моя инструкция")))
+        val next = source.copy(version = 22, steps = source.steps.map {
+            it.copy(title = EradicationCare.ironRecipe.name, productDescription = EradicationCare.ironRecipe.name)
+        })
+        val metadata = ProgramInstallationEntity("personal-iron", "apple", 21, today.toString(), "OPEN_GROUND", false,
+            EradicationCare.AUTUMN_IRON_STEP)
+        val original = CareProgramGenerator().generate(source,
+            CareProgramContext(today, CultivationType.OPEN_GROUND, requireNotNull(garden.climateOrNull())), metadata.plantCardId)
+            .installedRows(garden.id, garden.name).single().copy(id = 58, userEdited = true, userLockedDate = true)
+        val personalRows = listOf(original.copy(drugId = 77),
+            original.copy(drugId = null, programStepId = "${EradicationCare.AUTUMN_IRON_STEP}~personal:77"))
+        for (row in personalRows) for (availableGarden in listOf(garden, null)) {
+            val plan = ProgramUpdates.plan(listOf(row), emptyList(), availableGarden, metadata, today, listOf(next), listOf(source))
+            assertTrue("climate=${availableGarden != null}, drugId=${row.drugId}", plan?.updates.orEmpty().isEmpty())
+            assertTrue(plan?.additions.orEmpty().isEmpty())
+            assertTrue(plan?.removals.orEmpty().isEmpty())
+        }
+    }
 }

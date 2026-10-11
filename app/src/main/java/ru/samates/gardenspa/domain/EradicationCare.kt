@@ -16,7 +16,7 @@ data class EradicationComponentGroup(val id: String, val title: String, val opti
 
 object EradicationCare {
     const val FIRST_VARIANT_VERSION = 20
-    const val PROGRAM_VERSION = 21
+    const val PROGRAM_VERSION = 22
     const val EARLY_STEP = "before_bud_break"
     const val PEST_STEP = "before_bud_break_followup"
     const val AUTUMN_MIX_STEP = "autumn_before_leaf_fall_mix"
@@ -86,11 +86,7 @@ object EradicationCare {
                     "Температура: активное действие при среднесуточной температуре выше +14…+16 °C. Отдельный диапазон максимальной эффективности не указан.", kind = "fungicide"),
             EradicationVariant("topaz", "Топаз", "Топаз, КЭ — 2 мл на 10 л воды",
                 "Для смородины против американской мучнистой росы при первых признаках: 2 мл на 10 л.\n\n" +
-                    "Температура: эффективен при высоких температурах. Числовой диапазон максимальной эффективности производитель не указывает.", kind = "fungicide"),
-            EradicationVariant("tilt", "Тилт", "Тилт 250, КЭ",
-                "Пропиконазол 250 г/л. Применение в этой садовой смеси не подтверждено.\n\n" +
-                    "Температура максимальной эффективности для этой схемы не установлена. Диапазон +5…+8 °C относится к Тилт Турбо для зерновых.",
-                kind = "fungicide", unavailableReason = "Тилт 250 предназначен для полевых культур; применение в садовой смеси не подтверждено.")
+                    "Температура: эффективен при высоких температурах. Числовой диапазон максимальной эффективности производитель не указывает.", kind = "fungicide")
         ))
     )
 
@@ -114,7 +110,7 @@ object EradicationCare {
         "Через 14 дней после последней осенней обработки. Выберите один состав: Доктор Сад — БашИнком или известь с медным купоросом.\n\n" +
         "Известь + медный купорос: 2,5 кг гашёной извести и 300–500 г медного купороса на 10 л воды для усиленной дезинфекции."
 
-    val autumnVariant = EradicationVariant("autumn_main", "Осенняя основная обработка", "Баковая смесь «Осенняя основная»",
+    val autumnVariant = EradicationVariant("autumn_main", autumnRecipe.name, autumnRecipe.name,
         "$AUTUMN_CONDITIONS\n\n$AUTUMN_ADDITIONS", kind = "autumn_mix")
 
     fun componentsFor(variantId: String): List<EradicationComponentGroup> = when (variantId) {
@@ -224,10 +220,10 @@ object EradicationCare {
                 CareAnchor.DORMANT_SPRING_DATE, 7, productDescription = pest?.displayName ?: "Выберите средство",
                 note = listOf(PEST_NOTE, pest?.instruction).filterNotNull().joinToString("\n\n"))
         ) + retained + listOf(
-            CareStepTemplate(AUTUMN_MIX_STEP, "Осенняя основная обработка — выбрать смесь",
+            CareStepTemplate(AUTUMN_MIX_STEP, autumnRecipe.name,
                 CareAnchor.SAFE_AUTUMN_DATE, -30, productDescription = autumnRecipe.name, note = "$AUTUMN_CONDITIONS\n\n$AUTUMN_INGREDIENTS"),
-            CareStepTemplate(AUTUMN_IRON_STEP, "Осенняя искореняющая обработка",
-                CareAnchor.AUTUMN_ERADICATION_DATE, 0, productDescription = "Железный купорос — 300 г на 10 л воды", note = IRON_NOTE)
+            CareStepTemplate(AUTUMN_IRON_STEP, ironRecipe.name,
+                CareAnchor.AUTUMN_ERADICATION_DATE, 0, productDescription = ironRecipe.name, note = IRON_NOTE)
         ) + if (template.id in fruitTreeIds) listOf(
             CareStepTemplate("$WHITEWASH_STEP~eradication_whitewash_doctor", "Побелка деревьев",
                 CareAnchor.AUTUMN_ERADICATION_DATE, 14, productDescription = whitewashProducts.first().displayName, note = WHITEWASH_NOTE)

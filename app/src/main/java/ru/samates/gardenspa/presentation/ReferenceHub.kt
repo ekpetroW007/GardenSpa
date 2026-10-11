@@ -43,7 +43,7 @@ fun ReferenceHub(innerPadding: PaddingValues, onBack: (() -> Unit)? = null, onOp
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            ScreenHeader("Справочник", "Выберите, что хотите найти", onBack)
+            ScreenHeader("Процедуры", "Выберите, что хотите найти", onBack)
         }
         item {
             OutlinedTextField(query, { query = it }, label = { Text("Поиск по всем категориям") },

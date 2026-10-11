@@ -25,7 +25,7 @@ data class ProgramProduct(
     val sections: Set<ProductSection> = setOf(ProductSection.TREATMENT),
     val retailUrl: String? = null
 ) {
-    val displayName: String get() = "$name — $manufacturer"
+    val displayName: String get() = if (id.startsWith("mix_")) name else "$name — $manufacturer"
     val note: String get() = if (id.startsWith("eradication_")) "$purpose\n\n$instruction"
         else "$purpose\n$instruction\nИсточник: ${sourceUrl.ifBlank { "Рецепт пользователя" }}\n$PRODUCT_LABEL_NOTICE\n$SINGLE_PRODUCT_WORK_NOTICE"
 }

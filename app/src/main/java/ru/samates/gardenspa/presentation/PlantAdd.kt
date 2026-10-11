@@ -600,7 +600,7 @@ fun PlantAdd(
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text("Работы по уходу", color = Cream, style = MaterialTheme.typography.titleLarge)
-                            taskDrafts.forEachIndexed { index, task ->
+                            taskDrafts.withIndex().sortedBy { if (editingProgram) it.value.startDate else LocalDate.MIN }.forEach { (index, task) ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
@@ -649,7 +649,14 @@ fun PlantAdd(
                                         if (row.repeatType != RepeatType.NONE.name && row.repeatEndType == RepeatEndType.NEVER.name) {
                                             Text("Повторять до отключения", color = Mist)
                                         }
-                                        Text(row.drugName.toDrugDisplayName(), color = Leaf300)
+                                        val changedAutumnComponents = row.selectedVariantId == "autumn_main" &&
+                                            !ProgramVariants.hasCustomRecipe(row.variantChoices) &&
+                                            ProgramVariants.normalizedChoices("autumn_main", row.variantChoices) !=
+                                            ProgramVariants.normalizedChoices("autumn_main", "")
+                                        if (ProgramVariants.hasCustomRecipe(row.variantChoices)) RecipeComposition(row.drugName)
+                                        else if (changedAutumnComponents) RecipeComposition("На 10 л воды:\n${row.drugName}")
+                                        else ProgramProductSummary(row.programStepId, row.drugName, row.programNote,
+                                            task.name, personal = row.drugId != null || ProgramVariants.hasCustomRecipe(row.variantChoices))
                                         if (row.programNote.isNotBlank()) ExpandableInfo("Инструкция и ограничения", row.programNote)
                                         val hasHistory = row.id > 0 && procedureHistory.any { it.plantId == row.id }
                                         if (ProgramVariants.isVariantWork(row)) {
@@ -1139,7 +1146,7 @@ internal fun CareProgramPreviewDialog(
                     color = Mist
                 )
                 program.warning?.let { Text(it, color = Danger) }
-                program.steps.forEachIndexed { index, step ->
+                program.steps.withIndex().sortedBy { it.value.scheduledDate }.forEach { (index, step) ->
                     val hasVariants = EradicationCare.applies(program.templateId) && EradicationCare.isVariantStep(step.templateStepId)
                     GlassCard(Modifier.fillMaxWidth()) {
                         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -1165,9 +1172,8 @@ internal fun CareProgramPreviewDialog(
                             if (step.recurrence != null && step.recurrence.count == null) {
                                 Text("Повторять до отключения", color = Mist)
                             }
-                            step.productDescription?.let { description ->
-                                Text("Какое средство потребуется", color = Leaf300)
-                                Text(description, color = Cream)
+                            if (!hasVariants) step.productDescription?.let { description ->
+                                ProgramProductSummary(step.templateStepId, description, step.note, step.title)
                             }
                             Text(step.explanation, color = Mist)
                             if (step.note.isNotBlank()) {
@@ -1336,7 +1342,7 @@ internal fun AddDrugDialog(
         title = { Text("Новый препарат") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Средство сохранится в Справочнике — Мои средства.", color = Mist)
+                Text("Средство сохранится в разделе «Процедуры» — «Мои средства».", color = Mist)
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },

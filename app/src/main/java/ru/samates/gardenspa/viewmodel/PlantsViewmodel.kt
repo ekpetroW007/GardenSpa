@@ -340,19 +340,19 @@ class PlantsViewmodel(private val repository: BookeeperRepository) : ViewModel()
         }
     }
 
-    fun useTankMixture(plant: PlantEntity, recipe: FolkFertilizerRecipe, date: LocalDate,
+    fun useRecipe(plant: PlantEntity, recipe: FolkFertilizerRecipe, date: LocalDate,
         onSaved: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             try {
-                require(recipe.isTankMix)
                 require(!date.isBefore(LocalDate.now())) { "Выберите сегодняшнюю или будущую дату" }
                 val savedDrug = repository.saveToMyProducts(DrugEntity(name = recipe.name,
-                    purpose = recipe.purposeForDrug(), consumptionRate = recipe.consumptionRate, applicationMethod = "TREATMENT"))
+                    purpose = recipe.purposeForDrug(), consumptionRate = recipe.consumptionRate,
+                    applicationMethod = if (recipe.isTankMix) "TREATMENT" else "UNSPECIFIED"))
                 repository.addProgramTreatment(plant, plant.copy(
                     id = 0, plantCardId = plant.resolvedCardId,
                     taskName = "Использовать: ${recipe.name}",
                     creationDate = date.toString(), drugId = savedDrug.id, drugName = recipe.name,
-                    programStepId = "tank_mix:${recipe.id}", programImportKey = null,
+                    programStepId = "${if (recipe.isTankMix) "tank_mix" else "folk_recipe"}:${recipe.id}", programImportKey = null,
                     programNote = when (recipe.id) {
                         EradicationCare.IRON_RECIPE_ID -> recipe.preparation
                         EradicationCare.AUTUMN_RECIPE_ID -> "Осенняя основная обработка\n\n${recipe.purpose}\n\n${recipe.ingredients}"

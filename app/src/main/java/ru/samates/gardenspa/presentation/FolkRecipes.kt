@@ -55,9 +55,10 @@ fun FolkRecipes(innerPadding: PaddingValues, tankMixes: Boolean = false, onBack:
     val drugs by drugsVm.drugs.collectAsState()
     val plantsVm: PlantsViewmodel = viewModel(factory = PlantsViewmodelFactory(application.repository))
     val plants by plantsVm.plants.collectAsState()
+    val recipes = if (tankMixes) FolkFertilizers.tankMixes else FolkFertilizers.recipes
     var query by rememberSaveable(tankMixes) { mutableStateOf("") }
     var recipeToUseId by rememberSaveable(tankMixes) { mutableStateOf<String?>(null) }
-    val recipeToUse = FolkFertilizers.tankMixes.firstOrNull { it.id == recipeToUseId }
+    val recipeToUse = recipes.firstOrNull { it.id == recipeToUseId }
     var selectedCardId by rememberSaveable(recipeToUseId) { mutableStateOf<String?>(null) }
     var selectedDateText by rememberSaveable(recipeToUseId) { mutableStateOf<String?>(null) }
     val parentEntry = remember(navController) { navController?.currentBackStackEntry }
@@ -71,7 +72,7 @@ fun FolkRecipes(innerPadding: PaddingValues, tankMixes: Boolean = false, onBack:
     }
     var success by remember { mutableStateOf<String?>(null) }
     var saveError by remember { mutableStateOf<String?>(null) }
-    val filteredRecipes = (if (tankMixes) FolkFertilizers.tankMixes else FolkFertilizers.recipes).filter { recipe ->
+    val filteredRecipes = recipes.filter { recipe ->
         query.isBlank() ||
             recipe.name.contains(query, ignoreCase = true) ||
             recipe.purpose.contains(query, ignoreCase = true)
@@ -128,7 +129,7 @@ fun FolkRecipes(innerPadding: PaddingValues, tankMixes: Boolean = false, onBack:
         }
     }
     recipeToUse?.let { recipe ->
-        TankMixtureUseDialog(recipe, plants.toPlantCards(), selectedCardId, selectedDateText,
+        RecipeUseDialog(recipe, plants.toPlantCards(), selectedCardId, selectedDateText,
             onCardSelected = { selectedCardId = it }, onDateSelected = { selectedDateText = it.toString() },
             onAddPlant = navController?.let { navigation -> {
                 parentEntry?.savedStateHandle?.set(AppDestinations.CREATED_PLANT_CARD_RESULT, "")
@@ -136,7 +137,7 @@ fun FolkRecipes(innerPadding: PaddingValues, tankMixes: Boolean = false, onBack:
             } },
             onDismiss = { recipeToUseId = null },
             onSave = { card, date, onError ->
-                plantsVm.useTankMixture(card.primary, recipe, date, onSaved = {
+                plantsVm.useRecipe(card.primary, recipe, date, onSaved = {
                     TreatmentReminderScheduler.refreshNow(application)
                     success = "Добавлено в календарь: ${card.primary.plantName}, ${date.toRussianDate()}"
                     recipeToUseId = null
@@ -158,7 +159,7 @@ private fun FolkRecipeCard(
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(recipe.name, color = Cream, style = MaterialTheme.typography.titleLarge)
             Text(recipe.purpose, color = Leaf300)
-            if (recipe.isTankMix) PrimaryAction("Использовать", onUse, Modifier.fillMaxWidth())
+            PrimaryAction("Использовать", onUse, Modifier.fillMaxWidth())
             SecondaryAction(
                 text = if (expanded) "Скрыть рецепт" else "Показать рецепт",
                 onClick = { expanded = !expanded },
@@ -180,7 +181,7 @@ private fun FolkRecipeCard(
                 } else if (!exactRecipe) {
                     Text(recipe.sourceName, color = Mist)
                 }
-                if (!exactRecipe) Text("Справочник GardenSpa · сентябрь 2026", color = Mist)
+                if (!exactRecipe) Text("Процедуры GardenSpa · сентябрь 2026", color = Mist)
                 PrimaryAction(
                     text = if (alreadyAdded) "Уже добавлено" else "Добавить в мои средства",
                     onClick = onAdd,
@@ -193,7 +194,7 @@ private fun FolkRecipeCard(
 }
 
 @Composable
-private fun TankMixtureUseDialog(recipe: FolkFertilizerRecipe, plants: List<PlantCard>, cardId: String?, dateText: String?,
+private fun RecipeUseDialog(recipe: FolkFertilizerRecipe, plants: List<PlantCard>, cardId: String?, dateText: String?,
     onCardSelected: (String) -> Unit, onDateSelected: (LocalDate) -> Unit, onAddPlant: (() -> Unit)?, onDismiss: () -> Unit,
     onSave: (PlantCard, LocalDate, (String) -> Unit) -> Unit) {
     val selected = plants.firstOrNull { it.cardId == cardId }
@@ -202,7 +203,7 @@ private fun TankMixtureUseDialog(recipe: FolkFertilizerRecipe, plants: List<Plan
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     AlertDialog(onDismissRequest = { if (!saving) onDismiss() }, containerColor = Forest900,
-        title = { Text("Использовать баковую смесь", color = Cream) },
+        title = { Text("Использовать средство", color = Cream) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(recipe.name, color = Cream)

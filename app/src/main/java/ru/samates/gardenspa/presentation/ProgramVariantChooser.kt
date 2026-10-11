@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import ru.samates.gardenspa.domain.EradicationCare
 import ru.samates.gardenspa.domain.ProgramVariants
+import ru.samates.gardenspa.domain.ProgramRecipes
 import ru.samates.gardenspa.ui.theme.Cream
 import ru.samates.gardenspa.ui.theme.Forest900
 import ru.samates.gardenspa.ui.theme.Leaf300
@@ -43,6 +44,7 @@ internal fun ProgramVariantChooser(
     var editedProduct by rememberSaveable(stepId, selectedVariantId) { mutableStateOf("") }
     var editedNote by rememberSaveable(stepId, selectedVariantId) { mutableStateOf("") }
     var chooseAnother by rememberSaveable(stepId, selectedVariantId) { mutableStateOf(false) }
+    val variants = EradicationCare.variantsFor(ProgramVariants.baseStep(stepId))
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (ProgramVariants.baseStep(stepId) == EradicationCare.EARLY_STEP) {
             Text("Строго по спящим почкам, при устойчивой температуре +3…+5 °C и выше; учитывайте требования выбранного средства.", color = Leaf300)
@@ -50,7 +52,7 @@ internal fun ProgramVariantChooser(
         } else {
             Text(EradicationCare.AUTUMN_CONDITIONS, color = Leaf300)
         }
-        EradicationCare.variantsFor(ProgramVariants.baseStep(stepId)).forEach { variant ->
+        variants.forEach { variant ->
             val selected = selectedVariantId == variant.id
             val customized = selected && ProgramVariants.hasCustomRecipe(variantChoices)
             var expandedManually by rememberSaveable(stepId, variant.id, selectedVariantId) { mutableStateOf(false) }
@@ -61,7 +63,7 @@ internal fun ProgramVariantChooser(
             GlassCard(Modifier.fillMaxWidth().alpha(if (selectedVariantId != null && !selected) 0.65f else 1f)
                 .testTag("variant:${variant.id}")) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(variant.title, color = Cream, style = MaterialTheme.typography.titleMedium)
+                    if (variants.size > 1) Text(variant.title, color = Cream, style = MaterialTheme.typography.titleMedium)
                     completedYears[variant.id]?.forEach { year -> Text("Выполнено в $year году", color = Leaf300) }
                     if (selectedVariantId != null && !selected) {
                         TextButton(onClick = { expandedManually = !expandedManually }) {
@@ -69,8 +71,19 @@ internal fun ProgramVariantChooser(
                         }
                     }
                     if (expanded) {
-                        Text(if (customized) ProgramVariants.selectedProduct(variant, variantChoices) else variant.product, color = Leaf300)
-                        ExpandableInfo("Инструкция", if (customized) ProgramVariants.selectedNote(variant, variantChoices) else variant.note)
+                        if (variant.kind == "autumn_mix") {
+                            val composition = when {
+                                customized -> ProgramVariants.selectedProduct(variant, variantChoices)
+                                ProgramVariants.normalizedChoices(variant.id, draftChoices) == ProgramVariants.normalizedChoices(variant.id, "") ->
+                                    ProgramRecipes.composition(EradicationCare.autumnRecipe)
+                                else -> "На 10 л воды:\n" + ProgramVariants.selectedComponents(variant.id, draftChoices)
+                                    .joinToString("\n") { it.product } + "\nЭпин — 1 мл\nПрилипатель — 10 мл"
+                            }
+                            RecipeComposition(composition)
+                        } else Text(if (customized) ProgramVariants.selectedProduct(variant, variantChoices) else variant.product, color = Leaf300)
+                        if (variant.kind != "autumn_mix" || customized) {
+                            ExpandableInfo("Инструкция", if (customized) ProgramVariants.selectedNote(variant, variantChoices) else variant.note)
+                        }
                         if (!customized) EradicationCare.componentsFor(variant.id).forEach { group ->
                             val chosenId = ProgramVariants.normalizedChoices(variant.id, draftChoices)[group.id]
                             val chosen = group.options.single { it.id == chosenId }
@@ -83,10 +96,6 @@ internal fun ProgramVariantChooser(
                                     })
                             } else Text("${group.title}: ${chosen.product}", color = Leaf300)
                             ExpandableInfo("Применение выбранного средства", chosen.note)
-                        }
-                        if (variant.kind == "autumn_mix" && !customized) {
-                            Text(EradicationCare.AUTUMN_FIXED_INGREDIENTS, color = Leaf300)
-                            Text(EradicationCare.AUTUMN_ADJUVANT_NOTICE, color = Mist)
                         }
                         if (selected && !completed) {
                             SecondaryAction("Изменить состав и инструкцию", {

@@ -101,7 +101,8 @@ fun PlantEntity.withProgramVariant(variantId: String, choices: String): PlantEnt
         .first { ProgramVariants.baseStep(it.id) == ProgramVariants.baseStep(programStepId) }.title
     return copy(selectedVariantId = variantId, variantChoices = normalized, drugId = null,
         drugName = ProgramVariants.selectedProduct(variant, normalized),
-        taskName = "$baseTitle · ${variant.title}", programNote = ProgramVariants.selectedNote(variant, normalized),
+        taskName = if (baseTitle == variant.title) baseTitle else "$baseTitle · ${variant.title}",
+        programNote = ProgramVariants.selectedNote(variant, normalized),
         userEdited = true)
 }
 
