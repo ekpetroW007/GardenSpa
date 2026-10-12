@@ -124,6 +124,22 @@ class ProceduresViewmodel(private val repository: BookeeperRepository) : ViewMod
             }
         }
     }
+
+    fun undoCompletion(
+        procedureId: Int,
+        onError: (Throwable) -> Unit = {},
+        onSaved: () -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            try {
+                repository.undoCompletion(procedureId)
+                onSaved()
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                onError(error)
+            }
+        }
+    }
 }
 
 class ProceduresViewmodelFactory(

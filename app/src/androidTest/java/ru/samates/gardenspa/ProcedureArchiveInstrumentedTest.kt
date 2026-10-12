@@ -60,8 +60,11 @@ class ProcedureArchiveInstrumentedTest {
             assertEquals(LocalDate.of(2027, 5, 3), archive.nextSeasonScheduledDate(
                 db.plantDao().getAllPlantsOnce(), db.procedureDao().getAllProceduresOnce(), LocalDate.of(2026, 9, 27)))
             db.procedureDao().undoChange(original.id, archive.scheduledDate)
-            assertTrue(db.procedureDao().getAllProceduresOnce().isEmpty())
-            assertEquals(1, db.plantDao().getAllPlantsOnce().size)
+            val undone = db.procedureDao().getAllProceduresOnce().single()
+            assertEquals(archive.copy(status = "PLANNED", completedDate = null), undone)
+            assertEquals(3, db.plantDao().getAllPlantsOnce().size)
+            assertEquals(restored, db.plantDao().getPlantById(restored.id.toLong()))
+            assertEquals(archive.drugName, db.plantDao().getPlantById(original.id.toLong())?.drugName)
         } finally { db.close(); context.deleteDatabase(name) }
     }
 
@@ -85,9 +88,11 @@ class ProcedureArchiveInstrumentedTest {
             db.procedureDao().saveProcedureWithSnapshot(ProcedureEntity(plantId = next.id,
                 procedureName = next.taskName, scheduledDate = next.creationDate,
                 completedDate = next.creationDate, status = "COMPLETED"))
-            assertTrue(runCatching { db.procedureDao().undoChange(original.id, archive.scheduledDate) }.isFailure)
+            db.procedureDao().undoChange(original.id, archive.scheduledDate)
             assertEquals(2, db.procedureDao().getAllProceduresOnce().size)
-            assertEquals(2, db.plantDao().getAllPlantsOnce().size)
+            assertEquals("PLANNED", db.procedureDao().procedureById(archive.id)?.status)
+            assertEquals(3, db.plantDao().getAllPlantsOnce().size)
+            assertEquals("COMPLETED", db.procedureDao().procedureForSchedule(next.id, next.creationDate)?.status)
         } finally { db.close() }
     }
 

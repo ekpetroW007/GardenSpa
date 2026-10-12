@@ -17,6 +17,7 @@ import java.time.LocalDate
 import ru.samates.gardenspa.domain.resetProgramVariantForNextSeason
 import ru.samates.gardenspa.domain.ProgramVariants
 import ru.samates.gardenspa.domain.variantFollowupDateUpdates
+import ru.samates.gardenspa.domain.occursOn
 
 @Dao
 interface ProcedureDAO {
@@ -32,13 +33,17 @@ interface ProcedureDAO {
     @Transaction
     suspend fun saveProcedureWithSnapshot(procedure: ProcedureEntity): ProcedureEntity {
         // A repeated tap or a delayed notification must not replace an archived completion.
-        procedureForSchedule(procedure.plantId, procedure.scheduledDate)?.takeIf { it.status == "COMPLETED" }
-            ?.let { return it }
+        val previous = procedureForSchedule(procedure.plantId, procedure.scheduledDate)
+        previous?.takeIf { it.status == "COMPLETED" }?.let { return it }
         val plant = requireNotNull(plantForHistory(procedure.plantId)) { "Растение уже удалено" }
         require(procedure.status != "COMPLETED" || !ProgramVariants.isVariantWork(plant) || plant.selectedVariantId != null) {
             "Сначала выберите вариант обработки и средства"
         }
         val snapshot = procedure.copy(
+            id = previous?.id ?: procedure.id,
+            rescheduledDate = procedure.rescheduledDate ?: procedure.scheduledDate.takeUnless {
+                plant.occursOn(LocalDate.parse(it))
+            },
             procedureName = plant.taskName,
             plantCardId = plant.resolvedCardId,
             drugName = plant.drugName,
@@ -49,7 +54,7 @@ interface ProcedureDAO {
             reminderDaysBefore = plant.reminderDaysBefore,
             selectedVariantId = plant.selectedVariantId,
             variantChoices = plant.variantChoices,
-            comment = procedure.comment.trim()
+            comment = procedure.comment.trim().ifBlank { previous?.comment.orEmpty() }
         )
         val saved = snapshot.copy(id = insertProcedure(snapshot).toInt())
         if (saved.status == "PLANNED" && saved.scheduledDate == plant.creationDate) {
@@ -61,6 +66,12 @@ interface ProcedureDAO {
 
     @Update
     suspend fun updateFollowup(plant: PlantEntity)
+
+    @Update
+    suspend fun updateProcedure(procedure: ProcedureEntity)
+
+    @Insert
+    suspend fun insertRestoredWork(plant: PlantEntity): Long
 
     @Query("SELECT * FROM procedure_history WHERE id = :id")
     suspend fun procedureById(id: Int): ProcedureEntity?
@@ -110,17 +121,60 @@ interface ProcedureDAO {
     }
 
     @Transaction
-    suspend fun undoChange(plantId: Int, scheduledDate: String) {
-        procedureForSchedule(plantId, scheduledDate)?.let { archive ->
-            nextSeasonWork(archive.nextSeasonImportKey)?.let { next ->
-                require(historyCount(next.id) == 0) {
-                    "У работы следующего сезона уже есть выполнение или перенос. Сначала отмените его."
-                }
-                deleteNextSeasonWork(archive.nextSeasonImportKey)
+    suspend fun undoCompletion(procedureId: Int): ProcedureEntity {
+        val archive = requireNotNull(procedureById(procedureId)) { "Работа больше не найдена" }
+        if (archive.status != "COMPLETED") return archive
+        val original = plantForHistory(archive.plantId)
+        val sameRecipe = original != null && archive.procedureName == original.taskName &&
+            archive.drugName == original.drugName && archive.note == original.programNote &&
+            archive.programId == original.programId && archive.programStepId == original.programStepId &&
+            archive.selectedVariantId == original.selectedVariantId && archive.variantChoices == original.variantChoices
+        val restored = if (sameRecipe) requireNotNull(original) else {
+            val cardId = archive.plantCardId.ifBlank { original?.resolvedCardId.orEmpty() }
+            val card = requireNotNull(plantsForNextSeason().firstOrNull { it.resolvedCardId == cardId }) {
+                "Карточка растения уже удалена. Вернуть работу в план нельзя."
             }
+            val work = card.copy(
+                id = if (original == null) archive.plantId else 0,
+                plantCardId = cardId, taskName = archive.procedureName, creationDate = archive.scheduledDate,
+                drugId = null, drugName = archive.drugName, programNote = archive.note,
+                programId = archive.programId, programVersion = archive.programVersion, programStepId = archive.programStepId,
+                programImportKey = "undo-completion:${archive.id}:${archive.plantId}",
+                wateringInterval = 1, repeatType = "NONE", repeatInterval = 1, repeatDaysOfWeek = "",
+                repeatEndType = "NEVER", repeatEndDate = null, repeatCount = null,
+                reminderDaysBefore = archive.reminderDaysBefore,
+                selectedVariantId = archive.selectedVariantId, variantChoices = archive.variantChoices,
+                userLockedDate = true, userEdited = true, programBaseline = null
+            )
+            work.copy(id = insertRestoredWork(work).toInt())
         }
-        deleteForSchedule(plantId, scheduledDate)
-        plantForHistory(plantId)?.takeIf { it.creationDate == scheduledDate }?.let { parent ->
+        // Keep the same history id so an independently saved next season stays linked after another completion.
+        // A pinned occurrence also remains visible if the owner changed the original repeat or start date.
+        val planned = archive.copy(plantId = restored.id, status = "PLANNED", completedDate = null,
+            rescheduledDate = archive.rescheduledDate ?: archive.scheduledDate.takeUnless {
+                restored.occursOn(LocalDate.parse(it))
+            })
+        updateProcedure(planned)
+        if (planned.scheduledDate == restored.creationDate) {
+            variantFollowupDateUpdates(restored, plantsForNextSeason(), getAllProceduresOnce(),
+                LocalDate.parse(planned.rescheduledDate ?: planned.scheduledDate)).forEach { updateFollowup(it) }
+        }
+        return planned
+    }
+
+    @Transaction
+    suspend fun undoChange(plantId: Int, scheduledDate: String) {
+        val record = procedureForSchedule(plantId, scheduledDate) ?: return
+        if (record.status == "COMPLETED") {
+            undoCompletion(record.id)
+            return
+        }
+        // Cancelling a postponement must not discard a retained comment or its next-season identity.
+        val plant = plantForHistory(plantId)
+        updateProcedure(record.copy(rescheduledDate = record.scheduledDate.takeUnless {
+            plant?.occursOn(LocalDate.parse(it)) == true
+        }))
+        plant?.takeIf { it.creationDate == scheduledDate }?.let { parent ->
             variantFollowupDateUpdates(parent, plantsForNextSeason(), getAllProceduresOnce(), LocalDate.parse(parent.creationDate))
                 .forEach { updateFollowup(it) }
         }

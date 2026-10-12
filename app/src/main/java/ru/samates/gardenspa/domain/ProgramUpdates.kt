@@ -9,6 +9,7 @@ import ru.samates.gardenspa.data.database.entity.locationOrNull
 import ru.samates.gardenspa.data.database.entity.resolvedCardId
 import java.security.MessageDigest
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 internal fun programBaseStep(id: String?): String = id.orEmpty().substringBefore("~").substringBefore(":remaining:")
     .let { if (it == "after_leaf_fall_iron") "after_leaf_fall" else it }
@@ -109,20 +110,35 @@ object ProgramUpdates {
             val date = runCatching { LocalDate.parse(current.creationDate) }.getOrNull() ?: return@forEach
             val unchanged = current.programBaseline?.let { it == current.programFingerprint() }
                 ?: previous.steps.firstOrNull { programBaseStep(it.id) == programBaseStep(current.programStepId) }
-                    ?.let { matchesLegacyDefault(current, it) } ?: false
+                    ?.let { matchesLegacyDefault(current, it) }?.takeIf { it }
+                    ?: matchesBeforeRootTiming(current)
             if (!unchanged) {
                 if (renamed != current) updates += renamed
                 return@forEach
             }
+            val targetStep = template.steps.firstOrNull { programBaseStep(it.id) == programBaseStep(current.programStepId) }
             val replacement = candidates.firstOrNull { programOccurrenceKey(it.programStepId) == programOccurrenceKey(current.programStepId) }
+                ?: if (template.version >= RootCareSchedule.VERSION && RootCareSchedule.isRootStep(current.programStepId)) {
+                    candidates.firstOrNull { programBaseStep(it.programStepId) == programBaseStep(current.programStepId) }?.let { candidate ->
+                        // A previous late start may have materialized individual occurrences while the
+                        // new schedule uses a rule, or vice versa. Keep the installed representation here.
+                        val individual = current.programStepId.orEmpty().contains(":remaining:")
+                        candidate.copy(programStepId = if (individual) current.programStepId else targetStep?.id,
+                            programImportKey = "${current.resolvedCardId}:${template.id}:v${template.version}:${if (individual) current.programStepId else targetStep?.id}",
+                            creationDate = if (individual) current.creationDate else candidate.creationDate,
+                            repeatType = current.repeatType, repeatInterval = current.repeatInterval,
+                            repeatDaysOfWeek = current.repeatDaysOfWeek, repeatEndType = current.repeatEndType,
+                            repeatCount = current.repeatCount, repeatEndDate = current.repeatEndDate)
+                    }
+                } else null
             if (replacement == null) {
                 if (current.id !in historyIds && template.steps.none { programBaseStep(it.id) == programBaseStep(current.programStepId) }) removals += current.id
                 return@forEach
             }
             // Legacy dates keep their season year. Only explicit climate anchors can be
             // recalculated without recovering the original start/cultivation input.
-            val targetStep = template.steps.firstOrNull { programBaseStep(it.id) == programBaseStep(current.programStepId) }
-            val updatedDate = if (date.isBefore(today) || current.id in historyIds) current.creationDate
+            val updatedDate = if (date.isBefore(today) || current.id in historyIds ||
+                RootCareSchedule.isRootStep(current.programStepId) && current.programStepId.orEmpty().contains(":remaining:")) current.creationDate
                 else if (!legacy) replacement.creationDate else if (targetStep?.anchor != CareAnchor.START_DATE) {
                 LocalDate.parse(replacement.creationDate).withYear(date.year).toString()
             } else current.creationDate
@@ -137,10 +153,108 @@ object ProgramUpdates {
         var retained = rows.filterNot { it.id in removals }.map { updatedById[it.id] ?: it }
         // Updating an existing child must keep the same relation as adding a new one, including a postponed parent.
         retained.filter { it.variantFollowupRule() != null }.forEach { parent ->
-            variantFollowupDateUpdates(parent, retained, history, parent.effectiveVariantDate(history))
+            variantFollowupDateUpdates(parent, retained, history, parent.effectiveVariantDate(history), today)
                 .filter { it.id in updatedById }.forEach { updatedById[it.id] = it }
         }
         retained = retained.map { updatedById[it.id] ?: it }
+        fun nextSeasonStart(year: Int): LocalDate {
+            val spring = retained.filter { RootCareSchedule.isSpringTreatment(it.programStepId) }
+                .map { it.effectiveVariantDate(history) }.filter { it.year == year }.minOrNull()
+            return maxOf(RootCareSchedule.nextSeasonRootStart(template, cultivation, climate, year),
+                RootCareSchedule.earliestDate(template.id, "nutrition", climate, year, spring))
+        }
+        fun canMoveRoot(row: PlantEntity): Boolean {
+            val original = imported.first { it.id == row.id }
+            return RootCareSchedule.isRootStep(row.programStepId) && row.id !in historyIds && !row.userEdited && !row.userLockedDate &&
+                row.programBaseline == row.programFingerprint() && !LocalDate.parse(original.creationDate).isBefore(today)
+        }
+        val groupedIds = mutableSetOf<Int>()
+        if (template.version >= RootCareSchedule.VERSION) updatedById.values.filter { canMoveRoot(it) && it.programStepId.orEmpty().contains(":remaining:") }
+            .groupBy { programBaseStep(it.programStepId) to LocalDate.parse(it.creationDate).year }.values.forEach { group ->
+                val ordered = group.sortedBy { it.creationDate }
+                val first = ordered.first()
+                val initial = LocalDate.parse(first.creationDate)
+                val spring = retained.filter { RootCareSchedule.isSpringTreatment(it.programStepId) }
+                    .map { it.effectiveVariantDate(history) }.filter { it.year == initial.year }.minOrNull()
+                val earliest = RootCareSchedule.earliestDate(template.id, first.programStepId, climate, initial.year, spring)
+                var shift = ChronoUnit.DAYS.between(initial, RootCareSchedule.nextWarmDate(maxOf(initial, earliest), climate, ::nextSeasonStart))
+                ordered.forEach { row ->
+                    val originalDate = LocalDate.parse(row.creationDate)
+                    val nominal = originalDate.plusDays(shift)
+                    val date = RootCareSchedule.nextWarmDate(nominal, climate, ::nextSeasonStart)
+                    shift += ChronoUnit.DAYS.between(nominal, date)
+                    val updated = row.copy(creationDate = date.toString())
+                    updatedById[row.id] = updated.copy(programBaseline = updated.programFingerprint())
+                    groupedIds += row.id
+                }
+            }
+        // An unchanged feeding follows the actual spring date, including a manually postponed spray.
+        // Existing history, personal dates and past work keep their original schedule.
+        if (template.version >= RootCareSchedule.VERSION) updatedById.values.toList().forEach { row ->
+            if (!canMoveRoot(row) || row.id in groupedIds) return@forEach
+            val date = LocalDate.parse(row.creationDate)
+            val spring = retained.filter { RootCareSchedule.isSpringTreatment(it.programStepId) }
+                .map { it.effectiveVariantDate(history) }.filter { it.year == date.year }.minOrNull()
+            val earliest = RootCareSchedule.earliestDate(template.id, row.programStepId, climate, date.year, spring)
+            var safeDate = RootCareSchedule.nextWarmDate(maxOf(date, earliest), climate, ::nextSeasonStart)
+            if (programBaseStep(row.programStepId) == "hydrangea_pale_acid" &&
+                !safeDate.plusDays(10).isBefore(climate.safeAutumnDate(safeDate.year))) safeDate = nextSeasonStart(safeDate.year + 1)
+            if (date != safeDate) {
+                val shifted = row.copy(creationDate = safeDate.toString())
+                updatedById[row.id] = shifted.copy(programBaseline = shifted.programFingerprint())
+            }
+        }
+        if (template.version >= RootCareSchedule.VERSION) {
+            val acid = retained.firstOrNull { programBaseStep(it.programStepId) == "hydrangea_pale_acid" }
+                ?.let { updatedById[it.id] ?: it }
+            if (acid != null) updatedById.values.toList().forEach { row ->
+                val days = when (programBaseStep(row.programStepId)) {
+                    "hydrangea_pale_iron" -> 5L
+                    "hydrangea_yellow_magnesium" -> 10L
+                    else -> return@forEach
+                }
+                if (row.id in historyIds || row.userEdited || row.userLockedDate || row.programBaseline != row.programFingerprint() ||
+                    LocalDate.parse(imported.first { it.id == row.id }.creationDate).isBefore(today)) return@forEach
+                val date = acid.effectiveVariantDate(history).plusDays(days)
+                if (!date.isBefore(today)) {
+                    val shifted = row.copy(creationDate = date.toString())
+                    updatedById[row.id] = shifted.copy(programBaseline = shifted.programFingerprint())
+                }
+            }
+        }
+        val seasonalAdditions = mutableListOf<PlantEntity>()
+        if (template.version >= RootCareSchedule.VERSION) updatedById.values.toList().forEach { row ->
+            val original = imported.first { it.id == row.id }
+            val count = row.repeatCount
+            if (!RootCareSchedule.isRootStep(row.programStepId) || row.id in historyIds || row.userEdited || row.userLockedDate ||
+                row.programBaseline != row.programFingerprint() || LocalDate.parse(original.creationDate).isBefore(today) ||
+                row.repeatEndType != "COUNT" || count == null || row.repeatType == "NONE") return@forEach
+            val repeat = CareRecurrence(RepeatType.valueOf(row.repeatType), row.repeatInterval, count)
+            val start = LocalDate.parse(row.creationDate)
+            val dates = RootCareSchedule.finiteDates(start, repeat, climate, ::nextSeasonStart)
+            if (dates.indices.all { dates[it] == careOccurrenceDate(start, repeat, it) }) return@forEach
+            dates.forEachIndexed { index, date ->
+                val stepId = "${row.programStepId}:remaining:${index + 1}"
+                val work = row.copy(id = if (index == 0) row.id else 0, creationDate = date.toString(),
+                    programStepId = stepId, programImportKey = "${row.resolvedCardId}:${template.id}:v${template.version}:$stepId",
+                    repeatType = "NONE", repeatInterval = 1, wateringInterval = 1, repeatDaysOfWeek = "",
+                    repeatEndType = "NEVER", repeatEndDate = null, repeatCount = null, userEdited = false)
+                    .let { it.copy(programBaseline = it.programFingerprint()) }
+                if (index == 0) updatedById[row.id] = work else seasonalAdditions += work
+            }
+        }
+        if (template.version >= RootCareSchedule.VERSION) (updatedById.values.filter { canMoveRoot(it) && it.programStepId.orEmpty().contains(":remaining:") } + seasonalAdditions)
+            .groupBy { programBaseStep(it.programStepId) }.forEach { (base, group) ->
+                val repeat = template.steps.firstOrNull { programBaseStep(it.id) == base }?.recurrence
+                    ?.takeIf { it.count != null } ?: return@forEach
+                val ordered = group.sortedBy { it.creationDate }
+                val dates = RootCareSchedule.spacedDates(ordered.map { LocalDate.parse(it.creationDate) }, repeat, climate, ::nextSeasonStart)
+                ordered.zip(dates).forEach { (row, date) ->
+                    val changed = row.copy(creationDate = date.toString()).let { it.copy(programBaseline = it.programFingerprint()) }
+                    if (row.id != 0) updatedById[row.id] = changed
+                    else seasonalAdditions[seasonalAdditions.indexOfFirst { it.programImportKey == row.programImportKey }] = changed
+                }
+            }
         val additions = candidates.filter { programBaseStep(it.programStepId) !in known && programBaseStep(it.programStepId) !in existing }
             .map { row ->
                 val parent = retained.singleOrNull { row.isVariantFollowupOf(it) }
@@ -149,7 +263,7 @@ object ProgramUpdates {
                 var date = oldDate.withYear(maxOf(oldDate.year, today.year))
                 if (date.isBefore(today)) date = oldDate.withYear(date.year + 1)
                 row.copy(creationDate = date.toString(), userEdited = false).let { it.copy(programBaseline = it.programFingerprint()) }
-            }
+            } + seasonalAdditions
         val allKnown = (known + template.steps.map { programBaseStep(it.id) }).sorted().joinToString("\n")
         return ProgramUpdatePlan(context.copy(appliedVersion = template.version, knownStepIds = allKnown), updatedById.values.toList(), additions, removals)
     }
@@ -164,7 +278,7 @@ object ProgramUpdates {
             val previousStep = previous.steps.firstOrNull { programBaseStep(it.id) == programBaseStep(row.programStepId) }
             val pristine = !row.userEdited && !row.userLockedDate && row.selectedVariantId == null &&
                 (row.programBaseline?.let { it == row.programFingerprint() }
-                    ?: previousStep?.let { matchesLegacyDefault(row, it) } ?: false)
+                    ?: previousStep?.let { matchesLegacyDefault(row, it) }?.takeIf { it } ?: matchesBeforeRootTiming(row))
             val changed = if (pristine && step != null) row.copy(taskName = step.title,
                 drugName = step.productDescription ?: NO_DRUG_REQUIRED_LABEL) else row.withCurrentCatalogNames(template)
             changed.takeUnless { it == row }?.let {
@@ -183,6 +297,12 @@ object ProgramUpdates {
 
     private fun PlantEntity.hasPersonalProduct(): Boolean = drugId != null ||
         programStepId.orEmpty().substringAfter("~", "").startsWith("personal:")
+
+    private fun matchesBeforeRootTiming(row: PlantEntity): Boolean =
+        (row.programVersion ?: 0) in EradicationCare.FIRST_VARIANT_VERSION until RootCareSchedule.VERSION &&
+            PlantCareCatalog.beforeRootTiming().firstOrNull { it.id == row.programId }?.steps
+                ?.firstOrNull { programBaseStep(it.id) == programBaseStep(row.programStepId) }
+                ?.let { matchesLegacyDefault(row, it) } == true
 
     /** Known catalog labels can change without replacing the owner's recipe, timing, or selected alternatives. */
     private fun PlantEntity.withCurrentCatalogNames(template: PlantCareTemplate): PlantEntity {

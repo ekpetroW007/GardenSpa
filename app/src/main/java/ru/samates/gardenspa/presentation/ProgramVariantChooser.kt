@@ -38,7 +38,8 @@ internal fun ProgramVariantChooser(
     enabled: Boolean = true,
     completed: Boolean = false,
     completedYears: Map<String, List<Int>> = emptyMap(),
-    onComplete: (() -> Unit)? = null
+    onComplete: (() -> Unit)? = null,
+    onUndoCompletion: (() -> Unit)? = null
 ) {
     var editingRecipe by rememberSaveable(stepId, selectedVariantId) { mutableStateOf(false) }
     var editedProduct by rememberSaveable(stepId, selectedVariantId) { mutableStateOf("") }
@@ -114,6 +115,8 @@ internal fun ProgramVariantChooser(
                         }
                         if (selected && completed) {
                             Row { TwigCheckMark(); Text("Выполнено", color = Leaf300) }
+                            if (onUndoCompletion != null) SecondaryAction("Отменить выполнение", onUndoCompletion,
+                                Modifier.fillMaxWidth().testTag("undo-variant:${variant.id}"), enabled = enabled)
                         } else if (selected && onComplete != null) {
                             PrimaryAction("Выполнено", onComplete, Modifier.fillMaxWidth(), enabled = enabled)
                         } else if (selected) {

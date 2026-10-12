@@ -44,14 +44,15 @@ class SeasonalProgramsTest {
         val template = requireNotNull(PlantCareCatalog.find("пион"))
         val start = LocalDate.of(2026, 3, 1)
         val generated = CareProgramGenerator().generate(template, CareProgramContext(start, CultivationType.OPEN_GROUND, climate))
-        val changed = generated.withProduct(0, "bona_flowers", start.plusDays(2))
-        assertNotNull(generated.steps[0].recurrence)
-        assertNull(changed.steps[0].recurrence)
-        assertTrue(changed.steps[0].note.contains("15–25 г/м²"))
-        assertFalse(changed.steps[0].note.contains("100 г/куст"))
-        assertEquals(generated.steps.drop(1), changed.steps.drop(1))
-        assertEquals("bona_flowers", ProgramProductCatalog.productForStep(changed.steps[0].templateStepId)?.id)
-        assertThrows(NoSuchElementException::class.java) { generated.withProduct(0, "bona_blueberry", start) }
+        val index = generated.steps.indexOfFirst { programBaseStep(it.templateStepId) == "nutrition" }
+        val changed = generated.withProduct(index, "bona_flowers", generated.steps[index].scheduledDate)
+        assertNotNull(generated.steps[index].recurrence)
+        assertNull(changed.steps[index].recurrence)
+        assertTrue(changed.steps[index].note.contains("15–25 г/м²"))
+        assertFalse(changed.steps[index].note.contains("100 г/куст"))
+        assertEquals(generated.steps.filterIndexed { i, _ -> i != index }, changed.steps.filterIndexed { i, _ -> i != index })
+        assertEquals("bona_flowers", ProgramProductCatalog.productForStep(changed.steps[index].templateStepId)?.id)
+        assertThrows(NoSuchElementException::class.java) { generated.withProduct(index, "bona_blueberry", start) }
     }
 
     @Test fun exactCropProblemAndGroundAreRequiredEvenWhenDiagnosisIsOptional() {

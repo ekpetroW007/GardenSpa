@@ -369,7 +369,13 @@ object PlantCareCatalog {
         clean.copy(steps = steps, version = clean.version + if (steps.size != clean.steps.size) 1 else 0)
     }
 
-    private val templates = previousTemplates.map(EradicationCare::apply)
+    private val beforeRootTiming = previousTemplates.map { source ->
+        EradicationCare.apply(source).let { if (EradicationCare.applies(source.id))
+            it.copy(version = maxOf(source.version + 1, 22)) else it }
+    }
+    private val templates = beforeRootTiming.map(RootCareSchedule::apply)
+
+    internal fun beforeRootTiming(): List<PlantCareTemplate> = beforeRootTiming
 
     /** Previous shipped defaults let updates recognize unchanged installations. */
     fun previousAll(): List<PlantCareTemplate> = previousTemplates
@@ -463,7 +469,8 @@ class CareProgramGenerator {
 
         val generatedSteps = template.steps.filterNot { it.excludeInSouthernRegion && context.isSouthernRegion }.map { step ->
             val anchorDate = when (step.anchor) {
-                CareAnchor.START_DATE -> if (continuesStartedSeason) recommendedStart else context.startDate
+                CareAnchor.START_DATE -> RootCareSchedule.plantingStart(template, context,
+                    if (continuesStartedSeason) recommendedStart else context.startDate)
                 CareAnchor.SAFE_SPRING_DATE -> recommendedStart
                 CareAnchor.SAFE_AUTUMN_DATE -> context.climate.safeAutumnDate(context.startDate.year)
                 CareAnchor.DORMANT_SPRING_DATE -> context.climate.safeSpringDate(context.startDate.year).minusDays(21)
@@ -513,7 +520,7 @@ class CareProgramGenerator {
                 productDescription = step.productDescription,
                 note = step.note
             )
-        }.let { steps ->
+        }.let { RootCareSchedule.schedule(template, context, it) }.let { steps ->
             if (continuesStartedSeason) {
                 // Keep dependent work together when starting between linked stages.
                 val chains = listOf(
@@ -542,7 +549,8 @@ class CareProgramGenerator {
             }
         }
 
-        require(generatedSteps.isNotEmpty()) {
+        val scheduledSteps = RootCareSchedule.alignWithScheduledTreatments(template, context, generatedSteps)
+        require(scheduledSteps.isNotEmpty()) {
             NO_REMAINING_CARE_MESSAGE
         }
 
@@ -556,7 +564,7 @@ class CareProgramGenerator {
             chosenStartDate = context.startDate,
             climateSummary = context.climate.displayName(),
             warning = warning,
-            steps = generatedSteps.sortedBy { it.scheduledDate },
+            steps = scheduledSteps.sortedBy { it.scheduledDate },
             isSouthernRegion = context.isSouthernRegion
         )
     }
@@ -584,7 +592,7 @@ class CareProgramGenerator {
         // Keep an unlimited rule's original anchor; materializing or moving it would change its dates.
         if (count == null) return listOf(this)
         val occurrences = (0 until count).map { index ->
-            occurrenceDate(scheduledDate, repeat, index)
+            careOccurrenceDate(scheduledDate, repeat, index)
         }
         // Keep the original occurrence dates (including month ends) and a stable key for each work.
         return occurrences.mapIndexed { index, occurrence ->
@@ -611,22 +619,23 @@ class CareProgramGenerator {
         )
     }
 
-    private fun occurrenceDate(start: LocalDate, recurrence: CareRecurrence, index: Int): LocalDate {
-        val amount = recurrence.interval.coerceAtLeast(1).toLong() * index
-        return when (recurrence.type) {
-            RepeatType.NONE -> start
-            RepeatType.DAILY, RepeatType.CUSTOM -> start.plusDays(amount)
-            RepeatType.WEEKLY -> start.plusWeeks(amount)
-            RepeatType.MONTHLY -> start.plusMonths(amount)
-            RepeatType.YEARLY -> start.plusYears(amount)
-        }
-    }
-
-    private fun ForecastWeatherDay.satisfies(limits: WeatherLimits): Boolean =
-        (limits.minimumNightTemperatureC == null || minimumTemperatureC >= limits.minimumNightTemperatureC) &&
-            (limits.maximumPrecipitationMm == null || precipitationMm <= limits.maximumPrecipitationMm) &&
-            (limits.maximumWindMetersPerSecond == null || maximumWindMetersPerSecond <= limits.maximumWindMetersPerSecond)
 }
+
+internal fun careOccurrenceDate(start: LocalDate, recurrence: CareRecurrence, index: Int): LocalDate {
+    val amount = recurrence.interval.coerceAtLeast(1).toLong() * index
+    return when (recurrence.type) {
+        RepeatType.NONE -> start
+        RepeatType.DAILY, RepeatType.CUSTOM -> start.plusDays(amount)
+        RepeatType.WEEKLY -> start.plusWeeks(amount)
+        RepeatType.MONTHLY -> start.plusMonths(amount)
+        RepeatType.YEARLY -> start.plusYears(amount)
+    }
+}
+
+internal fun ForecastWeatherDay.satisfies(limits: WeatherLimits): Boolean =
+    (limits.minimumNightTemperatureC == null || minimumTemperatureC >= limits.minimumNightTemperatureC) &&
+        (limits.maximumPrecipitationMm == null || precipitationMm <= limits.maximumPrecipitationMm) &&
+        (limits.maximumWindMetersPerSecond == null || maximumWindMetersPerSecond <= limits.maximumWindMetersPerSecond)
 
 private val seasonLabel = Regex(
     "(?iu)(?<!\\p{L})(летняя|осенняя|весенняя|предзимняя|ранневесенняя|позднезимняя)(?!\\p{L})"

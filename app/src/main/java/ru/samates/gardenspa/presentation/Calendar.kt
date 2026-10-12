@@ -69,6 +69,7 @@ import kotlin.math.roundToInt
 import ru.samates.gardenspa.BookeeperApp
 import ru.samates.gardenspa.domain.ScheduledTreatment
 import ru.samates.gardenspa.domain.ProgramVariants
+import ru.samates.gardenspa.domain.nextSeasonImportKey
 import ru.samates.gardenspa.domain.gardenWorkDate
 import ru.samates.gardenspa.domain.nearestIncompleteTreatment
 import ru.samates.gardenspa.data.database.entity.climateOrNull
@@ -127,9 +128,11 @@ fun Calendar(
     var undoAction by remember { mutableStateOf<UndoAction?>(null) }
     var actionError by remember { mutableStateOf<String?>(null) }
     var variantSaving by remember { mutableStateOf(false) }
-    val completeWork = rememberCompleteWorkAction(proceduresVm) { treatment ->
-        undoAction = UndoAction("Работа отмечена как выполненная", treatment.plant.id, treatment.originalDate)
-    }
+    val undoCompletion = rememberUndoCompletionAction(proceduresVm,
+        hasNextSeason = { record -> plants.any { it.programImportKey == record.nextSeasonImportKey } }) { undoAction = null }
+    val completeWork = rememberCompleteWorkAction(proceduresVm,
+        hasNextSeason = { record -> plants.any { it.programImportKey == record.nextSeasonImportKey } },
+        onUndone = { undoAction = null })
     val todayTreatments = scheduledTreatmentsOn(plants, procedures, today)
     val nextTreatments = (1L..7L).flatMap { offset ->
         scheduledTreatmentsOn(plants, procedures, today.plusDays(offset))
@@ -164,6 +167,11 @@ fun Calendar(
                 },
                 onOpen = { navController.navigate(AppDestinations.plantDetails(treatment.plant.id)) },
                 onComplete = { completeWork(treatment) },
+                onUndoCompletion = {
+                    procedures.firstOrNull { it.plantId == treatment.plant.id &&
+                        it.scheduledDate == treatment.originalDate.toString() && it.status == "COMPLETED" }
+                        ?.let(undoCompletion)
+                },
                 onRepeat = { interval ->
                     plantsVm.updateProgramRepeat(treatment.plant, interval,
                         onSaved = { actionError = null; TreatmentReminderScheduler.refreshNow(application) },
@@ -191,7 +199,10 @@ fun Calendar(
                         Text(action.message, color = Cream, modifier = Modifier.weight(1f))
                         Text("Отменить", color = Leaf300, fontWeight = FontWeight.Bold,
                             modifier = Modifier.clickable {
-                                proceduresVm.undoChange(action.plantId, action.originalDate,
+                                val completed = procedures.firstOrNull { it.plantId == action.plantId &&
+                                    it.scheduledDate == action.originalDate.toString() && it.status == "COMPLETED" }
+                                if (completed != null) undoCompletion(completed)
+                                else proceduresVm.undoChange(action.plantId, action.originalDate,
                                     onError = { actionError = it.message ?: "Не удалось отменить действие" },
                                     onSaved = { TreatmentReminderScheduler.refreshNow(application); undoAction = null })
                             })
@@ -365,6 +376,7 @@ private fun TreatmentCard(
     completedYears: Map<String, List<Int>>,
     onVariant: (String, String) -> Unit,
     onComplete: () -> Unit,
+    onUndoCompletion: () -> Unit,
     onRepeat: (Int?) -> Unit,
     onReschedule: (LocalDate) -> Unit,
     onOpen: () -> Unit
@@ -388,7 +400,8 @@ private fun TreatmentCard(
             if (variants) {
                 ProgramVariantChooser(treatment.plant.programStepId, treatment.plant.selectedVariantId,
                     treatment.plant.variantChoices, onVariant, enabled = !variantSaving,
-                    completed = completed, completedYears = completedYears, onComplete = onComplete)
+                    completed = completed, completedYears = completedYears, onComplete = onComplete,
+                    onUndoCompletion = onUndoCompletion)
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SecondaryAction(
@@ -417,6 +430,8 @@ private fun TreatmentCard(
                     )
                 ) { CompletionButtonContent(completed) }
             }
+            if (completed && !variants) SecondaryAction("Отменить выполнение", onUndoCompletion,
+                Modifier.fillMaxWidth().semantics { contentDescription = "Отменить выполнение: ${treatment.plant.taskName}" })
         }
     }
 }

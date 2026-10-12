@@ -4,6 +4,7 @@ import ru.samates.gardenspa.data.database.entity.PlantEntity
 import ru.samates.gardenspa.data.database.entity.ProcedureEntity
 import ru.samates.gardenspa.data.database.entity.resolvedCardId
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 internal fun PlantEntity.effectiveVariantDate(history: List<ProcedureEntity>): LocalDate = LocalDate.parse(
     history.firstOrNull { it.plantId == id && it.scheduledDate == creationDate }?.rescheduledDate ?: creationDate
@@ -35,6 +36,60 @@ internal fun PlantEntity.isVariantFollowupOf(parent: PlantEntity): Boolean =
 
 /** Only an untouched automatic child follows its parent; its own history or edits take priority. */
 internal fun variantFollowupDateUpdates(
+    parent: PlantEntity,
+    plants: List<PlantEntity>,
+    history: List<ProcedureEntity>,
+    effectiveDate: LocalDate,
+    today: LocalDate = LocalDate.now()
+): List<PlantEntity> = variantStageDateUpdates(parent, plants, history, effectiveDate) +
+    rootFollowupDateUpdates(parent, plants, history, effectiveDate, today)
+
+private fun rootFollowupDateUpdates(
+    parent: PlantEntity,
+    plants: List<PlantEntity>,
+    history: List<ProcedureEntity>,
+    effectiveDate: LocalDate,
+    today: LocalDate
+): List<PlantEntity> {
+    if (!RootCareSchedule.isSpringTreatment(parent.programStepId) || !parent.isImportedProgramWork()) return emptyList()
+    val season = LocalDate.parse(parent.creationDate).year
+    // A different year can already contain a separate saved season; its works have no parent-occurrence link.
+    if (effectiveDate.year != season) return emptyList()
+    val protectedIds = history.map { it.plantId }.toSet()
+    val eligible = plants.filter { row ->
+        row.resolvedCardId == parent.resolvedCardId && row.programId == parent.programId && row.isImportedProgramWork() &&
+            (row.programVersion ?: 0) >= RootCareSchedule.VERSION && !row.userEdited && !row.userLockedDate && row.drugId == null &&
+            !row.programStepId.orEmpty().substringAfter("~", "").startsWith("personal:") && row.id !in protectedIds &&
+            row.programBaseline == row.programFingerprint() && LocalDate.parse(row.creationDate).let { it.year == season && !it.isBefore(today) }
+    }
+    val earliest = effectiveDate.plusDays(if (parent.programId in EradicationCare.fruitTreeIds) 1 else 0)
+    val updated = linkedMapOf<Int, PlantEntity>()
+    fun moveForward(row: PlantEntity, date: LocalDate) {
+        if (!LocalDate.parse(row.creationDate).isBefore(date)) return
+        val changed = row.copy(creationDate = date.toString())
+        updated[row.id] = changed.copy(programBaseline = changed.programFingerprint())
+    }
+    // These dates already contain the climate floor. Never move them backwards or move planting before its own phase.
+    eligible.filter { RootCareSchedule.isRootStep(it.programStepId) && !RootCareSchedule.isPlantingStep(it.programStepId) }
+        .groupBy { programBaseStep(it.programStepId) }.values.forEach { series ->
+            val first = series.minOf { LocalDate.parse(it.creationDate) }
+            val days = ChronoUnit.DAYS.between(first, earliest)
+            if (days > 0) series.forEach { moveForward(it, LocalDate.parse(it.creationDate).plusDays(days)) }
+        }
+    updated.values.firstOrNull { programBaseStep(it.programStepId) == "hydrangea_pale_acid" }?.let { acid ->
+        eligible.forEach { row ->
+            val days = when (programBaseStep(row.programStepId)) {
+                "hydrangea_pale_iron" -> 5L
+                "hydrangea_yellow_magnesium" -> 10L
+                else -> return@forEach
+            }
+            moveForward(updated[row.id] ?: row, LocalDate.parse(acid.creationDate).plusDays(days))
+        }
+    }
+    return updated.values.toList()
+}
+
+private fun variantStageDateUpdates(
     parent: PlantEntity,
     plants: List<PlantEntity>,
     history: List<ProcedureEntity>,

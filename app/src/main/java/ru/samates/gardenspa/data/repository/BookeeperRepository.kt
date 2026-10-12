@@ -119,6 +119,8 @@ class BookeeperRepository(
     suspend fun undoProcedureChange(plantId: Int, scheduledDate: LocalDate) =
         procedureDAO.undoChange(plantId, scheduledDate.toString())
 
+    suspend fun undoCompletion(procedureId: Int): ProcedureEntity = procedureDAO.undoCompletion(procedureId)
+
     suspend fun getGardenWorkForDate(date: LocalDate): List<GardenWorkEntity> =
         gardenWorkDAO.getEntriesForDate(date.toString())
 

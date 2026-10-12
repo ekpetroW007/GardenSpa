@@ -237,6 +237,36 @@ class CareWorkflowInstrumentedTest {
             assertEquals(if (recipe.isTankMix) "TREATMENT" else "UNSPECIFIED", product.applicationMethod)
             assertEquals(recipe.purposeForDrug(), product.purpose)
             assertEquals(recipe.consumptionRate, product.consumptionRate)
+
+            compose.onNodeWithContentDescription("Мои сады и растения").performClick()
+            compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(newName))
+            compose.onNodeWithText(newName).performClick()
+            val complete = hasContentDescription("Выполнить работу: ${procedure.taskName}")
+            compose.onNode(hasScrollToNodeAction()).performScrollToNode(complete)
+            compose.onNode(complete).performClick()
+            compose.waitUntil(10_000) { compose.onAllNodesWithText("Нет, только в архив").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText("Нет, только в архив").performClick()
+            fun record() = runBlocking { app.repository.getAllProceduresOnce().singleOrNull { it.plantId == procedure.id } }
+            compose.waitUntil(10_000) { record()?.status == "COMPLETED" }
+            val archived = requireNotNull(record())
+            assertEquals(procedure.taskName, archived.procedureName)
+            assertEquals(recipe.name, archived.drugName)
+            assertEquals(procedure.programNote, archived.note)
+            assertEquals(date.toString(), archived.scheduledDate)
+            val archive = hasTestTag("archive:${archived.id}")
+            compose.onNode(hasScrollToNodeAction()).performScrollToNode(archive)
+            compose.onNode(archive).assertExists()
+            screenshot("recipe-${recipe.id}-completed-archive")
+            compose.onNode(hasText("Отменить выполнение") and hasAnyAncestor(archive)).performScrollTo().performClick()
+            compose.waitUntil(10_000) { record()?.status == "PLANNED" }
+            assertEquals(archived.copy(status = "PLANNED", completedDate = null), record())
+            assertEquals(procedure, createdRows().single { it.id == procedure.id })
+            assertEquals(product, runBlocking { app.repository.allDrugs.first().single { it.id == product.id } })
+            assertEquals(2, createdRows().size)
+            compose.onNode(archive).assertDoesNotExist()
+            compose.onNode(hasScrollToNodeAction()).performScrollToNode(complete)
+            compose.onNode(complete).assertIsEnabled()
+            screenshot("recipe-${recipe.id}-execution-undone")
         } finally {
             runBlocking {
                 createdRows().map { it.resolvedCardId }.distinct().forEach { app.repository.deletePlantCard(it) }
@@ -299,7 +329,6 @@ class CareWorkflowInstrumentedTest {
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Добавить или заменить препарат").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Добавить или заменить препарат").performScrollTo().performClick()
         compose.onNodeWithText("Подробнее: Биозащитин, концентрат 5 мл").performScrollTo().performClick()
-        compose.onNodeWithText("Я сверил(а) этикетку: средство подходит для моей культуры, цели и условий").performScrollTo().performClick()
         compose.onNodeWithText("Выбрать этот препарат").performClick()
         compose.onNodeWithText("После осмотра обнаружена проблема").performScrollTo().performClick()
         compose.onNodeWithText("Не указывать / пропустить").assertExists()
@@ -310,7 +339,6 @@ class CareWorkflowInstrumentedTest {
         compose.onNodeWithText("Не указывать / пропустить").assertExists()
         compose.onNodeWithText("Перейти к препаратам").performClick()
         compose.onNodeWithText("Подробнее: Биозащитин, концентрат 5 мл").performScrollTo().performClick()
-        compose.onNodeWithText("Я сверил(а) этикетку: средство подходит для моей культуры, цели и условий").performScrollTo().performClick()
         compose.onNodeWithText("Добавить обработку").performClick()
         screenshot("generic-program-editor")
         compose.onNodeWithText("Сохранить программу").performScrollTo().performClick()

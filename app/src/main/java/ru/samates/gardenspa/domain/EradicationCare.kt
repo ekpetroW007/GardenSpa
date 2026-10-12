@@ -16,7 +16,7 @@ data class EradicationComponentGroup(val id: String, val title: String, val opti
 
 object EradicationCare {
     const val FIRST_VARIANT_VERSION = 20
-    const val PROGRAM_VERSION = 22
+    const val PROGRAM_VERSION = 23
     const val EARLY_STEP = "before_bud_break"
     const val PEST_STEP = "before_bud_break_followup"
     const val AUTUMN_MIX_STEP = "autumn_before_leaf_fall_mix"

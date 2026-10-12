@@ -1,5 +1,6 @@
 package ru.samates.gardenspa.presentation
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.rememberScrollState
@@ -29,10 +30,43 @@ import ru.samates.gardenspa.ui.theme.Leaf300
 import ru.samates.gardenspa.ui.theme.Mist
 import ru.samates.gardenspa.viewmodel.ProceduresViewmodel
 
+@Composable
+internal fun rememberUndoCompletionAction(
+    viewmodel: ProceduresViewmodel,
+    hasNextSeason: (ProcedureEntity) -> Boolean = { false },
+    onSaved: () -> Unit = {}
+): (ProcedureEntity) -> Unit {
+    val context = LocalContext.current.applicationContext
+    var saving by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    error?.let { message ->
+        AlertDialog(onDismissRequest = { error = null }, containerColor = Forest900,
+            title = { Text("Не удалось отменить выполнение", color = Cream) },
+            text = { Text(message, color = Mist) },
+            confirmButton = { TextButton(onClick = { error = null }) { Text("Понятно", color = Leaf300) } })
+    }
+    return { procedure ->
+        if (!saving) {
+            saving = true
+            viewmodel.undoCompletion(procedure.id,
+                onSaved = {
+                    saving = false
+                    TreatmentReminderScheduler.refreshNow(context)
+                    if (hasNextSeason(procedure)) Toast.makeText(context,
+                        "Выполнение отменено. Работа следующего сезона сохранена", Toast.LENGTH_LONG).show()
+                    onSaved()
+                },
+                onError = { saving = false; error = it.message ?: "Попробуйте ещё раз." })
+        }
+    }
+}
+
 /** Completion is saved before the optional next-season question is shown. */
 @Composable
 internal fun rememberCompleteWorkAction(
     viewmodel: ProceduresViewmodel,
+    hasNextSeason: (ProcedureEntity) -> Boolean = { false },
+    onUndone: () -> Unit = {},
     onCompleted: (ScheduledTreatment) -> Unit = {}
 ): (ScheduledTreatment) -> Unit {
     val context = LocalContext.current.applicationContext
@@ -61,6 +95,21 @@ internal fun rememberCompleteWorkAction(
                         completedId = null
                     },
                     onError = { saving = false; error = it.message ?: "Не удалось сохранить работу. Попробуйте ещё раз." })
+                }, onError = { saving = false; error = it.message ?: "Не удалось сохранить комментарий" })
+            }, onUndo = { comment ->
+                saving = true
+                error = null
+                viewmodel.updateCompletionComment(completed.id, comment, onSaved = {
+                    viewmodel.undoCompletion(completed.id,
+                        onSaved = {
+                            TreatmentReminderScheduler.refreshNow(context)
+                            if (hasNextSeason(completed)) Toast.makeText(context,
+                                "Выполнение отменено. Работа следующего сезона сохранена", Toast.LENGTH_LONG).show()
+                            saving = false
+                            completedId = null
+                            onUndone()
+                        },
+                        onError = { saving = false; error = it.message ?: "Не удалось отменить выполнение" })
                 }, onError = { saving = false; error = it.message ?: "Не удалось сохранить комментарий" })
             })
     } else if (error != null) {
@@ -93,7 +142,8 @@ internal fun NextSeasonDialog(
     saving: Boolean,
     error: String?,
     onDismiss: (String) -> Unit,
-    onConfirm: (String) -> Unit
+    onConfirm: (String) -> Unit,
+    onUndo: ((String) -> Unit)? = null
 ) {
     var comment by rememberSaveable(procedure.id) { mutableStateOf(procedure.comment) }
     AlertDialog(
@@ -112,6 +162,9 @@ internal fun NextSeasonDialog(
                 OutlinedTextField(value = comment, onValueChange = { comment = it.take(2000) },
                     label = { Text("Комментарий к выполненной работе") }, enabled = !saving,
                     minLines = 2, maxLines = 4, colors = glassTextFieldColors())
+                if (onUndo != null) TextButton(onClick = { onUndo(comment) }, enabled = !saving) {
+                    Text("Отменить выполнение", color = Leaf300)
+                }
                 error?.let { Text(it, color = Danger) }
             }
         },

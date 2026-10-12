@@ -91,9 +91,7 @@ class CareReferenceInstrumentedTest {
         compose.onNodeWithText("Перейти к препаратам").assertIsEnabled().performClick()
         compose.onNode(hasSetTextAction()).performTextInput("Август")
         compose.onNodeWithText("Подробнее: Чистоцвет, КЭ — цветочные культуры").performScrollTo().performClick()
-        compose.onNodeWithText("Добавить обработку").assertIsNotEnabled()
-        compose.onNodeWithText("Я сверил(а) этикетку: средство подходит для моей культуры, цели и условий")
-            .performScrollTo().performClick()
+        compose.onNodeWithText("Добавить обработку").assertIsEnabled()
         capture("peony-after-inspection")
         compose.onNodeWithText("Добавить обработку").performClick()
         compose.runOnIdle {
@@ -112,8 +110,6 @@ class CareReferenceInstrumentedTest {
         }
         compose.onNode(hasSetTextAction()).performTextInput("Агрикола")
         compose.onNodeWithText("Подробнее: Агрикола Аква для гортензий").performScrollTo().performClick()
-        compose.onNodeWithText("Я сверил(а) этикетку: средство подходит для моей культуры, цели и условий")
-            .performScrollTo().performClick()
         compose.onNodeWithText("Выбрать этот препарат").performClick()
         compose.runOnIdle { assertEquals("agricola_hydrangea", chosen) }
     }
@@ -155,8 +151,6 @@ class CareReferenceInstrumentedTest {
         compose.onNode(hasSetTextAction()).performTextInput("Фитолавин")
         compose.onNodeWithText("Подробнее: Баковая смесь «Фитолавин + стимулятор»").performScrollTo().performClick()
         compose.onNodeWithText("На 10 л воды: Фитолавин — 20 мл", substring = true).assertExists()
-        compose.onNodeWithText("Я сверил(а) этикетку: средство подходит для моей культуры, цели и условий")
-            .performScrollTo().performClick()
         capture("green-cone-choice")
         compose.onNodeWithText("Выбрать этот препарат").performClick()
         compose.runOnIdle { assertEquals("mix_fitolavin_tank_mix", chosen) }

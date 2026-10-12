@@ -39,9 +39,8 @@ class ProgramProductsInstrumentedTest {
         compose.onNodeWithText("Открытый грунт").performClick()
         compose.onNodeWithText("Перейти к препаратам").performClick()
         compose.onNodeWithText("Подробнее: Биозащитин, концентрат 5 мл").performScrollTo().performClick()
-        compose.onNodeWithText("Добавить обработку").assertIsNotEnabled()
-        compose.onNodeWithText("Я сверил(а) этикетку: средство подходит для моей культуры, цели и условий")
-            .performScrollTo().performClick()
+        compose.onNodeWithText("Я сверил(а) этикетку: средство подходит для моей культуры, цели и условий").assertDoesNotExist()
+        compose.onNodeWithText("Добавить обработку").assertIsEnabled()
         compose.onNodeWithText("Добавить обработку").performClick()
         compose.runOnIdle { assertEquals("biozashchitin", chosen); assertNull(diagnosis) }
     }

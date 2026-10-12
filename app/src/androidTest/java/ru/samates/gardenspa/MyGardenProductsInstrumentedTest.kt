@@ -75,7 +75,8 @@ class MyGardenProductsInstrumentedTest {
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Культура 8").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Культура 8").performScrollTo().assertIsDisplayed()
         capture("all-eight-plants")
-        val search = compose.onNodeWithText("Поиск растений в этом саду")
+        val testGarden = hasAnyChild(hasText("Тест полного сада")) and !hasScrollToNodeAction()
+        val search = compose.onNode(hasSetTextAction() and hasText("Поиск растений в этом саду") and hasAnyAncestor(testGarden))
         search.performScrollTo().performTextInput("кУЛЬТУРА 8")
         compose.onNodeWithText("Культура 8").assertExists()
         compose.onNodeWithText("Культура 1").assertDoesNotExist()
@@ -85,7 +86,7 @@ class MyGardenProductsInstrumentedTest {
         compose.onNodeWithText("Растения не найдены. Измените запрос.").assertExists()
         search.performTextClearance()
         compose.onNodeWithText("Расчёт обновлён", substring = true).assertDoesNotExist()
-        compose.onNodeWithText("Место: Москва  ›").performScrollTo().performClick()
+        compose.onNode(hasText("Место: Москва  ›") and hasAnyAncestor(testGarden)).performScrollTo().performClick()
         compose.onNodeWithText("Изменить место сада").assertExists()
         compose.onNodeWithText("Расчёт обновлён", substring = true).assertExists()
         capture("location-details")
@@ -93,7 +94,7 @@ class MyGardenProductsInstrumentedTest {
         compose.onNodeWithText("Сохранить место сада").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithContentDescription("Назад").performClick()
         compose.runOnIdle { assertEquals("gardens", nav.currentDestination?.route) }
-        compose.onNodeWithText("Место: Москва  ›").assertExists()
+        compose.onNode(hasText("Место: Москва  ›") and hasAnyAncestor(testGarden)).assertExists()
     }
 
     @Test fun manualCareOffersBothReferenceSectionsAndSavesTheChosenProduct() = garden { garden ->
@@ -159,8 +160,8 @@ class MyGardenProductsInstrumentedTest {
             compose.onNodeWithText("Название").performTextInput(name)
             compose.onNodeWithText("Добавить").performClick()
             compose.waitUntil(10_000) { ownProducts().any { it.name == name } }
-            compose.onNodeWithText("Выбрать этот препарат").assertIsNotEnabled()
-            compose.onNodeWithText("Я сверил(а) этикетку: средство подходит для моей культуры, цели и условий").performScrollTo().performClick()
+            compose.onNodeWithText("Выбрать этот препарат").assertIsEnabled()
+            compose.onNodeWithText("Я сверил(а) этикетку: средство подходит для моей культуры, цели и условий").assertDoesNotExist()
             compose.onNodeWithText("Выбрать этот препарат").performClick()
             compose.runOnIdle { assertEquals(name, selected?.name); assertTrue(requireNotNull(selected).id > 0) }
         } finally { runBlocking { ownProducts().filter { it.name == name }.forEach { app.repository.deleteDrug(it.id) } } }

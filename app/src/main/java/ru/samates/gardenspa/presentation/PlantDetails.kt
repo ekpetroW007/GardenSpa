@@ -23,6 +23,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -33,6 +36,7 @@ import ru.samates.gardenspa.domain.ProgramProductCatalog
 import ru.samates.gardenspa.domain.ProgramVariants
 import ru.samates.gardenspa.domain.ScheduledTreatment
 import ru.samates.gardenspa.domain.nextSeasonScheduledDate
+import ru.samates.gardenspa.domain.nextSeasonImportKey
 import java.time.LocalDate
 import ru.samates.gardenspa.domain.recurrenceDescription
 import ru.samates.gardenspa.domain.toPlantCards
@@ -80,7 +84,10 @@ fun PlantDetails(navController: NavController, plantId: Int) {
     var variantSaving by remember { mutableStateOf(false) }
     var commentId by rememberSaveable { mutableStateOf<Int?>(null) }
     var commentDraft by rememberSaveable { mutableStateOf("") }
-    val completeWork = rememberCompleteWorkAction(proceduresVm)
+    val completeWork = rememberCompleteWorkAction(proceduresVm,
+        hasNextSeason = { record -> plants.any { it.programImportKey == record.nextSeasonImportKey } })
+    val undoCompletion = rememberUndoCompletionAction(proceduresVm,
+        hasNextSeason = { record -> plants.any { it.programImportKey == record.nextSeasonImportKey } })
 
     BotanicalBackground {
         Column(Modifier.fillMaxSize()) {
@@ -150,9 +157,12 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                         procedures.firstOrNull { it.plantId == row.id && it.scheduledDate == row.creationDate }
                             ?.rescheduledDate ?: row.creationDate
                     }, key = { "card-procedure:${it.id}" }) { procedure ->
-                        val plannedDate = procedures.firstOrNull {
+                        val recorded = procedures.firstOrNull {
                             it.plantId == procedure.id && it.scheduledDate == procedure.creationDate
-                        }?.rescheduledDate ?: procedure.creationDate
+                        }
+                        val plannedDate = recorded?.rescheduledDate ?: procedure.creationDate
+                        val treatment = ScheduledTreatment(procedure, LocalDate.parse(procedure.creationDate),
+                            LocalDate.parse(plannedDate), recorded?.status == "COMPLETED", recorded?.rescheduledDate != null)
                         GlassCard(Modifier.fillMaxWidth()) {
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(procedure.taskName, color = Cream, style = MaterialTheme.typography.titleMedium)
@@ -162,7 +172,6 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                                 }
                                 Text("Дата: ${plannedDate.toRussianDateOrSelf()}", color = Mist)
                                 if (ProgramVariants.isVariantWork(procedure)) {
-                                    val recorded = procedures.firstOrNull { it.plantId == procedure.id && it.scheduledDate == procedure.creationDate }
                                     ProgramVariantChooser(procedure.programStepId, procedure.selectedVariantId, procedure.variantChoices,
                                         onSelect = { variant, choices ->
                                             variantSaving = true
@@ -172,11 +181,15 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                                         }, enabled = !variantSaving,
                                         completed = recorded?.status == "COMPLETED",
                                         completedYears = ProgramVariants.completedYears(procedure, history),
-                                        onComplete = {
-                                            completeWork(ScheduledTreatment(procedure, LocalDate.parse(procedure.creationDate),
-                                                LocalDate.parse(recorded?.rescheduledDate ?: procedure.creationDate), false,
-                                                recorded?.rescheduledDate != null))
-                                        })
+                                        onComplete = { completeWork(treatment) },
+                                        onUndoCompletion = { recorded?.let(undoCompletion) })
+                                } else if (treatment.completed) {
+                                    Row { TwigCheckMark(); Text("Выполнено", color = Leaf300) }
+                                    SecondaryAction("Отменить выполнение", { recorded?.let(undoCompletion) },
+                                        Modifier.fillMaxWidth().semantics { contentDescription = "Отменить выполнение: ${procedure.taskName}" })
+                                } else {
+                                    PrimaryAction("Выполнено", { completeWork(treatment) },
+                                        Modifier.fillMaxWidth().semantics { contentDescription = "Выполнить работу: ${procedure.taskName}" })
                                 }
                                 if (procedure.programId != null) {
                                     ProgramRepeatSelector(procedure.recurrenceDescription(), onSelected = { interval ->
@@ -210,7 +223,7 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                         item { EmptyGlassState("История пока пуста", "Выполненные процедуры появятся здесь") }
                     }
                     items(history, key = { it.id }) { procedure ->
-                        GlassCard(Modifier.fillMaxWidth()) {
+                        GlassCard(Modifier.fillMaxWidth().testTag("archive:${procedure.id}")) {
                             Column {
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Text(procedure.procedureName, color = Cream, style = MaterialTheme.typography.titleMedium,
@@ -220,6 +233,7 @@ fun PlantDetails(navController: NavController, plantId: Int) {
                                 Text("Запланировано: ${procedure.scheduledDate.toRussianDateOrSelf()}", color = Mist)
                                 Text("Выполнено: ${procedure.completedDate?.toRussianDateOrSelf() ?: "—"}", color = Mist)
                                 Text(if (procedure.drugName.isBlank()) "Препарат не указан" else procedure.drugName.toDrugDisplayText(), color = Leaf300)
+                                SecondaryAction("Отменить выполнение", { undoCompletion(procedure) }, Modifier.fillMaxWidth())
                                 if (procedure.comment.isNotBlank()) Text("Комментарий: ${procedure.comment}", color = Cream)
                                 SecondaryAction(if (procedure.comment.isBlank()) "Добавить комментарий" else "Изменить комментарий", {
                                     commentDraft = procedure.comment; commentId = procedure.id

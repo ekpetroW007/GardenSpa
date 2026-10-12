@@ -24,6 +24,201 @@ class ProgramUpdatesTest {
     private fun installation() = ProgramInstallationEntity("card", old.id, 1, today.toString(), "OPEN_GROUND", false,
         old.steps.joinToString("\n") { it.id })
 
+    private fun rootUpdateFixture(): Pair<List<PlantEntity>, ProgramInstallationEntity> {
+        val previous = PlantCareCatalog.beforeRootTiming().single { it.id == "apple" }
+        val climate = requireNotNull(garden.climateOrNull())
+        val start = recommendedStartDate(previous, CultivationType.OPEN_GROUND, climate, 2027)
+        val generated = CareProgramGenerator().generate(previous,
+            CareProgramContext(start, CultivationType.OPEN_GROUND, climate), "root-timing")
+        val rows = generated.installedRows(garden.id, garden.name).mapIndexed { index, row -> row.copy(id = 500 + index, userEdited = false) }
+        val metadata = ProgramInstallationEntity("root-timing", "apple", previous.version, start.toString(), "OPEN_GROUND", false,
+            previous.steps.joinToString("\n") { programBaseStep(it.id) })
+        return rows to metadata
+    }
+
+    @Test fun rootTimingUpdateUsesTheActualPostponedSpringTreatmentAndClimateWithoutChangingItsHistory() {
+        val (rows, metadata) = rootUpdateFixture()
+        val spring = rows.single { programBaseStep(it.programStepId) == EradicationCare.EARLY_STEP }
+        val feeding = rows.single { programBaseStep(it.programStepId) == "nutrition" }
+        assertEquals("2027-04-04", feeding.creationDate)
+        val record = ProcedureEntity(plantId = spring.id, procedureName = spring.taskName,
+            scheduledDate = spring.creationDate, rescheduledDate = "2027-05-10", status = "PLANNED")
+        val plan = requireNotNull(ProgramUpdates.plan(rows, listOf(record), garden, metadata, LocalDate.of(2027, 4, 1)))
+        val updated = plan.updates.single { it.id == feeding.id }
+        assertEquals("2027-05-11", updated.creationDate)
+        assertEquals(RootCareSchedule.VERSION, updated.programVersion)
+        assertEquals(updated.programFingerprint(), updated.programBaseline)
+        assertTrue(updated.programNote.contains(RootCareSchedule.SOIL_NOTICE))
+        assertEquals(feeding.repeatCount, updated.repeatCount)
+        assertEquals("2027-05-10", record.rescheduledDate)
+        assertTrue(plan.additions.isEmpty())
+        assertTrue(plan.removals.isEmpty())
+    }
+
+    @Test fun rootTimingPreservesManualDatesPersonalMeansCompletedPastAndDeletedWork() {
+        val (original, metadata) = rootUpdateFixture()
+        val feeding = original.single { programBaseStep(it.programStepId) == "nutrition" }
+        val variants = listOf(feeding.copy(userLockedDate = true), feeding.copy(userEdited = true),
+            feeding.copy(drugId = 17), feeding.copy(programNote = "Моя инструкция"))
+        variants.forEach { personal ->
+            val plan = requireNotNull(ProgramUpdates.plan(original.map { if (it.id == feeding.id) personal else it },
+                emptyList(), garden, metadata, LocalDate.of(2027, 4, 1)))
+            assertFalse(plan.updates.any { it.id == feeding.id })
+        }
+        val archived = ProcedureEntity(plantId = feeding.id, procedureName = feeding.taskName,
+            scheduledDate = feeding.creationDate, completedDate = feeding.creationDate, status = "COMPLETED",
+            drugName = feeding.drugName, note = "Запись архива")
+        val done = requireNotNull(ProgramUpdates.plan(original, listOf(archived), garden, metadata, LocalDate.of(2027, 4, 1)))
+        assertFalse(done.updates.any { it.id == feeding.id })
+        assertEquals("Запись архива", archived.note)
+        val past = requireNotNull(ProgramUpdates.plan(original, emptyList(), garden, metadata, LocalDate.of(2027, 6, 1)))
+        assertEquals(feeding.creationDate, past.updates.single { it.id == feeding.id }.creationDate)
+        val deleted = requireNotNull(ProgramUpdates.plan(original.filterNot { it.id == feeding.id }, emptyList(), garden, metadata,
+            LocalDate.of(2027, 4, 1)))
+        assertFalse(deleted.additions.any { programBaseStep(it.programStepId) == "nutrition" })
+        assertNull(ProgramUpdates.plan(original, emptyList(), garden.copy(climateSafeSpringDay = null), metadata, LocalDate.of(2027, 4, 1)))
+    }
+
+    @Test fun version22RowsWithoutFingerprintStillRecognizeTheirUnchangedRootDefaults() {
+        val (rows, metadata) = rootUpdateFixture()
+        val feeding = rows.single { programBaseStep(it.programStepId) == "nutrition" }
+        val plan = requireNotNull(ProgramUpdates.plan(rows.map { it.copy(programBaseline = null) }, emptyList(), garden, metadata,
+            LocalDate.of(2027, 4, 1)))
+        assertEquals("2027-04-25", plan.updates.single { it.id == feeding.id }.creationDate)
+    }
+
+    @Test fun version22LateStartIndividualFeedingsKeepTheirIdentityAndDeletedOccurrenceWhileReceivingTheClimateFloor() {
+        val previous = PlantCareCatalog.beforeRootTiming().single { it.id == "currant" }
+        val start = LocalDate.of(2027, 4, 10)
+        val program = CareProgramGenerator().generate(previous,
+            CareProgramContext(start, CultivationType.OPEN_GROUND, requireNotNull(garden.climateOrNull())), "late-roots")
+        val original = program.installedRows(garden.id, garden.name).mapIndexed { index, row -> row.copy(id = 700 + index, userEdited = false) }
+        val roots = original.filter { programBaseStep(it.programStepId) == "nutrition" }
+        assertEquals(3, roots.size)
+        assertTrue(roots.all { it.programStepId!!.contains(":remaining:") })
+        val removed = roots.first { it.programStepId!!.endsWith(":remaining:2") }
+        val remaining = original.filterNot { it.id == removed.id }
+        val metadata = program.installation().copy(appliedVersion = previous.version)
+        val plan = requireNotNull(ProgramUpdates.plan(remaining, emptyList(), garden, metadata, start))
+        val updated = plan.updates.filter { programBaseStep(it.programStepId) == "nutrition" }
+        assertEquals(roots.filterNot { it.id == removed.id }.map { it.id }.toSet(), updated.map { it.id }.toSet())
+        updated.forEach { row ->
+            val old = roots.single { it.id == row.id }
+            assertEquals(old.programStepId, row.programStepId)
+            assertEquals("NONE", row.repeatType)
+            assertNull(row.repeatCount)
+            assertEquals(LocalDate.parse(old.creationDate).year, LocalDate.parse(row.creationDate).year)
+            assertTrue(LocalDate.parse(row.creationDate) >= requireNotNull(garden.climateOrNull()).safeSpringDate(LocalDate.parse(row.creationDate).year))
+            assertFalse(row.userEdited)
+            assertTrue(row.programNote.contains(RootCareSchedule.SOIL_NOTICE))
+            assertEquals(row.programFingerprint(), row.programBaseline)
+        }
+        assertEquals("2028-04-25", updated.single { it.programStepId!!.endsWith(":remaining:1") }.creationDate)
+        assertTrue(plan.additions.isEmpty())
+        assertTrue(plan.removals.isEmpty())
+    }
+
+    @Test fun upgradingFiniteWateringSplitsOnlyUntouchedFutureSeriesAndKeepsAllEightWorks() {
+        val coldGarden = garden.copy(climateSafeSpringDay = "--06-01", climateSafeAutumnDay = "--09-10")
+        val previous = PlantCareCatalog.beforeRootTiming().single { it.id == "thuja" }
+        val cold = requireNotNull(coldGarden.climateOrNull())
+        val start = recommendedStartDate(previous, CultivationType.OPEN_GROUND, cold, 2027)
+        val program = CareProgramGenerator().generate(previous, CareProgramContext(start, CultivationType.OPEN_GROUND, cold), "cold-roots")
+        val original = program.installedRows(garden.id, garden.name).mapIndexed { index, row -> row.copy(id = 800 + index, userEdited = false) }
+        val watering = original.single { programBaseStep(it.programStepId) == "conifer_water" }
+        val metadata = program.installation().copy(appliedVersion = previous.version)
+        val plan = requireNotNull(ProgramUpdates.plan(original, emptyList(), coldGarden, metadata, LocalDate.of(2027, 5, 1)))
+        val water = (plan.updates + plan.additions).filter { programBaseStep(it.programStepId) == "conifer_water" }
+        assertEquals(8, water.size)
+        assertEquals(7, plan.additions.size)
+        assertEquals(watering.id, plan.updates.single { programBaseStep(it.programStepId) == "conifer_water" }.id)
+        assertTrue(water.all { it.repeatType == "NONE" && it.repeatCount == null && !it.userEdited && it.programBaseline == it.programFingerprint() })
+        assertEquals(8, water.map { it.programImportKey }.distinct().size)
+        assertEquals("2028-06-01", water.maxOf { it.creationDate })
+        assertTrue(plan.removals.isEmpty())
+        for (protected in listOf(watering.copy(userEdited = true), watering.copy(userLockedDate = true),
+            watering.copy(drugId = 100), watering.withProgramRepeat(14))) {
+            val saved = original.map { if (it.id == watering.id) protected else it }
+            val protectedPlan = requireNotNull(ProgramUpdates.plan(saved, emptyList(), coldGarden, metadata, LocalDate.of(2027, 5, 1)))
+            assertFalse(protectedPlan.updates.any { it.id == watering.id })
+            assertTrue(protectedPlan.additions.isEmpty())
+        }
+        for (status in listOf("COMPLETED", "PLANNED", "CANCELLED")) {
+            val record = ProcedureEntity(plantId = watering.id, procedureName = watering.taskName, scheduledDate = watering.creationDate,
+                completedDate = if (status == "COMPLETED") watering.creationDate else null, status = status, note = "Сохранённая история")
+            val protectedPlan = requireNotNull(ProgramUpdates.plan(original, listOf(record), coldGarden, metadata, LocalDate.of(2027, 5, 1)))
+            val saved = protectedPlan.updates.firstOrNull { it.id == watering.id } ?: watering
+            assertEquals(watering.creationDate, saved.creationDate)
+            assertEquals(watering.repeatCount, saved.repeatCount)
+            assertEquals(watering.programStepId, saved.programStepId)
+            assertTrue(protectedPlan.additions.isEmpty())
+            assertEquals("Сохранённая история", record.note)
+        }
+    }
+
+    @Test fun twoEarlyMaterializedFeedingsMoveTogetherInsteadOfCollapsingOntoTheClimateFloor() {
+        val previous = PlantCareCatalog.beforeRootTiming().single { it.id == "currant" }
+        val start = LocalDate.of(2027, 4, 10)
+        val program = CareProgramGenerator().generate(previous,
+            CareProgramContext(start, CultivationType.OPEN_GROUND, requireNotNull(garden.climateOrNull())), "early-pair")
+        val original = program.installedRows(garden.id, garden.name).mapIndexed { index, row ->
+            val suffix = row.programStepId.orEmpty().substringAfter(":remaining:", "")
+            val date = if (programBaseStep(row.programStepId) != "nutrition") row.creationDate else when (suffix) {
+                "1" -> "2027-03-01"
+                "2" -> "2027-04-15"
+                else -> "2027-05-30"
+            }
+            row.copy(id = 900 + index, creationDate = date, userEdited = false).let { it.copy(programBaseline = it.programFingerprint()) }
+        }
+        val plan = requireNotNull(ProgramUpdates.plan(original, emptyList(), garden,
+            program.installation().copy(appliedVersion = previous.version), LocalDate.of(2027, 2, 1)))
+        val dates = plan.updates.filter { programBaseStep(it.programStepId) == "nutrition" }.map { it.creationDate }.sorted()
+        assertEquals(listOf("2027-04-25", "2027-06-09", "2027-07-24"), dates)
+        assertTrue(plan.additions.isEmpty())
+        assertTrue(plan.removals.isEmpty())
+    }
+
+    @Test fun coldTomatoUpgradeCarriesTheLastFeedingAfterNextYearsRecommendedPlantingAndSpray() {
+        val coldGarden = garden.copy(climateSafeSpringDay = "--06-01", climateSafeAutumnDay = "--09-10")
+        val cold = requireNotNull(coldGarden.climateOrNull())
+        val previous = PlantCareCatalog.beforeRootTiming().single { it.id == "tomato" }.copy(version = 22)
+        val start = recommendedStartDate(previous, CultivationType.OPEN_GROUND, cold, 2027)
+        val program = CareProgramGenerator().generate(previous, CareProgramContext(start, CultivationType.OPEN_GROUND, cold), "cold-tomato")
+        val original = program.installedRows(garden.id, garden.name).mapIndexed { index, row -> row.copy(id = 1000 + index, userEdited = false) }
+        val plan = requireNotNull(ProgramUpdates.plan(original, emptyList(), coldGarden,
+            program.installation().copy(appliedVersion = 22), LocalDate.of(2027, 5, 1)))
+        val feedings = (plan.updates + plan.additions).filter { programBaseStep(it.programStepId) == "gumi_omi_feeding" }
+        assertEquals(6, feedings.size)
+        assertEquals(6, feedings.map { it.programImportKey }.distinct().size)
+        val carried = feedings.single { it.creationDate.startsWith("2028") }
+        assertEquals("2028-06-12", carried.creationDate)
+        assertTrue(LocalDate.parse(carried.creationDate) >= recommendedStartDate(previous, CultivationType.OPEN_GROUND, cold, 2028).plusDays(8))
+        assertTrue(feedings.all { !it.userEdited && it.repeatType == "NONE" })
+        assertTrue(plan.removals.isEmpty())
+    }
+
+    @Test fun upgradeDoesNotMergeMissedRoseFeedingWithTheColdTailInTheNextSeason() {
+        val coldGarden = garden.copy(climateSafeSpringDay = "--06-01", climateSafeAutumnDay = "--08-01")
+        val previous = PlantCareCatalog.beforeRootTiming().single { it.id == "rose" }
+        val start = LocalDate.of(2027, 7, 15)
+        val program = CareProgramGenerator().generate(previous,
+            CareProgramContext(start, CultivationType.OPEN_GROUND, requireNotNull(coldGarden.climateOrNull())), "rose-tail")
+        val original = program.installedRows(garden.id, garden.name).mapIndexed { index, row -> row.copy(id = 1100 + index, userEdited = false) }
+        val plan = requireNotNull(ProgramUpdates.plan(original, emptyList(), coldGarden,
+            program.installation().copy(appliedVersion = previous.version), start))
+        val feeding = plan.updates.filter { programBaseStep(it.programStepId) == "nutrition" }
+        assertEquals(3, feeding.size)
+        assertEquals(3, feeding.map { it.programStepId }.distinct().size)
+        val dates = feeding.map { LocalDate.parse(it.creationDate) }.sorted()
+        assertEquals(3, dates.distinct().size)
+        dates.groupBy { it.year }.values.forEach { year -> year.zipWithNext().forEach { (first, second) ->
+            assertTrue(java.time.temporal.ChronoUnit.DAYS.between(first, second) >= 45)
+        } }
+        assertTrue(feeding.all { !it.userEdited && it.programBaseline == it.programFingerprint() })
+        assertTrue(plan.additions.isEmpty())
+        assertTrue(plan.removals.isEmpty())
+    }
+
     @Test fun updateAddsOnlyNewStepsAndPreservesEditsDeletedStepsHistoryAndCustomWorks() {
         val original = originalRows()
         val rows = original.filterNot { it.programStepId == "deleted" }.map {

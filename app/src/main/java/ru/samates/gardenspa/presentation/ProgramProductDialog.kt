@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -72,7 +71,6 @@ internal fun ProgramProductDialog(
     var addingCustom by remember { mutableStateOf(false) }
     var dateText by rememberSaveable { mutableStateOf(maxOf(initialDate, minimumDate).toString()) }
     var reminder by rememberSaveable { mutableStateOf(initialReminder) }
-    var confirmed by rememberSaveable { mutableStateOf(false) }
     var datePickerOpen by remember { mutableStateOf(false) }
     var productQuery by rememberSaveable { mutableStateOf("") }
     val scroll = rememberScrollState()
@@ -84,7 +82,7 @@ internal fun ProgramProductDialog(
         ?: options.firstOrNull { it.id == selectedId }
     val goBack: () -> Unit = {
         if (!saving) when {
-            selected != null -> { selectedId = null; customProduct = null; confirmed = false }
+            selected != null -> { selectedId = null; customProduct = null }
             afterInspection && choosingProduct -> choosingProduct = false
             else -> onDismiss()
         }
@@ -107,7 +105,6 @@ internal fun ProgramProductDialog(
                             ProductChoice(type.displayName, cultivation == type, !saving && initialCultivation == null) {
                                 cultivationName = type.name
                                 selectedId = null
-                                confirmed = false
                             }
                         }
                         if (initialCultivation != null) Text("Условия выращивания взяты из выбранной программы.", color = Mist)
@@ -152,7 +149,6 @@ internal fun ProgramProductDialog(
                                     product.unavailableReason?.let { Text(it, color = Danger) }
                                     SecondaryAction("Подробнее: ${product.name}", {
                                         selectedId = product.id
-                                        confirmed = false
                                     }, Modifier.fillMaxWidth(), enabled = !saving)
                                 }
                             }
@@ -179,12 +175,6 @@ internal fun ProgramProductDialog(
                             listOf(0 to "В день процедуры", 1 to "За 1 день", 5 to "За 5 дней").forEach { (days, label) ->
                                 ProductChoice(label, reminder == days, !saving) { reminder = days }
                             }
-                            Row(Modifier.fillMaxWidth().clickable(enabled = !saving, role = Role.Checkbox) { confirmed = !confirmed },
-                                verticalAlignment = Alignment.CenterVertically) {
-                                Checkbox(checked = confirmed, onCheckedChange = null, enabled = !saving)
-                                Text("Я сверил(а) этикетку: средство подходит для моей культуры, цели и условий", color = Cream,
-                                    modifier = Modifier.weight(1f))
-                            }
                         }
                     }
                     error?.let { Text(it, color = Danger) }
@@ -197,8 +187,8 @@ internal fun ProgramProductDialog(
                         val custom = customProduct
                         if (custom != null) onCustomConfirm?.invoke(custom, problemId, cultivation ?: CultivationType.OPEN_GROUND, LocalDate.parse(dateText), reminder)
                         else onConfirm(selected.id, problemId, cultivation ?: CultivationType.OPEN_GROUND, LocalDate.parse(dateText), reminder)
-                    }, Modifier.fillMaxWidth(), enabled = !saving && confirmed && selected.unavailableReason == null)
-                    SecondaryAction("К списку препаратов", { selectedId = null; customProduct = null; confirmed = false }, Modifier.fillMaxWidth(), enabled = !saving)
+                    }, Modifier.fillMaxWidth(), enabled = !saving && selected.unavailableReason == null)
+                    SecondaryAction("К списку препаратов", { selectedId = null; customProduct = null }, Modifier.fillMaxWidth(), enabled = !saving)
                 } else if (afterInspection) {
                     SecondaryAction("Изменить проблему или грунт", { choosingProduct = false }, Modifier.fillMaxWidth(), enabled = !saving)
                 }
@@ -207,7 +197,7 @@ internal fun ProgramProductDialog(
         }
     }
     if (addingCustom) AddDrugDialog(onDismiss = { addingCustom = false }, onSaved = {
-        customProduct = it; selectedId = null; confirmed = false; addingCustom = false
+        customProduct = it; selectedId = null; addingCustom = false
     })
     if (datePickerOpen) {
         GardenDatePickerDialog("Дата обработки", LocalDate.parse(dateText), { date ->
