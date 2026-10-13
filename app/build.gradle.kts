@@ -20,7 +20,7 @@ val weatherApiProxyUrl = System.getenv("WEATHERAPI_PROXY_URL")
     ?.takeIf { it.isNotBlank() }
     ?: localProperties.getProperty("WEATHERAPI_PROXY_URL")
         ?.takeIf { it.isNotBlank() }
-    ?: "https://gardenspa-weather-api.pukpukyc96.chatgpt.site/api/weather"
+    ?: "https://gardenspa-weather-api.egorkagangster.chatgpt.site/api/weather"
 fun String.asBuildConfigString(): String =
     "\"${trim().replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
